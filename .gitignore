@@ -12,3 +12,6 @@ reports/figures/*.pdf
 .env
 .vscode/
 .idea/
+claude.md
+# baseline congelado mantém outputs
+!docs/baseline/Baseline_TCC.ipynb
