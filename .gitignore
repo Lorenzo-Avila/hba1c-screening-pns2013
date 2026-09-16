@@ -15,3 +15,4 @@ reports/figures/*.pdf
 claude.md
 # baseline congelado mantém outputs
 !docs/baseline/Baseline_TCC.ipynb
+docs/controle_interno
