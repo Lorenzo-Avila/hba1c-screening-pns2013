@@ -1,12 +1,8 @@
-"""Diagnóstico de multicolinearidade: Pearson entre contínuas + VIF (§6.5).
+"""Diagnóstico de multicolinearidade: Pearson entre contínuas + VIF.
 
-A §6.5 exige **duas** ferramentas, e ambas são obrigatórias. O baseline entregou
-apenas o VIF, e calculado sobre o bloco numérico cru — `has_combinada` (binária) e
-`has_autorrelato` (nominal) ficaram fora do diagnóstico, razão pela qual a
-redundância de D-001 passou despercebida. Aqui o VIF roda sobre a **matriz de
-design pós-transformação**, dummies incluídas (D-002).
+Aqui o VIF roda sobre a matriz de design pós-transformação, dummies incluídas.
 
-Tudo é ajustado no treino (R2). `peso_lab` não entra em nenhuma função (R10).
+Tudo é ajustado no treino. `peso_lab` não entra em nenhuma função.
 """
 
 from __future__ import annotations
@@ -60,9 +56,9 @@ def matriz_pearson(X_train: pd.DataFrame, cols_continuas: list[str]) -> pd.DataF
 def pares_pearson(matriz: pd.DataFrame, feature_set: str = "") -> pd.DataFrame:
     """Converte a matriz de Pearson na lista de pares, ordenada por |r|.
 
-    A §6.5 cobra as duas ferramentas como **resultado**, não como inspeção visual:
-    o heatmap comunica o padrão, mas os coeficientes precisam estar em tabela para
-    entrar no texto e serem citados individualmente.
+    Cobra as duas ferramentas como resultado, não como inspeção visual. O heatmap
+    comunica o padrão, mas os coeficientes precisam estar em tabela para entrar no
+    texto e serem citados individualmente.
 
     Returns:
         DataFrame com `feature_set`, `var_1`, `var_2`, `pearson` e `abs_pearson`,

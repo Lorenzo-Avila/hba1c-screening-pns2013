@@ -1,4 +1,4 @@
-"""Testes dos comparadores não-ML (§7 da spec · D-006).
+"""Testes dos comparadores.
 
 A regra ADA precisa ser exatamente a regra: determinística, em escala clínica, sem
 nada estimado. E precisa atravessar o mesmo harness dos modelos, sobre as mesmas

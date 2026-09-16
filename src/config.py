@@ -1,8 +1,10 @@
 """Constantes, caminhos, mapeamentos e semente do projeto.
 
-Fonte única de verdade para parâmetros metodológicos. Qualquer valor usado por
-mais de um módulo de `src/` mora aqui — nunca replicado em notebook.
-
+Modulo criado para consolidar, em fonte única, os parâmetros metodológicos definidos ao longo de todo o projeto.
+Todo valor utilizado por mais de um módulo de `src/` deve estar
+exclusivamente aqui, nunca replicado em notebooks, de modo que nenhuma
+divergência silenciosa possa comprometer a rastreabilidade das decisões que
+sustentam a metodologia.
 """
 
 from pathlib import Path
@@ -13,9 +15,9 @@ TEST_SIZE = 0.20
 CV_FOLDS = 5
 
 # --- Critérios clínicos e diagnósticos ---
-LIMIAR_HBA1C = 6.5   # critério ADA 2010 
+LIMIAR_HBA1C = 6.5   # critério ADA 2010
 VIF_LIMIAR = 10      # §6.5
-RECALL_ALVO = 0.80   # EXTRAPOLAÇÃO 
+RECALL_ALVO = 0.80   # provisório — confirmar com orientador antes da pré-banca (D-004)
 
 # --- Caminhos ---
 RAIZ = Path(__file__).resolve().parents[1]
@@ -43,8 +45,10 @@ ALVO_CONTINUO = "hba1c"
 ALVO = "target"
 PESO = "peso_lab"
 
-# Preditoras conceituais devolvidas por `separar`. `peso_kg` e `altura_cm` saem:
-# entram no modelo apenas pelas derivadas `imc` e `rcest` (§6.4.1).
+# Preditoras conceituais devolvidas por `separar`. `peso_kg` e `altura_cm` foram
+# deliberadamente excluídas desta lista, de forma que passam a integrar o modelo
+# tão somente por meio das derivadas `imc` e `rcest`, conforme estabelecido na
+# §6.4.1.
 PREDITORAS = ["idade", "sexo", "imc", "circ_cintura", "rcest", "pas", "pad",
               "has_autorrelato", "colesterol_alto", "raca_cor", "escolaridade",
               "plano_saude", "regiao", "saude_autoaval"]

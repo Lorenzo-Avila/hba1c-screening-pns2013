@@ -59,28 +59,25 @@ def limpar(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
-    # 1. Conversão de tipos.
     for col in cfg.CONTINUAS + [cfg.ALVO_CONTINUO, cfg.PESO]:
         df[col] = _para_numero(df[col]).astype("float64")
     for col in cfg.CATEGORICAS:
         df[col] = _para_numero(df[col]).astype("Int64")
 
-    # 2. Decodificação de ausência: "Ignorado" não é categoria, é não resposta.
+    # "Ignorado" não é categoria, é não resposta.
     df["raca_cor"] = df["raca_cor"].replace(cfg.COD_IGNORADO_RACA, pd.NA)
 
-    # 3. Remoção de duplicados idênticos.
     df = df.drop_duplicates().reset_index(drop=True)
 
-    # 4. Exclusões. Sem HbA1c válida, o registro sai da base (R3).
+    # Sem HbA1c válida, o registro sai da base (R3).
     sem_alvo = df[cfg.ALVO_CONTINUO].isna()
     sem_medicao = df[cfg.MEDICAO].isna().all(axis=1)
     df = df[~sem_alvo & ~sem_medicao].reset_index(drop=True)
 
-    # 5. Derivadas row-wise (§6.4.1).
-    df["imc"] = df["peso_kg"] / (df["altura_cm"] / 100.0) ** 2   # fórmula de Quetelet
-    df["rcest"] = df["circ_cintura"] / df["altura_cm"]           # razão cintura-estatura
+    df["imc"] = df["peso_kg"] / (df["altura_cm"] / 100.0) ** 2   # Quetelet
+    df["rcest"] = df["circ_cintura"] / df["altura_cm"]
 
-    # 6. Desfecho binário: hiperglicemia crônica clinicamente significativa (§6.3.1).
+    # Desfecho: hiperglicemia crônica clinicamente significativa (§6.3.1).
     df[cfg.ALVO] = (df[cfg.ALVO_CONTINUO] >= cfg.LIMIAR_HBA1C).astype(int)
 
     return df

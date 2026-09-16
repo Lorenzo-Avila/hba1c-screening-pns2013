@@ -1,8 +1,4 @@
-"""Comparadores não-ML (§7 da spec · D-006).
-
-O TCC I posiciona FINDRISC e BrDMrisc como o estado da arte do qual o trabalho se
-diferencia (§2, §5), mas não estabelece comparador executável. Sem um, "o modelo
-funciona" não tem contra o quê ser medido.
+"""Comparadores não-ML.
 
 Dois pisos, avaliados pelo mesmo `evaluate.avaliar` e sobre as mesmas partições:
 
@@ -13,11 +9,11 @@ Dois pisos, avaliados pelo mesmo `evaluate.avaliar` e sobre as mesmas partiçõe
   entrega ~0,93 de acurácia e recall zero. Existe para exibir a armadilha da
   acurácia, não para competir.
 
-**Critério de sucesso (§7):** o modelo deve superar a regra clínica em Recall **com
-NNS menor**. Resultado negativo é legítimo e deve ser reportado.
+Critério de sucesso: o modelo deve superar a regra clínica em Recall com
+NNS menor. Resultado negativo é legítimo e deve ser reportado.
 
-**Sobre FINDRISC e BrDMrisc:** não são reproduzíveis nesta base. Exigem histórico
-familiar e variáveis comportamentais, excluídas por R5 (§6.3.2 princípio 3). O
+Sobre FINDRISC e BrDMrisc: não são reproduzíveis nesta base. Exigem histórico
+familiar e variáveis comportamentais, excluídas por decisão metodológica. O
 BrDMrisc, além disso, é escore de incidência derivado de coorte longitudinal,
 incompatível com o desenho transversal da PNS 2013. Documentar a impossibilidade é
 resultado, não limitação omitida.
