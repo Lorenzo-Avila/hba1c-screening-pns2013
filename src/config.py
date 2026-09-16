@@ -20,7 +20,8 @@ RECALL_ALVO = 0.80   # EXTRAPOLAÇÃO
 # --- Caminhos ---
 RAIZ = Path(__file__).resolve().parents[1]
 PATH_RAW = RAIZ / "data" / "raw" / "EXAMES_PNS_2013_BRUTA.csv"
-PATH_FIGURAS = RAIZ / "reports" / "figures"
+PATH_REPORTS = RAIZ / "reports"
+PATH_FIGURAS = PATH_REPORTS / "figures"
 
 # --- De-para: código oficial PNS 2013 -> nome legível (rastreabilidade com o TCC) ---
 DE_PARA = {

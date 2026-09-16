@@ -49,17 +49,30 @@ def test_A_tem_ortogonalidade_plena():
     assert ft.fontes_em_canal_duplo("A_atomico") == set()
 
 
-def test_A_e_B_sem_componente_isolado_e_agregado():
-    """Invariante da §4.1: nenhuma fonte entra isolada e dentro de agregada ao mesmo tempo.
-
-    Em A o conjunto é vazio por não haver agregadas. Em B a sobreposição residual
-    existe, mas se restringe ao bloco antropométrico, via componente de obesidade
-    do escore — nenhum componente crítico se repete (ver D-012).
-    """
+def test_A_e_B_cumprem_o_invariante_estrito():
+    """Nenhuma fonte entra como coluna própria e parcela idêntica de agregada (§4.2 v2)."""
     assert ft.fontes_isoladas_e_agregadas("A_atomico") == set()
-    residual_b = ft.fontes_isoladas_e_agregadas("B_composto")
-    assert residual_b.isdisjoint(COMPONENTES_CRITICOS)
-    assert residual_b == {"peso_kg", "altura_cm", "circ_cintura", "sexo"}
+    assert ft.fontes_isoladas_e_agregadas("B_composto") == set()
+
+
+def test_B_tem_sobreposicao_apenas_por_coarsening():
+    """A redundância admitida em B é antropométrica e binarizada por corte clínico."""
+    coarsening_b = ft.fontes_em_coarsening("B_composto")
+    assert coarsening_b == {"peso_kg", "altura_cm", "circ_cintura", "sexo"}
+    # Nada de diagnóstico autorrelatado nem de pressão aferida.
+    assert coarsening_b.isdisjoint(COMPONENTES_CRITICOS)
+
+
+def test_B_nao_carrega_has_combinada_ao_lado_do_escore():
+    """D-012: `has_combinada` é parcela literal de `multimorbidade`.
+
+    Mantê-la ao lado do escore reproduziria em B a violação que a §4.1 acusa no
+    baseline, e o modelo recuperaria a parcela linearmente — esvaziando a
+    hipótese de sinergia que B existe para testar.
+    """
+    colunas = ft.colunas_do_conjunto("B_composto")
+    assert "has_combinada" not in colunas
+    assert "multimorbidade" in colunas
 
 
 @pytest.mark.parametrize("nome", ["A_atomico", "B_composto"])
@@ -79,9 +92,10 @@ def test_diagnostico_autorrelatado_entra_uma_unica_vez(nome):
 
 
 def test_C_reproduz_a_redundancia_do_baseline():
-    """C existe para quantificar o custo da redundância — ela precisa estar lá."""
+    """Falha se a redundância desaparecer: em C ela é proposital (§4.2 v2)."""
     duplicadas = ft.fontes_isoladas_e_agregadas("C_completo")
     assert {"has_autorrelato", "colesterol_alto"} <= duplicadas
+    assert "has_combinada" in ft.colunas_do_conjunto("C_completo")
 
 
 def test_rcest_apenas_em_C():
@@ -134,7 +148,7 @@ def test_conjunto_desconhecido_falha_alto():
 def test_compostas_sao_transformador_nao_funcao_de_dataframe():
     """R2: as compostas dependem de imputação, logo só existem dentro do pipeline."""
     pre = ft.construir_preprocessador("B_composto")
-    assert [nome for nome, _ in pre.steps] == ["imputacao", "compostas", "seletor"]
+    assert [nome for nome, _ in pre.steps] == ["imputacao", "compostas", "preparo"]
     assert isinstance(pre.named_steps["compostas"], ft.ConstrutorCompostas)
     assert isinstance(pre.named_steps["imputacao"], ft.ImputadorPNS)
 
@@ -223,7 +237,7 @@ def test_imputacao_ajustada_apenas_no_treino(split):
     pre = ft.construir_preprocessador("A_atomico")
     pre.fit(X_train, y_train)
 
-    escalonador = pre.named_steps["seletor"].named_transformers_["num"]
+    escalonador = pre.named_steps["preparo"].named_transformers_["num"]
     assert escalonador.n_samples_seen_ == len(X_train)
     # Transformar só uma fatia do teste dá o mesmo resultado que transformar tudo:
     # prova de que nenhuma estatística é recalculada em `transform`.
@@ -237,7 +251,7 @@ def test_raca_cor_gera_quatro_dummies(split):
     X_train, _, y_train, _ = split
     pre = ft.construir_preprocessador("A_atomico")
     pre.fit(X_train, y_train)
-    nomes = list(pre.named_steps["seletor"].get_feature_names_out())
+    nomes = list(pre.named_steps["preparo"].get_feature_names_out())
     assert len([n for n in nomes if n.startswith("raca_cor_")]) == 4
 
 
@@ -389,4 +403,4 @@ def test_escalonador_interno_ajustado_apenas_no_treino(split):
     assert not np.allclose(metrico_teste[imp.continuas_].mean(), 0.0, atol=1e-9)
     # E o escalonador do ColumnTransformer segue sendo outro, intacto.
     pre = ft.construir_preprocessador("C_completo").fit(X_train)
-    assert pre.named_steps["seletor"].named_transformers_["num"] is not imp.escalonador_
+    assert pre.named_steps["preparo"].named_transformers_["num"] is not imp.escalonador_

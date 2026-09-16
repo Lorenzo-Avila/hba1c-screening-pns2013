@@ -41,13 +41,12 @@ FEATURE_SETS = {
         "bin": ["sexo_fem", "plano_sim"],
         "nom": ["raca_cor", "regiao", "has_autorrelato", "colesterol_alto"],
     },
-    # B — agregado: usa as compostas justificadas na §6.4.1, sem repetir os
-    #     componentes de diagnóstico autorrelatado como colunas próprias.
-    #     Testa a hipótese de captura de interações sinérgicas do escore ordinal.
+    # B — agregado: o escore ordinal SUBSTITUI seus componentes de diagnóstico e
+    #     pressão. Só assim a hipótese de sinergia da §6.4.1 é testável (D-012).
     "B_composto": {
         "num": ["idade", "imc", "circ_cintura",
                 "escolaridade", "saude_autoaval", "multimorbidade"],
-        "bin": ["sexo_fem", "plano_sim", "has_combinada"],
+        "bin": ["sexo_fem", "plano_sim"],
         "nom": ["raca_cor", "regiao"],
     },
     # C — completo: as 16 variáveis conceituais do TCC I, com RCEst.
@@ -86,6 +85,26 @@ FONTES = {
 # Colunas que embutem outras variáveis conceituais (§4.4).
 AGREGADAS = {"has_combinada", "multimorbidade"}
 
+# Como cada fonte entra numa agregada (§4.2 da v2). A distinção decide qual
+# invariante de ortogonalidade cada conjunto cumpre.
+#
+# PARCELA_IDENTICA — a agregada soma exatamente o que a coluna própria já
+# informa. `has_autorrelato == 1` dentro de `has_combinada` não acrescenta nada
+# ao que o one-hot da nominal já representa: é o mesmo canal, duas vezes.
+#
+# COARSENING — a agregada usa a fonte binarizada por ponto de corte clínico. O
+# gradiente contínuo carrega sinal que o limiar descarta, então coluna própria e
+# agregada não são o mesmo canal. `sexo` entra aqui por selecionar qual corte de
+# cintura se aplica, não por ser parcela do escore.
+PARCELA_IDENTICA = {
+    "has_combinada": {"has_autorrelato"},
+    "multimorbidade": {"has_autorrelato", "colesterol_alto"},
+}
+COARSENING = {
+    "has_combinada": {"pas", "pad"},
+    "multimorbidade": {"pas", "pad", "peso_kg", "altura_cm", "circ_cintura", "sexo"},
+}
+
 # Variáveis de diagnóstico autorrelatado — as que o baseline duplicava (§4.1, D-001).
 DIAGNOSTICO_AUTORRELATADO = {"has_autorrelato", "colesterol_alto"}
 
@@ -117,35 +136,51 @@ def fontes_em_canal_duplo(nome: str) -> set[str]:
     return {fonte for fonte, n in contagem.items() if n > 1}
 
 
-def fontes_isoladas_e_agregadas(nome: str) -> set[str]:
-    """Variáveis cruas presentes ao mesmo tempo como coluna própria e dentro de agregada.
-
-    Esta é a forma exata da violação descrita na §4.1: no baseline,
-    `has_autorrelato` entrava como nominal isolada **e** dentro de
-    `has_combinada` e `multimorbidade`; `colesterol_alto`, como binária isolada
-    **e** dentro do escore. O SHAP não consegue sinalizar que a agregada é a soma
-    de componentes já presentes no modelo, e o coeficiente de cada um se dilui.
-
-    Distingue-se de `fontes_em_canal_duplo`, que também conta a sobreposição
-    **entre agregadas** — em B, `multimorbidade` contém `has_combinada` por
-    construção, e o componente de obesidade do escore reusa `imc`, `circ_cintura`
-    e `sexo`. Essa redundância residual é inerente ao desenho do escore da §6.4.1
-    e é justamente o que o VIF da etapa 3 vai quantificar; ver D-012.
-    """
-    colunas = colunas_do_conjunto(nome)
-    isoladas = {
+def _fontes_isoladas(nome: str) -> set[str]:
+    """Fontes que chegam ao modelo por coluna não agregada."""
+    return {
         fonte
-        for coluna in colunas
+        for coluna in colunas_do_conjunto(nome)
         if coluna not in AGREGADAS
         for fonte in FONTES[coluna]
     }
-    componentes = {
+
+
+def _fontes_dentro_de_agregadas(nome: str, mapa: dict[str, set[str]]) -> set[str]:
+    """Fontes que entram nas agregadas presentes no conjunto, pelo modo dado."""
+    return {
         fonte
-        for coluna in colunas
+        for coluna in colunas_do_conjunto(nome)
         if coluna in AGREGADAS
-        for fonte in FONTES[coluna]
+        for fonte in mapa.get(coluna, set())
     }
-    return isoladas & componentes
+
+
+def fontes_isoladas_e_agregadas(nome: str) -> set[str]:
+    """Invariante estrito: fonte como coluna própria **e** parcela idêntica de agregada.
+
+    É a forma exata da violação descrita na §4.1: no baseline, `has_autorrelato`
+    entrava como nominal isolada **e** dentro de `has_combinada` e
+    `multimorbidade`; `colesterol_alto`, como binária isolada **e** dentro do
+    escore. O SHAP não consegue sinalizar que a agregada é a soma de componentes
+    já presentes no modelo, e o coeficiente de cada um se dilui.
+
+    Cumprido por A e B (conjunto vazio). Violado por C, deliberadamente — C existe
+    para quantificar o custo dessa redundância.
+    """
+    return _fontes_isoladas(nome) & _fontes_dentro_de_agregadas(nome, PARCELA_IDENTICA)
+
+
+def fontes_em_coarsening(nome: str) -> set[str]:
+    """Fontes como coluna própria **e** binarizadas por corte clínico numa agregada.
+
+    Sobreposição admitida, não violação: o limiar descarta o gradiente que a
+    coluna contínua preserva, então os dois canais carregam informação distinta.
+    Em B são `peso_kg`, `altura_cm`, `circ_cintura` e `sexo`, pelo componente de
+    obesidade do escore. A magnitude dessa redundância é medida pelo VIF da etapa
+    3, nunca presumida (D-012).
+    """
+    return _fontes_isoladas(nome) & _fontes_dentro_de_agregadas(nome, COARSENING)
 
 
 # ---------------------------------------------------------------------------
@@ -420,12 +455,33 @@ class ConstrutorCompostas(BaseEstimator, TransformerMixin):
 # ---------------------------------------------------------------------------
 
 
-def construir_preprocessador(feature_set: str) -> Pipeline:
+def conjunto_sem(feature_set: str, *variaveis: str) -> dict[str, list[str]]:
+    """Devolve o conjunto de atributos sem as variáveis indicadas.
+
+    Serve ao protocolo da §6.5, que autoriza remover experimentalmente a variável
+    de maior VIF dentro de um mesmo bloco temático e recalcular o diagnóstico. O
+    conjunto derivado não é registrado em `FEATURE_SETS`: é objeto de análise, não
+    um quarto conjunto de modelagem.
+    """
+    base = FEATURE_SETS[feature_set]
+    remover = set(variaveis)
+    desconhecidas = remover - set(colunas_do_conjunto(feature_set))
+    if desconhecidas:
+        raise ValueError(
+            f"{feature_set} não contém {sorted(desconhecidas)}"
+        )
+    return {bloco: [c for c in colunas if c not in remover]
+            for bloco, colunas in base.items()}
+
+
+def construir_preprocessador(feature_set: str | dict) -> Pipeline:
     """Monta o preprocessador completo de um conjunto de atributos.
 
     Args:
         feature_set: chave de `FEATURE_SETS` (`"A_atomico"`, `"B_composto"`,
-            `"C_completo"`).
+            `"C_completo"`) ou um conjunto literal `{"num": [...], "bin": [...],
+            "nom": [...]}`, como o devolvido por `conjunto_sem` — usado nas
+            ablações da §6.5.
 
     Returns:
         `Pipeline` de três estágios: imputação por KNN (ajustada só no treino),
@@ -436,14 +492,20 @@ def construir_preprocessador(feature_set: str) -> Pipeline:
     estágios anteriores precisam de todas as preditoras cruas para imputar e para
     compor, inclusive as que não entram no modelo.
     """
-    if feature_set not in FEATURE_SETS:
+    if isinstance(feature_set, dict):
+        cj = feature_set
+        faltando = {"num", "bin", "nom"} - set(cj)
+        if faltando:
+            raise ValueError(f"Conjunto literal sem os blocos {sorted(faltando)}")
+    elif feature_set not in FEATURE_SETS:
         raise ValueError(
             f"Conjunto desconhecido: {feature_set!r}. "
             f"Disponíveis: {sorted(FEATURE_SETS)}"
         )
-    cj = FEATURE_SETS[feature_set]
+    else:
+        cj = FEATURE_SETS[feature_set]
 
-    seletor = ColumnTransformer(
+    preparo = ColumnTransformer(
         transformers=[
             ("num", StandardScaler(), cj["num"]),
             ("bin", "passthrough", cj["bin"]),
@@ -457,5 +519,5 @@ def construir_preprocessador(feature_set: str) -> Pipeline:
     return Pipeline([
         ("imputacao", ImputadorPNS()),
         ("compostas", ConstrutorCompostas()),
-        ("seletor", seletor),
+        ("preparo", preparo),
     ])
