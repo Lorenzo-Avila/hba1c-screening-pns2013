@@ -268,6 +268,171 @@ def test_comparar_traz_assinadas_antes_das_complementares(resultados):
     assert {"vp", "fp", "fn", "vn"} <= set(tabela.columns)
 
 
+# ---------------------------------------------------------------------------
+# Dispersão entre folds
+# ---------------------------------------------------------------------------
+
+
+def test_metricas_por_fold_cobrem_o_treino_inteiro(split, resultados):
+    """Cinco folds disjuntos que somam o conjunto de treino (§6.3 fase 5)."""
+    X_train, _, _, _ = split
+    for r in resultados:
+        por_fold = r["metricas_por_fold"]
+        assert len(por_fold) == cfg.CV_FOLDS
+        assert por_fold["n"].sum() == len(X_train)
+        assert set(ev.METRICAS_ASSINADAS) <= set(por_fold.columns)
+
+
+def test_dispersao_presente_para_cada_metrica_assinada(resultados):
+    """Sem dispersão não há como julgar se a diferença entre conjuntos é sinal."""
+    for r in resultados:
+        for metrica in ev.METRICAS_ASSINADAS:
+            media, dp = r[f"{metrica}_cv_media"], r[f"{metrica}_cv_dp"]
+            assert np.isfinite(media) and np.isfinite(dp)
+            assert 0.0 <= media <= 1.0
+            assert dp >= 0.0
+
+
+def test_resumir_folds_confere_com_o_dataframe(resultados):
+    for r in resultados:
+        esperado = ev.resumir_folds(r["metricas_por_fold"])
+        for chave, valor in esperado.items():
+            assert r[chave] == pytest.approx(valor)
+
+
+def test_folds_reconstruidos_sao_os_da_validacao_cruzada(split):
+    """Mesma semente, mesmas partições: a média dos folds bate com o agregado."""
+    X_train, _, y_train, _ = split
+    est = _logreg("A_atomico")
+    proba_cv = ev.probabilidades_por_cv(est, X_train, y_train)
+    escolha = ev.selecionar_limiar(y_train, proba_cv, cfg.RECALL_ALVO)
+    por_fold = ev.metricas_por_fold(y_train, proba_cv, escolha["limiar"],
+                                    X_tr=X_train)
+
+    # Folds de tamanho igual: a média simples aproxima o recall agregado.
+    assert por_fold["recall"].mean() == pytest.approx(escolha["recall_cv"], abs=0.01)
+
+
+def test_comparar_traz_media_e_dp_ao_lado_do_teste(resultados):
+    tabela = ev.comparar(resultados)
+    for metrica in ev.METRICAS_ASSINADAS:
+        assert {metrica, f"{metrica}_cv_media", f"{metrica}_cv_dp"} <= set(tabela.columns)
+        # O valor de teste vem imediatamente antes da sua dispersão.
+        colunas = list(tabela.columns)
+        assert colunas.index(metrica) + 1 == colunas.index(f"{metrica}_cv_media")
+
+
+def test_comparar_formatado_exibe_media_e_dp(resultados):
+    tabela = ev.comparar_formatado(resultados)
+    assert len(tabela) == 3
+    for metrica in ev.METRICAS_ASSINADAS:
+        assert tabela[metrica].str.contains("±").all()
+
+
+# ---------------------------------------------------------------------------
+# Calibração — o número, não só a figura
+# ---------------------------------------------------------------------------
+
+
+def test_brier_trivial_e_a_variancia_da_prevalencia():
+    y = np.repeat([0, 1], [930, 70])
+    p = y.mean()
+    assert ev.brier_trivial(y) == pytest.approx(p * (1 - p))
+
+
+def test_tabela_calibracao_particiona_o_teste(split, resultados):
+    _, X_test, _, _ = split
+    for r in resultados:
+        tabela = r["calibracao"]["tabela"]
+        assert tabela["n"].sum() == len(X_test)
+        assert (tabela["proba_media"].between(0, 1)).all()
+        assert (tabela["freq_observada"].between(0, 1)).all()
+
+
+def test_probabilidades_infladas_por_class_weight(resultados):
+    """Hipótese confirmada: `class_weight='balanced'` desloca o nível, não a forma.
+
+    O modelo é treinado como se as classes fossem equilibradas, então a
+    probabilidade média sai perto de 0,4 contra prevalência de 0,07. Discriminação
+    (slope ≈ 1) preservada; nível (intercepto ≈ logito da prevalência) deslocado.
+    """
+    for r in resultados:
+        cal = r["calibracao"]
+        assert cal["razao_inflacao"] > 4.0
+        assert cal["proba_media"] > 5 * cal["prevalencia"]
+        # Pior que prever sempre a prevalência.
+        assert r["brier_skill"] < 0
+        assert r["brier"] > r["brier_trivial"]
+        # Forma preservada, nível deslocado.
+        assert 0.7 < cal["slope"] < 1.2
+        assert cal["intercepto"] < -2.0
+
+
+def test_intercepto_reproduz_o_logito_da_prevalencia(split, resultados):
+    """O deslocamento é exatamente o reponderamento de classes, não ruído."""
+    _, _, y_train, _ = split
+    p = float(np.mean(y_train))
+    logito_prevalencia = np.log(p / (1 - p))
+
+    for r in resultados:
+        assert r["calibracao"]["intercepto"] == pytest.approx(
+            logito_prevalencia, abs=0.1
+        )
+
+
+def test_modelo_bem_calibrado_tem_slope_um_e_intercepto_zero():
+    """Controle: com probabilidades honestas, o diagnóstico acusa calibração boa."""
+    rng = np.random.default_rng(cfg.RANDOM_STATE)
+    proba = rng.uniform(0.01, 0.99, 40_000)
+    y = rng.binomial(1, proba)
+
+    cal = ev.diagnostico_calibracao(y, proba)
+    assert cal["slope"] == pytest.approx(1.0, abs=0.12)
+    assert cal["intercepto"] == pytest.approx(0.0, abs=0.12)
+    assert cal["razao_inflacao"] == pytest.approx(1.0, abs=0.05)
+    assert cal["ece"] < 0.02
+    assert cal["brier_skill"] > 0  # melhor que o previsor trivial
+
+
+def test_tabela_calibracao_comparada_uma_linha_por_conjunto(resultados):
+    tabela = ev.tabela_calibracao_comparada(resultados)
+    assert len(tabela) == 3
+    assert {"brier", "brier_trivial", "brier_skill", "razao_inflacao",
+            "ece", "slope", "intercepto"} <= set(tabela.columns)
+
+
+def test_corte_unico_detectado_pela_saida(resultados):
+    """Modelo com escore contínuo não é classificador de corte único."""
+    for r in resultados:
+        assert r["corte_unico"] is False
+        assert len(np.unique(r["proba_teste"])) > 2
+
+
+def test_nota_de_rodape_ausente_sem_corte_unico(resultados):
+    """Sem linhas de corte único, não há advertência a fazer."""
+    tabela = ev.comparar(resultados)
+    assert ev.nota_corte_unico(tabela) == ""
+
+
+def test_nota_de_rodape_gerada_automaticamente(resultados, tmp_path):
+    """A advertência depende do conteúdo, não de alguém lembrar de pedi-la."""
+    com_corte = ev.comparar(resultados)
+    com_corte.loc[0, "corte_unico"] = True
+    com_corte.loc[0, "modelo"] = "Regra ADA"
+
+    nota = ev.nota_corte_unico(com_corte)
+    assert "Regra ADA" in nota
+    assert "AUC-ROC" in nota and "NNS" in nota
+
+    destino = ev.exportar_latex(com_corte, "com_nota.tex", path_reports=tmp_path)
+    conteudo = destino.read_text(encoding="utf-8")
+    assert "footnotesize" in conteudo and "corte único" in conteudo
+
+    # Suprimível de propósito, nunca por esquecimento.
+    sem = ev.exportar_latex(com_corte, "sem_nota.tex", path_reports=tmp_path, nota="")
+    assert "footnotesize" not in sem.read_text(encoding="utf-8")
+
+
 def test_exportacao_latex(resultados, tmp_path):
     tabela = ev.comparar(resultados)
     destino = ev.exportar_latex(tabela, "comparativo.tex", path_reports=tmp_path)

@@ -47,7 +47,7 @@ from . import config as cfg
 # Métricas assinadas na §6.3 fase 5 — obrigatórias em toda tabela de resultado.
 METRICAS_ASSINADAS = ["recall", "especificidade", "f1", "auc_roc"]
 # Complementares (§10 item 4) — somam-se às assinadas, jamais as substituem.
-METRICAS_COMPLEMENTARES = ["pr_auc", "brier", "nns", "precisao"]
+METRICAS_COMPLEMENTARES = ["pr_auc", "brier", "nns", "precisao", "acuracia"]
 
 
 def _slug(*partes: str) -> str:
@@ -201,6 +201,9 @@ def metricas_no_limiar(y_te, proba_te, limiar: float) -> dict:
         "brier": float(brier_score_loss(y_te, proba_te)),
         "precisao": precisao,
         "nns": float(1.0 / precisao) if precisao > 0 else float("inf"),
+        # Acurácia entra só para expor a própria armadilha: com 7% de positivos,
+        # classificar todo mundo como negativo já entrega ~0,93 (§7 da spec).
+        "acuracia": float((vp + tn) / (vp + tn + fp + fn)),
         # Matriz de confusão.
         "vp": int(vp), "vn": int(tn), "fp": int(fp), "fn": int(fn),
     }
@@ -233,30 +236,40 @@ def tabela_calibracao(y_te, proba_te, n_bins: int = 10,
     proba_te = np.asarray(proba_te, dtype="float64")
     y_te = np.asarray(y_te)
 
-    if strategy == "quantile":
-        cortes = np.quantile(proba_te, np.linspace(0, 1, n_bins + 1))
-        cortes = np.unique(cortes)
+    distintos = np.unique(proba_te)
+    if len(distintos) <= n_bins:
+        # Saída discreta — caso dos comparadores da §7, que devolvem indicadoras.
+        # Cada valor vira seu próprio grupo: com dois valores, a tabela mostra a
+        # frequência observada entre encaminhados e entre não encaminhados. Forçar
+        # quantis aqui produziria faixas vazias ou um único bin degenerado.
+        grupos = [(v, proba_te == v) for v in distintos]
     else:
-        cortes = np.linspace(proba_te.min(), proba_te.max(), n_bins + 1)
-    indices = np.clip(np.digitize(proba_te, cortes[1:-1], right=False),
-                      0, len(cortes) - 2)
+        if strategy == "quantile":
+            cortes = np.unique(np.quantile(proba_te, np.linspace(0, 1, n_bins + 1)))
+        else:
+            cortes = np.linspace(proba_te.min(), proba_te.max(), n_bins + 1)
+        indices = np.clip(np.digitize(proba_te, cortes[1:-1], right=False),
+                          0, max(len(cortes) - 2, 0))
+        grupos = [(b, indices == b) for b in range(max(len(cortes) - 1, 1))]
 
     linhas = []
-    for b in range(len(cortes) - 1):
-        sel = indices == b
+    for _, sel in grupos:
         if not sel.any():
             continue
         predito = float(proba_te[sel].mean())
         observado = float(y_te[sel].mean())
         linhas.append({
-            "bin": b + 1,
+            "bin": len(linhas) + 1,
             "n": int(sel.sum()),
             "proba_media": predito,
             "freq_observada": observado,
             "diferenca": predito - observado,
             "razao": predito / observado if observado > 0 else float("inf"),
         })
-    return pd.DataFrame(linhas)
+    return pd.DataFrame(
+        linhas,
+        columns=["bin", "n", "proba_media", "freq_observada", "diferenca", "razao"],
+    )
 
 
 def diagnostico_calibracao(y_te, proba_te, n_bins: int = 10) -> dict:
@@ -441,7 +454,7 @@ def figura_calibracao(y_te, proba_te, rotulo: str, n_bins: int = 10,
 
 def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
             recall_alvo: float = cfg.RECALL_ALVO, conjunto: str = "",
-            salvar_figuras: bool = True,
+            salvar_figuras: bool = True, limiar: float | None = None,
             path_figuras: Path | None = None) -> dict:
     """Avalia um estimador pelo protocolo da §6.3 fase 5.
 
@@ -455,6 +468,11 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
         recall_alvo: restrição de recall do ponto de operação (D-004, provisório
             em 0,80 — confirmar com o orientador).
         conjunto: conjunto de atributos, registrado para a comparação.
+        limiar: quando informado, **dispensa a calibração** e usa este valor. É o
+            caso dos comparadores não-ML da §7: a regra clínica ADA devolve uma
+            indicadora 0/1, não um escore, e calibrar limiar sobre ela produziria
+            um ponto de operação sem significado. `limiar_calibrado` no retorno
+            distingue os dois regimes.
 
     Returns:
         Dicionário com o limiar, as métricas assinadas e complementares, a matriz
@@ -467,7 +485,23 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
 
     # Etapas 1 e 2 — tudo no treino.
     proba_cv = probabilidades_por_cv(estimador, X_tr, y_tr)
-    escolha = selecionar_limiar(y_tr, proba_cv, recall_alvo)
+    if limiar is None:
+        escolha = selecionar_limiar(y_tr, proba_cv, recall_alvo)
+        escolha["limiar_calibrado"] = True
+    else:
+        # Limiar imposto: nenhuma busca, nenhuma curva. `recall_alvo_atingido`
+        # deixa de ser garantia de projeto e passa a ser constatação.
+        predito_cv = (proba_cv >= limiar).astype(int)
+        recall_cv = float(recall_score(y_tr, predito_cv, zero_division=0))
+        escolha = {
+            "limiar": float(limiar),
+            "limiar_calibrado": False,
+            "recall_alvo": recall_alvo,
+            "recall_alvo_atingido": bool(recall_cv >= recall_alvo),
+            "recall_cv": recall_cv,
+            "precisao_cv": float(precision_score(y_tr, predito_cv,
+                                                 zero_division=0)),
+        }
     limiar = escolha["limiar"]
 
     # Dispersão entre folds, no limiar já fixado: escala de referência para
@@ -480,6 +514,11 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
     proba_te = ajustado.predict_proba(X_te)[:, 1]
     metricas = metricas_no_limiar(y_te, proba_te, limiar)
     calibracao = diagnostico_calibracao(y_te, proba_te)
+
+    # Classificador de corte único: a saída assume no máximo dois valores, então
+    # não há curva a percorrer. Detectado pela saída, não pelo tipo do estimador —
+    # o que vale é o que ele produz. Governa a nota de rodapé de `comparar`.
+    corte_unico = bool(len(np.unique(proba_te)) <= 2)
 
     figuras = {}
     if salvar_figuras:
@@ -500,6 +539,7 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
         **escolha,
         **metricas,
         **dispersao,
+        "corte_unico": corte_unico,
         "brier_trivial": calibracao["brier_trivial"],
         "brier_skill": calibracao["brier_skill"],
         "razao_inflacao": calibracao["razao_inflacao"],
@@ -526,11 +566,11 @@ def comparar(resultados: list[dict]) -> pd.DataFrame:
         for coluna in (metrica, f"{metrica}_cv_media", f"{metrica}_cv_dp")
     ]
     colunas = (
-        ["modelo", "conjunto", "limiar", "recall_alvo_atingido"]
+        ["modelo", "conjunto", "limiar", "limiar_calibrado", "recall_alvo_atingido"]
         + assinadas_com_dispersao
         + METRICAS_COMPLEMENTARES
         + ["brier_trivial", "brier_skill", "razao_inflacao", "ece"]
-        + ["vp", "fp", "fn", "vn", "auc_roc_cv", "recall_cv"]
+        + ["vp", "fp", "fn", "vn", "auc_roc_cv", "recall_cv", "corte_unico"]
     )
     tabela = pd.DataFrame([
         {k: r[k] for k in colunas if k in r} for r in resultados
@@ -579,14 +619,49 @@ def tabela_calibracao_comparada(resultados: list[dict]) -> pd.DataFrame:
     ])
 
 
+def nota_corte_unico(tabela: pd.DataFrame) -> str:
+    """Nota de rodapé sobre as linhas cuja saída assume no máximo dois valores.
+
+    Devolve string vazia quando a tabela não tem nenhuma. A nota existe porque a
+    tabela comparativa põe lado a lado objetos diferentes: sem ela, um leitor
+    compara a AUC-ROC 0,656 da regra ADA com a 0,781 do modelo como se medissem a
+    mesma coisa.
+    """
+    if "corte_unico" not in tabela.columns or not tabela["corte_unico"].any():
+        return ""
+    nomes = ", ".join(sorted(tabela.loc[tabela["corte_unico"], "modelo"].unique()))
+    return (
+        f"Nota: {nomes} são classificadores de corte único — a saída assume dois "
+        f"valores, não um escore. AUC-ROC, PR-AUC, Brier e a curva de calibração "
+        f"dependem de percorrer limiares e, para essas linhas, ficam degradadas por "
+        f"construção, não por desempenho. As métricas comparáveis entre todas as "
+        f"linhas são Recall, Especificidade e NNS."
+    )
+
+
 def exportar_latex(tabela: pd.DataFrame, nome_arquivo: str,
-                   path_reports: Path | None = None, **kwargs) -> Path:
-    """Exporta a tabela comparativa para `.tex` em `reports/`."""
+                   path_reports: Path | None = None, nota: str | None = None,
+                   **kwargs) -> Path:
+    """Exporta a tabela comparativa para `.tex` em `reports/`.
+
+    Args:
+        nota: rodapé anexado após o `tabular`. Quando omitido, a nota de corte
+            único é gerada automaticamente se a tabela tiver linhas que a exijam —
+            uma advertência que depende do conteúdo não deveria depender de alguém
+            lembrar de pedi-la. Passe `nota=""` para suprimir.
+    """
     path_reports = cfg.PATH_REPORTS if path_reports is None else Path(path_reports)
     path_reports.mkdir(parents=True, exist_ok=True)
     destino = path_reports / nome_arquivo
 
     opcoes = {"index": False, "float_format": "%.3f"}
     opcoes.update(kwargs)
-    destino.write_text(tabela.to_latex(**opcoes), encoding="utf-8")
+    conteudo = tabela.to_latex(**opcoes)
+
+    if nota is None:
+        nota = nota_corte_unico(tabela)
+    if nota:
+        conteudo += f"\n\\begin{{flushleft}}\n\\footnotesize {nota}\n\\end{{flushleft}}\n"
+
+    destino.write_text(conteudo, encoding="utf-8")
     return destino
