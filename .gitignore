@@ -6,9 +6,9 @@ __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
 .pytest_cache/
-reports/figures/*.png
-reports/figures/*.pdf
-!reports/figures/.gitkeep
+reports/figuras/*.png
+reports/figuras/*.pdf
+!reports/figuras/.gitkeep
 .env
 .vscode/
 .idea/

@@ -1,7 +1,7 @@
-"""Testes do harness de avaliação (§6 da spec · §6.3 fase 5).
+"""Testes do harness de avaliação.
 
-O ponto crítico: o limiar é decidido no treino, por validação cruzada. Nenhuma
-estatística do conjunto de teste pode influenciá-lo — há teste específico para isso.
+O ponto crítico é que o limiar se decide no treino, por validação cruzada. Nenhuma
+estatística do conjunto de teste pode influenciá-lo, e há teste específico para isso.
 """
 
 import numpy as np
@@ -30,7 +30,7 @@ def split():
 
 
 def _logreg(conjunto: str) -> Pipeline:
-    """Estimador já embrulhado no preprocessador — como `avaliar` o espera."""
+    """Estimador já embrulhado no preprocessador, como `avaliar` espera receber."""
     return Pipeline([
         ("pre", ft.construir_preprocessador(conjunto)),
         ("clf", LogisticRegression(class_weight="balanced", max_iter=1000,
@@ -51,7 +51,7 @@ def resultados(split, tmp_path_factory):
 
 
 # ---------------------------------------------------------------------------
-# Seleção de limiar — no treino, nunca no teste
+# Seleção de limiar: no treino, nunca no teste
 # ---------------------------------------------------------------------------
 
 
@@ -92,11 +92,11 @@ def test_limiar_e_o_maior_que_atinge_o_alvo():
 
 
 def test_alvo_inatingivel_sinaliza_em_vez_de_falhar_em_silencio(monkeypatch):
-    """Sem limiar que alcance o alvo: devolve o de maior recall e avisa.
+    """Sem limiar que alcance o alvo, devolve o de maior recall e avisa.
 
-    Ramo defensivo. Em `precision_recall_curve` o menor limiar classifica tudo
-    como positivo, então o recall máximo é sempre 1,0 e nenhum alvo válido cai
-    aqui — por isso a curva é substituída para exercitar o caminho.
+    Ramo defensivo. Em `precision_recall_curve` o menor limiar classifica tudo como
+    positivo, então o recall máximo é sempre 1,0 e nenhum alvo válido cai aqui; daí
+    a curva ser substituída para exercitar o caminho.
     """
     curva_degenerada = (
         np.array([0.5, 0.5, 1.0]),   # precisão
@@ -125,7 +125,7 @@ def test_recall_alvo_fora_do_intervalo_falha_alto():
 
 
 def test_cv_e_estratificada_com_a_semente_do_projeto(split):
-    """R11: mesma semente, mesmas probabilidades fora da amostra."""
+    """Mesma semente, mesmas probabilidades fora da amostra."""
     X_train, _, y_train, _ = split
     est = _logreg("B_composto")
     primeira = ev.probabilidades_por_cv(est, X_train, y_train)
@@ -188,7 +188,7 @@ def test_especificidade_complementa_a_taxa_de_falsos_positivos(resultados):
 
 @pytest.mark.parametrize("metrica", ev.METRICAS_ASSINADAS)
 def test_metricas_assinadas_presentes_em_todo_resultado(resultados, metrica):
-    """§6.3 fase 5: obrigatórias em toda tabela, sem exceção."""
+    """Métricas assinadas: obrigatórias em toda tabela, sem exceção."""
     for r in resultados:
         assert metrica in r
         assert np.isfinite(r[metrica])
@@ -264,7 +264,7 @@ def test_comparar_traz_assinadas_antes_das_complementares(resultados):
     assert max(posicoes.index(m) for m in ev.METRICAS_ASSINADAS) < min(
         posicoes.index(m) for m in ev.METRICAS_COMPLEMENTARES
     )
-    # Matriz de confusão também entra na tabela (§6.3 fase 5).
+    # A matriz de confusão também entra na tabela.
     assert {"vp", "fp", "fn", "vn"} <= set(tabela.columns)
 
 
@@ -274,7 +274,7 @@ def test_comparar_traz_assinadas_antes_das_complementares(resultados):
 
 
 def test_metricas_por_fold_cobrem_o_treino_inteiro(split, resultados):
-    """Cinco folds disjuntos que somam o conjunto de treino (§6.3 fase 5)."""
+    """Cinco folds disjuntos que somam o conjunto de treino."""
     X_train, _, _, _ = split
     for r in resultados:
         por_fold = r["metricas_por_fold"]
@@ -330,7 +330,7 @@ def test_comparar_formatado_exibe_media_e_dp(resultados):
 
 
 # ---------------------------------------------------------------------------
-# Calibração — o número, não só a figura
+# Calibração: o número, não só a figura
 # ---------------------------------------------------------------------------
 
 
@@ -352,9 +352,10 @@ def test_tabela_calibracao_particiona_o_teste(split, resultados):
 def test_probabilidades_infladas_por_class_weight(resultados):
     """Hipótese confirmada: `class_weight='balanced'` desloca o nível, não a forma.
 
-    O modelo é treinado como se as classes fossem equilibradas, então a
-    probabilidade média sai perto de 0,4 contra prevalência de 0,07. Discriminação
-    (slope ≈ 1) preservada; nível (intercepto ≈ logito da prevalência) deslocado.
+    O modelo treina como se as classes fossem equilibradas, então a probabilidade
+    média sai perto de 0,4 contra prevalência de 0,07. A discriminação (slope perto
+    de 1) fica preservada e o nível (intercepto perto do logito da prevalência) sai
+    deslocado.
     """
     for r in resultados:
         cal = r["calibracao"]

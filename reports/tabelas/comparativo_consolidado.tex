@@ -1,0 +1,12 @@
+\begin{tabular}{llrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr}
+\toprule
+modelo & conjunto & limiar & limiar_calibrado & recall_alvo_atingido & recall & recall_cv_media & recall_cv_dp & especificidade & especificidade_cv_media & especificidade_cv_dp & f1 & f1_cv_media & f1_cv_dp & auc_roc & auc_roc_cv_media & auc_roc_cv_dp & pr_auc & brier & nns & precisao & acuracia & brier_trivial & brier_skill & razao_inflacao & ece & vp & fp & fn & vn & auc_roc_cv & recall_cv & corte_unico \\
+\midrule
+LogReg & B_composto & 0.445 & True & True & 0.765 & 0.802 & 0.008 & 0.637 & 0.640 & 0.023 & 0.233 & 0.244 & 0.011 & 0.781 & 0.782 & 0.013 & 0.244 & 0.196 & 7.264 & 0.138 & 0.646 & 0.065 & -1.995 & 5.665 & 0.328 & 91 & 570 & 28 & 1002 & 0.783 & 0.802 & False \\
+Regra ADA & — & 0.500 & False & True & 0.866 & 0.894 & 0.025 & 0.446 & 0.454 & 0.017 & 0.188 & 0.196 & 0.008 & 0.656 & 0.674 & 0.018 & 0.101 & 0.525 & 9.456 & 0.106 & 0.475 & 0.065 & -7.018 & 8.185 & 0.525 & 103 & 871 & 16 & 701 & 0.674 & 0.895 & True \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize Nota: Regra ADA são classificadores de corte único — a saída assume dois valores, não um escore. AUC-ROC, PR-AUC, Brier e a curva de calibração dependem de percorrer limiares e, para essas linhas, ficam degradadas por construção, não por desempenho. As métricas comparáveis entre todas as linhas são Recall, Especificidade e NNS.
+\end{flushleft}

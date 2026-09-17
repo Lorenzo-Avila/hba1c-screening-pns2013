@@ -1,8 +1,8 @@
-"""Diagnóstico de multicolinearidade: Pearson entre contínuas + VIF.
+"""Diagnóstico de multicolinearidade: Pearson entre contínuas mais VIF.
 
-Aqui o VIF roda sobre a matriz de design pós-transformação, dummies incluídas.
+O VIF roda sobre a matriz de design pós-transformação, dummies incluídas.
 
-Tudo é ajustado no treino. `peso_lab` não entra em nenhuma função.
+Tudo é ajustado no treino. `peso_lab` não entra em função nenhuma daqui.
 """
 
 from __future__ import annotations
@@ -33,19 +33,19 @@ CMAP_CLINICAL_TEAL = LinearSegmentedColormap.from_list(
 
 
 def matriz_pearson(X_train: pd.DataFrame, cols_continuas: list[str]) -> pd.DataFrame:
-    """Correlação de Pearson entre as variáveis contínuas do treino (§6.5).
+    """Correlação de Pearson entre as variáveis contínuas do treino.
 
     Args:
-        X_train: matriz de treino. Aceita tanto as preditoras cruas quanto a saída
-            dos estágios de imputação e compostas — o que importa é conter as
-            colunas pedidas.
+        X_train: matriz de treino. Aceita as preditoras cruas ou a saída dos
+            estágios de imputação e compostas; o que importa é ter as colunas
+            pedidas.
         cols_continuas: contínuas a correlacionar.
 
     Returns:
         Matriz de correlação quadrada, índice e colunas em `cols_continuas`.
 
-    Calculada **apenas no treino** (R2): a correlação é estatística entre linhas e
-    não pode ser estimada sobre a base inteira.
+    Calculada **só no treino**: correlação é estatística entre linhas, e estimá-la
+    sobre a base inteira vazaria o teste.
     """
     faltantes = [c for c in cols_continuas if c not in X_train.columns]
     if faltantes:
@@ -54,11 +54,10 @@ def matriz_pearson(X_train: pd.DataFrame, cols_continuas: list[str]) -> pd.DataF
 
 
 def pares_pearson(matriz: pd.DataFrame, feature_set: str = "") -> pd.DataFrame:
-    """Converte a matriz de Pearson na lista de pares, ordenada por |r|.
+    """Converte a matriz de Pearson numa lista de pares, ordenada por |r|.
 
-    Cobra as duas ferramentas como resultado, não como inspeção visual. O heatmap
-    comunica o padrão, mas os coeficientes precisam estar em tabela para entrar no
-    texto e serem citados individualmente.
+    O heatmap comunica o padrão, mas os coeficientes precisam estar em tabela para
+    entrar no texto e serem citados um a um.
 
     Returns:
         DataFrame com `feature_set`, `var_1`, `var_2`, `pearson` e `abs_pearson`,
@@ -79,7 +78,8 @@ def heatmap_pearson(matriz: pd.DataFrame, feature_set: str,
                     path_figuras: Path | None = None) -> Path:
     """Salva o heatmap da matriz de Pearson e devolve o caminho do arquivo.
 
-    Figura em `reports/figures/pearson_{feature_set}.png`, paleta Clinical Teal.
+    A figura sai em `reports/figuras/pearson_{feature_set}.png`, na paleta Clinical
+    Teal.
     """
     path_figuras = cfg.PATH_FIGURAS if path_figuras is None else Path(path_figuras)
     path_figuras.mkdir(parents=True, exist_ok=True)
@@ -124,15 +124,14 @@ def heatmap_pearson(matriz: pd.DataFrame, feature_set: str,
 def matriz_de_design(pipeline, X_train: pd.DataFrame) -> pd.DataFrame:
     """Aplica os estágios de pré-processamento e devolve a matriz de design nomeada.
 
-    Aceita tanto um preprocessador (último estágio é o `ColumnTransformer`) quanto
-    um pipeline de modelagem completo (último estágio é o estimador). No segundo
-    caso, e **somente** nele, o último estágio é descartado — é o que a §5 da spec
-    descreve como `pipeline[:-1]`.
+    Aceita um preprocessador (último estágio é o `ColumnTransformer`) ou um pipeline
+    de modelagem completo (último estágio é o estimador). Só no segundo caso o
+    último estágio é descartado, via `pipeline[:-1]`.
 
     A distinção importa: aplicar `pipeline[:-1]` a um preprocessador devolveria a
-    saída de `ConstrutorCompostas`, isto é, as preditoras antes da codificação —
-    sem nenhuma dummy. O VIF calculado ali seria o diagnóstico incompleto do
-    baseline, exatamente a falha que D-002 corrige.
+    saída de `ConstrutorCompostas`, ou seja, as preditoras antes da codificação, sem
+    dummy nenhuma. O VIF calculado ali é o diagnóstico incompleto que o baseline
+    fazia.
     """
     estagios = pipeline[:-1] if hasattr(pipeline[-1], "predict") else pipeline
     try:
@@ -151,11 +150,10 @@ def matriz_de_design(pipeline, X_train: pd.DataFrame) -> pd.DataFrame:
 def _vif_de_coluna(design: pd.DataFrame, coluna: str) -> float:
     """VIF de uma coluna: `1 / (1 - R²)` da regressão auxiliar contra as demais.
 
-    `R² >= 1` significa colinearidade perfeita — a coluna é combinação linear
-    exata das outras. Devolve infinito em vez de estourar a divisão por zero; um
-    VIF infinito é o diagnóstico correto, não um erro numérico a mascarar.
-    Coluna constante recebe o mesmo tratamento: sem variância, não há regressão
-    auxiliar possível.
+    `R² >= 1` é colinearidade perfeita, com a coluna sendo combinação linear exata
+    das outras. Aí devolve infinito em vez de estourar na divisão por zero: VIF
+    infinito é o diagnóstico correto, não um erro numérico a esconder. Coluna
+    constante cai no mesmo caso, porque sem variância não há regressão auxiliar.
     """
     y = design[coluna].to_numpy()
     if np.isclose(y.var(), 0.0):
@@ -173,18 +171,18 @@ def _vif_de_coluna(design: pd.DataFrame, coluna: str) -> float:
 
 def vif_matriz_design(pipeline, X_train: pd.DataFrame,
                       feature_set: str) -> pd.DataFrame:
-    """VIF de cada coluna da matriz de design pós-transformação (§6.5, D-002).
+    """VIF de cada coluna da matriz de design pós-transformação.
 
     Args:
-        pipeline: preprocessador **já ajustado no treino**, ou pipeline completo
-            de modelagem.
+        pipeline: preprocessador **já ajustado no treino**, ou pipeline completo de
+            modelagem.
         X_train: preditoras de treino, na forma que o pipeline espera.
         feature_set: nome do conjunto, registrado na tabela para a comparação.
 
     Returns:
-        DataFrame com uma linha por coluna da matriz de design — dummies
-        incluídas — e as colunas `feature_set`, `variavel`, `vif` e
-        `acima_do_limiar`, ordenado por VIF decrescente.
+        DataFrame com uma linha por coluna da matriz de design, dummies incluídas,
+        e as colunas `feature_set`, `variavel`, `vif` e `acima_do_limiar`, ordenado
+        por VIF decrescente.
     """
     design = matriz_de_design(pipeline, X_train)
     vifs = {coluna: _vif_de_coluna(design, coluna) for coluna in design.columns}
@@ -194,9 +192,9 @@ def vif_matriz_design(pipeline, X_train: pd.DataFrame,
         "variavel": list(vifs),
         "vif": list(vifs.values()),
     })
-    # R² da regressão auxiliar: fração da variância da coluna já explicada pelas
-    # demais. O VIF isolado subestima a leitura — VIF 8,60 soa moderado, mas
-    # corresponde a 88,4% de variância redundante, mesmo abaixo do limiar de 10.
+    # R² da regressão auxiliar: fração da variância da coluna que as demais já
+    # explicam. O VIF sozinho engana a leitura: 8,60 soa moderado, mas são 88,4%
+    # de variância redundante, ainda abaixo do limiar de 10.
     tabela["r2_auxiliar"] = r2_de_vif(tabela["vif"])
     tabela["acima_do_limiar"] = tabela["vif"] > cfg.VIF_LIMIAR
     return tabela.sort_values("vif", ascending=False).reset_index(drop=True)
@@ -205,22 +203,23 @@ def vif_matriz_design(pipeline, X_train: pd.DataFrame,
 def r2_de_vif(vif):
     """Converte VIF em R² da regressão auxiliar: `R² = 1 - 1/VIF`.
 
-    Aceita escalar ou Série. VIF infinito (colinearidade perfeita) devolve R² = 1.
+    Aceita escalar ou Série. VIF infinito, que é colinearidade perfeita, devolve
+    R² = 1.
     """
     vif = pd.Series(vif) if not isinstance(vif, pd.Series) else vif
     return (1.0 - 1.0 / vif).where(np.isfinite(vif), 1.0)
 
 
 # ---------------------------------------------------------------------------
-# Decomposição do escore — o que o VIF não mede
+# Decomposição do escore: o que o VIF não mede
 # ---------------------------------------------------------------------------
 
 
 def preditoras_pos_compostas(pipeline, X: pd.DataFrame) -> pd.DataFrame:
     """Aplica os estágios até imediatamente antes do `ColumnTransformer`.
 
-    Devolve as preditoras imputadas e compostas em **escala clínica original**
-    (D-014), que é onde as identidades da §4.4 podem ser verificadas.
+    Devolve as preditoras imputadas e compostas em **escala clínica original**, que
+    é onde dá para verificar as identidades das variáveis compostas.
     """
     estagios = pipeline[:-1] if hasattr(pipeline[-1], "predict") else pipeline
     saida = X
@@ -232,11 +231,11 @@ def preditoras_pos_compostas(pipeline, X: pd.DataFrame) -> pd.DataFrame:
 
 
 def obesidade_reconstruida(preditoras: pd.DataFrame) -> pd.Series:
-    """Indicadora de obesidade exatamente como a §4.4 a define.
+    """Indicadora de obesidade, exatamente como as compostas a definem.
 
     Disjuntiva e sensível ao sexo: IMC ≥ 30, ou cintura ≥ 80 cm em mulheres, ou
-    ≥ 94 cm em homens (SBD 2019). Reconstruída aqui para tornar explícita a
-    terceira parcela de `multimorbidade`, que não existe como coluna do modelo.
+    ≥ 94 cm em homens (SBD 2019). Reconstruída aqui para deixar visível a terceira
+    parcela de `multimorbidade`, que não existe como coluna do modelo.
     """
     fem = preditoras["sexo_fem"] == 1
     return (
@@ -253,18 +252,18 @@ def decomposicao_do_escore(pipeline, X_train: pd.DataFrame,
     `multimorbidade` é, por construção, a soma de três parcelas binárias:
     `has_combinada`, `colesterol_alto == 1` e a indicadora de obesidade. Em
     `C_completo` as duas primeiras são colunas do modelo; a terceira não é, mas
-    deriva de `imc`, `circ_cintura` e `sexo_fem`, que também são.
+    deriva de `imc`, `circ_cintura` e `sexo_fem`, que são.
 
-    Duas regressões auxiliares sobre o mesmo escore:
+    Daí duas regressões auxiliares sobre o mesmo escore:
 
-    - **identidade** — sobre as três parcelas exatas. R² é 1 por definição: não é
-      estimativa, é a identidade algébrica da §4.4 escrita como regressão.
-    - **VIF** — sobre as demais colunas da matriz de design, onde a obesidade só
-      aparece indiretamente, via `imc` e `circ_cintura` **contínuas**. O limiar que
-      as binariza não é recuperável por combinação linear.
+    - **identidade**: sobre as três parcelas exatas. R² é 1 por definição, porque
+      não é estimativa, é a identidade algébrica escrita como regressão.
+    - **VIF**: sobre as demais colunas da matriz de design, onde a obesidade só
+      aparece de forma indireta, via `imc` e `circ_cintura` **contínuas**. O limiar
+      que as binariza não é recuperável por combinação linear.
 
-    A distância entre os dois R² é a parcela da redundância que o diagnóstico
-    linear não enxerga (D-016).
+    A distância entre os dois R² é a parte da redundância que o diagnóstico linear
+    não enxerga.
 
     Returns:
         Dicionário com `r2_identidade`, `r2_vif`, `vif` e `parcelas`.
@@ -294,7 +293,7 @@ def decomposicao_do_escore(pipeline, X_train: pd.DataFrame,
 
 
 # ---------------------------------------------------------------------------
-# Tabela comparativa A/B/C — resultado do TCC, não diagnóstico interno
+# Tabela comparativa A/B/C: resultado do TCC, não diagnóstico interno
 # ---------------------------------------------------------------------------
 
 
@@ -302,8 +301,8 @@ def tabela_comparativa(X_train: pd.DataFrame, y_train=None,
                        feature_sets: list[str] | None = None) -> pd.DataFrame:
     """Roda o VIF para cada conjunto de atributos e empilha os resultados.
 
-    Ajusta um preprocessador por conjunto **no treino** (R2) e devolve a tabela
-    única prevista na §5 da spec. Ordenada por conjunto e VIF decrescente.
+    Ajusta um preprocessador por conjunto, sempre **no treino**, e devolve a tabela
+    única, ordenada por conjunto e VIF decrescente.
     """
     feature_sets = list(ft.FEATURE_SETS) if feature_sets is None else feature_sets
     partes = []
@@ -332,15 +331,15 @@ def resumo_por_conjunto(tabela: pd.DataFrame) -> pd.DataFrame:
 def ablacao_vif(X_train: pd.DataFrame, y_train=None,
                 feature_set: str = "C_completo",
                 variavel: str = "rcest") -> pd.DataFrame:
-    """Executa o protocolo da §6.5: remove uma variável e recalcula o VIF.
+    """Executa o protocolo de ablação: remove uma variável e recalcula o VIF.
 
-    A §6.5 autoriza avaliar por experimentação a remoção da variável de maior VIF
-    dentro de um mesmo bloco temático. Esta função materializa o procedimento e
-    devolve o antes e o depois lado a lado.
+    A metodologia autoriza testar a remoção da variável de maior VIF dentro de um
+    mesmo bloco temático. Esta função executa o procedimento e devolve o antes e o
+    depois lado a lado.
 
     Args:
-        variavel: coluna a remover do conjunto. Ela própria não aparece na saída —
-        o que interessa é o efeito sobre as **demais**.
+        variavel: coluna a remover do conjunto. Ela mesma não aparece na saída,
+            porque o que interessa é o efeito sobre as **demais**.
 
     Returns:
         DataFrame com `variavel`, `vif_antes`, `vif_depois`, `delta_vif`,
@@ -371,12 +370,12 @@ def ablacao_vif(X_train: pd.DataFrame, y_train=None,
 
 def exportar_latex(tabela: pd.DataFrame, nome_arquivo: str,
                    path_reports: Path | None = None, **kwargs) -> Path:
-    """Exporta a tabela para `.tex` em `reports/` e devolve o caminho.
+    """Exporta a tabela para `.tex` em `reports/tabelas/` e devolve o caminho.
 
-    A tabela comparativa de VIF é **resultado do TCC**, materializando o protocolo
-    da §6.5 — por isso vai para `reports/`, não para um diretório de trabalho.
+    A tabela comparativa de VIF é **resultado do TCC**, não rascunho: por isso vai
+    para `reports/tabelas/` e não para um diretório de trabalho.
     """
-    path_reports = cfg.PATH_REPORTS if path_reports is None else Path(path_reports)
+    path_reports = cfg.PATH_TABELAS if path_reports is None else Path(path_reports)
     path_reports.mkdir(parents=True, exist_ok=True)
     destino = path_reports / nome_arquivo
 
@@ -388,10 +387,10 @@ def exportar_latex(tabela: pd.DataFrame, nome_arquivo: str,
 
 def diagnostico_completo(X_train: pd.DataFrame, y_train=None,
                          feature_sets: list[str] | None = None) -> dict:
-    """Executa o protocolo da §6.5 inteiro e salva os artefatos.
+    """Roda o diagnóstico de colinearidade inteiro e salva os artefatos.
 
-    Para cada conjunto: matriz de Pearson entre as contínuas e respectivo heatmap.
-    Para o conjunto dos três: tabela de VIF empilhada, resumo e exportação LaTeX.
+    Por conjunto: matriz de Pearson entre as contínuas e o heatmap correspondente.
+    Para os três juntos: tabela de VIF empilhada, resumo e exportação LaTeX.
 
     Returns:
         Dicionário com `pearson` (por conjunto), `figuras`, `vif`, `resumo` e os
@@ -402,7 +401,7 @@ def diagnostico_completo(X_train: pd.DataFrame, y_train=None,
     pearson, figuras, pares = {}, {}, []
     for nome in feature_sets:
         pre = ft.construir_preprocessador(nome).fit(X_train, y_train)
-        # Contínuas na escala clínica, depois de imputação e compostas (D-014).
+        # Contínuas na escala clínica, depois de imputação e compostas.
         preditoras = preditoras_pos_compostas(pre, X_train)
         continuas = [c for c in ft.FEATURE_SETS[nome]["num"] if c in preditoras.columns]
         pearson[nome] = matriz_pearson(preditoras, continuas)
@@ -435,8 +434,8 @@ def diagnostico_completo(X_train: pd.DataFrame, y_train=None,
 
 
 def _salvar_csv(tabela: pd.DataFrame, nome_arquivo: str) -> Path:
-    """Salva a tabela em `reports/` como CSV e devolve o caminho."""
-    cfg.PATH_REPORTS.mkdir(parents=True, exist_ok=True)
-    destino = cfg.PATH_REPORTS / nome_arquivo
+    """Salva a tabela em `reports/tabelas/` como CSV e devolve o caminho."""
+    cfg.PATH_TABELAS.mkdir(parents=True, exist_ok=True)
+    destino = cfg.PATH_TABELAS / nome_arquivo
     tabela.to_csv(destino, index=False, encoding="utf-8")
     return destino

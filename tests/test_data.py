@@ -1,9 +1,8 @@
-"""Testes de contrato da etapa de dados (§3 da spec da Sprint 1).
+"""Testes de contrato da etapa de dados.
 
-Validam shape, prevalência e padrão de ausência após a limpeza. São testes de
-contrato, não de unidade: qualquer mudança em `src/data.py` que altere a amostra
-analítica precisa ser uma decisão consciente, registrada em
-`docs/RASTREABILIDADE.md`.
+Validam shape, prevalência e padrão de ausência depois da limpeza. São contrato, não
+unidade: qualquer mudança em `src/data.py` que mexa na amostra analítica tem de ser
+decisão consciente, registrada em `docs/RASTREABILIDADE.md`.
 """
 
 import numpy as np
@@ -11,9 +10,10 @@ import pandas as pd
 import pytest
 
 from src import config as cfg
-from src.data import carregar_bruto, limpar, separar
+from src.data import (ausentes_por_variavel, carregar_bruto, limpar,
+                      resumo_amostra, separar)
 
-# Contrato de saída da §3 da spec.
+# Contrato de saída da etapa de dados.
 N_ESPERADO = 8451
 PREVALENCIA_ESPERADA = 0.0702
 TOLERANCIA_PREVALENCIA = 0.001
@@ -60,7 +60,7 @@ def test_faixa_etaria(df):
 
 
 def test_alvo_sem_ausentes_e_binario(df):
-    """R3: registros sem HbA1c válida são excluídos, jamais imputados."""
+    """Registro sem HbA1c válida é excluído, nunca imputado."""
     assert df[cfg.ALVO_CONTINUO].isna().sum() == 0
     assert set(df["target"].unique()) == {0, 1}
 
@@ -69,7 +69,7 @@ def test_decimal_brasileiro_convertido(df):
     """Conversão numérica: nenhuma contínua pode sobrar como texto."""
     for col in cfg.CONTINUAS + [cfg.ALVO_CONTINUO, cfg.PESO, "imc", "rcest"]:
         assert pd.api.types.is_float_dtype(df[col]), col
-    # Valores fracionários existem de fato — prova que a vírgula foi tratada.
+    # Há valores fracionários de fato, o que prova que a vírgula foi tratada.
     assert (df["hba1c"] % 1 != 0).any()
 
 
@@ -84,7 +84,7 @@ def test_sem_duplicados(df):
 
 
 def test_derivadas_row_wise(df):
-    """`imc` e `rcest` são funções apenas da própria linha (R1)."""
+    """`imc` e `rcest` dependem só da própria linha."""
     esperado_imc = df["peso_kg"] / (df["altura_cm"] / 100.0) ** 2
     esperado_rcest = df["circ_cintura"] / df["altura_cm"]
     assert np.allclose(df["imc"], esperado_imc)
@@ -92,14 +92,14 @@ def test_derivadas_row_wise(df):
 
 
 def test_nenhuma_imputacao_em_data(df):
-    """Imputação é pós-split (R2). `data.py` não pode ter preenchido nada."""
+    """Imputação é pós-split: `data.py` não pode ter preenchido nada."""
     assert df[list(AUSENTES_ESPERADOS)].isna().sum().sum() == sum(
         AUSENTES_ESPERADOS.values()
     )
 
 
 def test_separar_isola_peso_lab(df):
-    """R10: `peso_lab` pondera a EDA e não entra em X."""
+    """`peso_lab` pondera a EDA e não entra em X."""
     X, y, peso_lab = separar(df)
     assert cfg.PESO not in X.columns
     assert list(X.columns) == cfg.PREDITORAS
@@ -108,13 +108,72 @@ def test_separar_isola_peso_lab(df):
 
 
 def test_hba1c_nao_e_preditora(df):
-    """R6: HbA1c é exclusivamente desfecho, jamais preditor."""
+    """HbA1c é só desfecho, nunca preditor."""
     X, _, _ = separar(df)
     assert cfg.ALVO_CONTINUO not in X.columns
     assert cfg.ALVO not in X.columns
 
 
 def test_variaveis_comportamentais_ausentes(df):
-    """R5: dieta, atividade física e tabagismo permanecem fora do recorte."""
+    """Dieta, atividade física e tabagismo seguem fora do recorte."""
     proibidas = {"dieta", "atividade_fisica", "tabagismo", "fumo"}
     assert proibidas.isdisjoint(df.columns)
+
+
+# ---------------------------------------------------------------------------
+# Quadro descritivo da amostra (insumo do notebook de resultados)
+# ---------------------------------------------------------------------------
+
+def test_exclusoes_registradas_na_limpeza(df):
+    """As contagens vêm de onde o corte acontece, não de recontagem posterior."""
+    exclusoes = df.attrs["exclusoes"]
+    assert exclusoes["linhas_brutas"] == 8952
+    assert exclusoes["sem_hba1c"] == 411
+    assert exclusoes["sem_bloco_medicao"] == 90
+    # As exclusões não se sobrepõem: a soma tem de fechar com a amostra analítica.
+    total_excluido = (exclusoes["duplicadas"] + exclusoes["sem_hba1c"]
+                      + exclusoes["sem_bloco_medicao"])
+    assert exclusoes["linhas_brutas"] - total_excluido == N_ESPERADO
+
+
+def test_resumo_amostra_fecha_a_aritmetica(df):
+    resumo = resumo_amostra(df)
+    # As quatro primeiras linhas somam a amostra analítica.
+    assert int(resumo["n"].iloc[:4].sum()) == N_ESPERADO
+    assert int(resumo.loc[resumo["item"] == "Amostra analítica", "n"].iloc[0]) == N_ESPERADO
+
+
+def test_resumo_amostra_reporta_as_duas_prevalencias(df):
+    """Amostral e ponderada por `peso_lab` medem coisas diferentes."""
+    resumo = resumo_amostra(df)
+    proporcoes = resumo.dropna(subset=["proporcao"])
+    assert len(proporcoes) == 2
+    amostral, ponderada = proporcoes["proporcao"].tolist()
+    assert amostral == pytest.approx(df["target"].mean())
+    peso = df[cfg.PESO]
+    assert ponderada == pytest.approx((peso * df["target"]).sum() / peso.sum())
+    # Têm de ser distintas: iguais significaria ponderação não aplicada.
+    assert amostral != pytest.approx(ponderada, abs=1e-6)
+
+
+def test_resumo_amostra_exige_attrs_da_limpeza():
+    """Sem os `attrs`, o quadro falha em vez de recalcular as exclusões por conta."""
+    sem_attrs = pd.DataFrame({cfg.ALVO: [0, 1], cfg.PESO: [1.0, 2.0]})
+    with pytest.raises(KeyError):
+        resumo_amostra(sem_attrs)
+
+
+def test_ausentes_por_variavel_bate_com_o_contrato(df):
+    tabela = ausentes_por_variavel(df)
+    assert dict(zip(tabela["variavel"], tabela["ausentes"])) == AUSENTES_ESPERADOS
+    # Ordem decrescente: quem mais pesa na imputação aparece primeiro.
+    assert tabela["ausentes"].is_monotonic_decreasing
+
+
+def test_ausentes_por_variavel_com_treino(df):
+    """A coluna do treino é a que importa: é onde o KNN é ajustado."""
+    X, _, _ = separar(df)
+    treino = X.iloc[:6760]
+    tabela = ausentes_por_variavel(df, treino)
+    assert "no_treino" in tabela.columns
+    assert (tabela["no_treino"] <= tabela["ausentes"]).all()

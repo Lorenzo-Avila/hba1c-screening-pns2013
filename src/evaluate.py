@@ -1,20 +1,19 @@
-"""Harness de avaliação (§6 da spec · §6.3 fase 5).
+"""Harness de avaliação.
 
-Todo modelo passa por aqui — Regressão Logística, Random Forest e comparadores
-não-ML —, garantindo que a comparação seja entre modelos e não entre protocolos de
-avaliação.
+Todo modelo passa por aqui: Regressão Logística, Random Forest e os comparadores
+não-ML. Assim a comparação é entre modelos, não entre protocolos de avaliação.
 
 Duas regras estruturam o módulo:
 
-1. **O limiar é calibrado no treino, por validação cruzada, e nunca no teste.** Com
+1. **O limiar é calibrado no treino, por validação cruzada, nunca no teste.** Com
    7% de positivos, o 0,5 implícito do `predict()` é uma decisão silenciosa e
-   inadequada (D-004). Aqui ele é parâmetro explícito, escolhido sobre
-   probabilidades fora da amostra obtidas por `cross_val_predict`.
-2. **O estimador chega pronto.** Já vem embrulhado no preprocessador da §4.5 —
-   `avaliar` não constrói pipeline, não escolhe conjunto de atributos e não toca em
-   imputação. Assim R2 e R3 são responsabilidade de um lugar só.
+   ruim. Aqui ele é parâmetro explícito, escolhido sobre probabilidades fora da
+   amostra obtidas por `cross_val_predict`.
+2. **O estimador chega pronto**, já embrulhado no preprocessador. `avaliar` não
+   constrói pipeline, não escolhe conjunto de atributos e não toca em imputação,
+   de modo que o cuidado com vazamento fica concentrado num lugar só.
 
-`peso_lab` não é parâmetro de nenhuma função deste módulo (R10, §9).
+`peso_lab` não é parâmetro de nenhuma função deste módulo.
 """
 
 from __future__ import annotations
@@ -44,29 +43,29 @@ from sklearn.model_selection import StratifiedKFold, cross_val_predict
 
 from . import config as cfg
 
-# Métricas assinadas na §6.3 fase 5 — obrigatórias em toda tabela de resultado.
+# Métricas assinadas no TCC I: obrigatórias em toda tabela de resultado.
 METRICAS_ASSINADAS = ["recall", "especificidade", "f1", "auc_roc"]
-# Complementares (§10 item 4) — somam-se às assinadas, jamais as substituem.
+# Complementares: somam-se às assinadas, nunca as substituem.
 METRICAS_COMPLEMENTARES = ["pr_auc", "brier", "nns", "precisao", "acuracia"]
 
 
 def _slug(*partes: str) -> str:
-    """Nome de arquivo seguro a partir do modelo e do conjunto de atributos."""
+    """Monta um nome de arquivo seguro a partir do modelo e do conjunto."""
     bruto = "_".join(p for p in partes if p)
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", bruto).strip("_")
 
 
 # ---------------------------------------------------------------------------
-# Etapas 1 e 2 — validação cruzada no treino e seleção de limiar
+# Validação cruzada no treino e seleção de limiar
 # ---------------------------------------------------------------------------
 
 
 def probabilidades_por_cv(estimador, X_tr, y_tr, cv=None) -> np.ndarray:
     """Probabilidades fora da amostra, por `StratifiedKFold(5)` no treino.
 
-    `cross_val_predict` devolve, para cada observação de treino, a probabilidade
-    estimada pelo fold em que ela **não** participou do ajuste. É o que permite
-    calibrar o limiar sem olhar para o teste e sem otimismo de reajuste.
+    Para cada observação de treino, `cross_val_predict` devolve a probabilidade
+    estimada pelo fold em que ela **não** entrou no ajuste. É o que permite calibrar
+    o limiar sem olhar para o teste e sem o otimismo de quem reavalia no que treinou.
     """
     cv = cv if cv is not None else StratifiedKFold(
         n_splits=cfg.CV_FOLDS, shuffle=True, random_state=cfg.RANDOM_STATE
@@ -80,24 +79,23 @@ def probabilidades_por_cv(estimador, X_tr, y_tr, cv=None) -> np.ndarray:
 def selecionar_limiar(y_tr, proba_cv, recall_alvo: float) -> dict:
     """Maior limiar que ainda garante o recall-alvo, medido por CV no treino.
 
-    Entre todos os limiares que atingem o alvo, o maior é o que produz a melhor
-    precisão — menos encaminhamentos desnecessários para o mesmo recall. Em
-    triagem, recall é restrição; precisão é o que se otimiza sob ela.
+    Entre os limiares que atingem o alvo, o maior é o de melhor precisão, ou seja,
+    menos encaminhamento desnecessário para o mesmo recall. Em triagem, recall é
+    restrição e precisão é o que se otimiza sob ela.
 
-    Se **nenhum** limiar atinge o alvo, devolve o de maior recall e sinaliza:
-    `recall_alvo_atingido=False`, mais um `UserWarning`. Silenciar isso faria uma
-    tabela de resultados reportar um ponto de operação que não cumpre o que
-    promete.
+    Se **nenhum** limiar atinge o alvo, devolve o de maior recall e sinaliza com
+    `recall_alvo_atingido=False` mais um `UserWarning`. Silenciar isso faria a
+    tabela de resultados reportar um ponto de operação que não cumpre o que promete.
 
-    Nota sobre esse ramo: em `precision_recall_curve` o menor limiar classifica
-    todas as observações como positivas, logo o recall máximo da curva é 1,0 e
-    qualquer alvo válido encontra candidato. O fallback é defesa contra curvas
-    degeneradas, não caminho esperado — alvo fora de (0, 1] é erro de chamada e
-    falha alto, em vez de virar aviso.
+    Sobre esse ramo: em `precision_recall_curve` o menor limiar classifica todo
+    mundo como positivo, então o recall máximo da curva é 1,0 e qualquer alvo válido
+    encontra candidato. O fallback é defesa contra curva degenerada, não caminho
+    esperado. Alvo fora de (0, 1] é erro de chamada e falha alto, em vez de virar
+    aviso.
 
     Returns:
-        Dicionário com `limiar`, `recall_alvo`, `recall_alvo_atingido`,
-        `recall_cv` e `precisao_cv` no limiar escolhido.
+        Dicionário com `limiar`, `recall_alvo`, `recall_alvo_atingido`, `recall_cv`
+        e `precisao_cv` no limiar escolhido.
     """
     if not 0.0 < recall_alvo <= 1.0:
         raise ValueError(
@@ -112,8 +110,8 @@ def selecionar_limiar(y_tr, proba_cv, recall_alvo: float) -> dict:
         limiar = float(max(candidatos))
         atingido = True
     else:
-        # Sem nenhum limiar que alcance o alvo: o de maior recall é o melhor
-        # disponível, e o fato precisa aparecer no resultado.
+        # Nenhum limiar alcança o alvo: o de maior recall é o melhor disponível, e
+        # isso precisa aparecer no resultado.
         melhor = int(np.argmax(rec[:-1]))
         limiar = float(thr[melhor])
         atingido = False
@@ -138,12 +136,12 @@ def metricas_por_fold(y_tr, proba_cv, limiar: float, cv=None,
     """Métricas assinadas dentro de cada fold da CV, com o limiar já fixado.
 
     Reaproveita as probabilidades fora da amostra de `probabilidades_por_cv`: os
-    folds são reconstruídos com a mesma semente (R11), então cada partição de
-    validação é exatamente a que gerou aquelas probabilidades. Nenhum reajuste.
+    folds são reconstruídos com a mesma semente, então cada partição de validação é
+    exatamente a que gerou aquelas probabilidades. Nada é reajustado.
 
     A dispersão entre folds é o que permite dizer se a diferença entre A, B e C é
-    sinal ou variação de partição. Sem ela, comparar 0,748 com 0,765 é comparar
-    dois números sem escala de referência.
+    sinal ou variação de partição. Sem ela, comparar 0,748 com 0,765 é comparar dois
+    números sem escala de referência.
 
     Returns:
         DataFrame com uma linha por fold e as quatro métricas assinadas.
@@ -173,7 +171,7 @@ def resumir_folds(por_fold: pd.DataFrame) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Etapas 3 e 4 — métricas no teste
+# Métricas no teste
 # ---------------------------------------------------------------------------
 
 
@@ -181,8 +179,8 @@ def metricas_no_limiar(y_te, proba_te, limiar: float) -> dict:
     """Métricas assinadas e complementares no teste, com o limiar já fixado.
 
     NNS (Number Needed to Screen) é `1 / precisão`: quantas pessoas a UBS encaminha
-    a exame laboratorial para identificar um caso. Precisão zero devolve NNS
-    infinito — nenhum encaminhamento acerta.
+    a exame laboratorial para achar um caso. Precisão zero devolve NNS infinito,
+    porque nenhum encaminhamento acerta.
     """
     y_pred = (np.asarray(proba_te) >= limiar).astype(int)
     tn, fp, fn, vp = confusion_matrix(y_te, y_pred, labels=[0, 1]).ravel()
@@ -191,18 +189,18 @@ def metricas_no_limiar(y_te, proba_te, limiar: float) -> dict:
     especificidade = float(tn / (tn + fp)) if (tn + fp) else float("nan")
 
     return {
-        # Assinadas (§6.3 fase 5).
+        # Assinadas.
         "recall": float(recall_score(y_te, y_pred, zero_division=0)),
         "especificidade": especificidade,
         "f1": float(f1_score(y_te, y_pred, zero_division=0)),
         "auc_roc": float(roc_auc_score(y_te, proba_te)),
-        # Complementares (§10 item 4).
+        # Complementares.
         "pr_auc": float(average_precision_score(y_te, proba_te)),
         "brier": float(brier_score_loss(y_te, proba_te)),
         "precisao": precisao,
         "nns": float(1.0 / precisao) if precisao > 0 else float("inf"),
         # Acurácia entra só para expor a própria armadilha: com 7% de positivos,
-        # classificar todo mundo como negativo já entrega ~0,93 (§7 da spec).
+        # chutar negativo para todo mundo já dá uns 0,93.
         "acuracia": float((vp + tn) / (vp + tn + fp + fn)),
         # Matriz de confusão.
         "vp": int(vp), "vn": int(tn), "fp": int(fp), "fn": int(fn),
@@ -210,16 +208,16 @@ def metricas_no_limiar(y_te, proba_te, limiar: float) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Calibração — o número, não só a figura
+# Calibração: o número, não só a figura
 # ---------------------------------------------------------------------------
 
 
 def brier_trivial(y) -> float:
-    """Brier de um previsor que sempre responde a prevalência observada.
+    """Brier de quem sempre responde a prevalência observada.
 
-    Para uma constante `p`, o Brier é `p(1-p)`. É o piso de referência: um modelo
+    Para uma constante `p`, o Brier é `p(1-p)`. Serve de piso de referência: modelo
     com Brier acima disso tem probabilidades piores que a resposta mais ingênua
-    possível, ainda que discrimine bem.
+    possível, mesmo que discrimine bem.
     """
     p = float(np.mean(y))
     return p * (1.0 - p)
@@ -231,17 +229,17 @@ def tabela_calibracao(y_te, proba_te, n_bins: int = 10,
 
     Returns:
         DataFrame com `bin`, `n`, `proba_media`, `freq_observada`, `diferenca` e
-        `razao` (predito ÷ observado).
+        `razao` (predito dividido por observado).
     """
     proba_te = np.asarray(proba_te, dtype="float64")
     y_te = np.asarray(y_te)
 
     distintos = np.unique(proba_te)
     if len(distintos) <= n_bins:
-        # Saída discreta — caso dos comparadores da §7, que devolvem indicadoras.
-        # Cada valor vira seu próprio grupo: com dois valores, a tabela mostra a
+        # Saída discreta, caso dos comparadores, que devolvem indicadoras. Cada
+        # valor vira seu próprio grupo: com dois valores, a tabela mostra a
         # frequência observada entre encaminhados e entre não encaminhados. Forçar
-        # quantis aqui produziria faixas vazias ou um único bin degenerado.
+        # quantis aqui daria faixas vazias ou um único bin degenerado.
         grupos = [(v, proba_te == v) for v in distintos]
     else:
         if strategy == "quantile":
@@ -277,16 +275,16 @@ def diagnostico_calibracao(y_te, proba_te, n_bins: int = 10) -> dict:
 
     Métricas devolvidas:
 
-    - `brier` e `brier_trivial` — o modelo contra o previsor constante na
-      prevalência. `brier_skill` negativo significa pior que o trivial.
-    - `proba_media` e `prevalencia` — se a média das probabilidades não bate com a
+    - `brier` e `brier_trivial`: o modelo contra o previsor constante na
+      prevalência. `brier_skill` negativo é pior que o trivial.
+    - `proba_media` e `prevalencia`: se a média das probabilidades não bate com a
       prevalência, o modelo está deslocado em nível, não só em forma.
-    - `razao_inflacao` — quantas vezes a probabilidade média excede a prevalência.
-    - `ece` — erro de calibração esperado, média ponderada de |predito − observado|
+    - `razao_inflacao`: quantas vezes a probabilidade média excede a prevalência.
+    - `ece`: erro de calibração esperado, média ponderada de |predito − observado|
       entre as faixas.
-    - `slope` e `intercepto` — calibração de Cox: regressão de `y` sobre o logito
-      das probabilidades. Modelo calibrado tem slope 1 e intercepto 0; intercepto
-      fortemente negativo indica probabilidades sistematicamente infladas.
+    - `slope` e `intercepto`: calibração de Cox, regredindo `y` sobre o logito das
+      probabilidades. Modelo calibrado tem slope 1 e intercepto 0; intercepto bem
+      negativo indica probabilidades infladas de forma sistemática.
     """
     y_te = np.asarray(y_te)
     proba_te = np.asarray(proba_te, dtype="float64")
@@ -320,7 +318,7 @@ def diagnostico_calibracao(y_te, proba_te, n_bins: int = 10) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Etapa 5 — figuras
+# Figuras
 # ---------------------------------------------------------------------------
 
 
@@ -334,7 +332,7 @@ def _preparar_eixo(ax, titulo: str, xlabel: str, ylabel: str) -> None:
 
 def figura_matriz_confusao(y_te, proba_te, limiar: float, rotulo: str,
                            path_figuras: Path | None = None) -> Path:
-    """Matriz de confusão no limiar escolhido. Salva e devolve o caminho."""
+    """Matriz de confusão no limiar escolhido. Salva a figura e devolve o caminho."""
     path_figuras = cfg.PATH_FIGURAS if path_figuras is None else Path(path_figuras)
     path_figuras.mkdir(parents=True, exist_ok=True)
     destino = path_figuras / f"confusao_{_slug(rotulo)}.png"
@@ -366,7 +364,7 @@ def figura_matriz_confusao(y_te, proba_te, limiar: float, rotulo: str,
 
 def figura_roc(y_te, proba_te, rotulo: str,
                path_figuras: Path | None = None) -> Path:
-    """Curva ROC no teste. Salva e devolve o caminho."""
+    """Curva ROC no teste. Salva a figura e devolve o caminho."""
     path_figuras = cfg.PATH_FIGURAS if path_figuras is None else Path(path_figuras)
     path_figuras.mkdir(parents=True, exist_ok=True)
     destino = path_figuras / f"roc_{_slug(rotulo)}.png"
@@ -424,7 +422,7 @@ def figura_precision_recall(y_te, proba_te, limiar: float, rotulo: str,
 
 def figura_calibracao(y_te, proba_te, rotulo: str, n_bins: int = 10,
                       path_figuras: Path | None = None) -> Path:
-    """Curva de calibração — subsidia o backlog de calibração probabilística."""
+    """Curva de calibração, insumo do backlog de calibração probabilística."""
     path_figuras = cfg.PATH_FIGURAS if path_figuras is None else Path(path_figuras)
     path_figuras.mkdir(parents=True, exist_ok=True)
     destino = path_figuras / f"calibracao_{_slug(rotulo)}.png"
@@ -456,41 +454,40 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
             recall_alvo: float = cfg.RECALL_ALVO, conjunto: str = "",
             salvar_figuras: bool = True, limiar: float | None = None,
             path_figuras: Path | None = None) -> dict:
-    """Avalia um estimador pelo protocolo da §6.3 fase 5.
+    """Avalia um estimador pelo protocolo de validação do projeto.
 
     Args:
-        estimador: estimador **já embrulhado** no preprocessador da §4.5. Nada
-            aqui constrói pipeline: o conjunto de atributos e a imputação são
-            decididos fora, em `features.construir_preprocessador`.
+        estimador: estimador **já embrulhado** no preprocessador. Nada aqui constrói
+            pipeline: conjunto de atributos e imputação são decididos fora, em
+            `features.construir_preprocessador`.
         X_tr, y_tr: treino. Único conjunto que participa da escolha do limiar.
-        X_te, y_te: teste. Usado exclusivamente para medir, nunca para decidir.
+        X_te, y_te: teste. Serve só para medir, nunca para decidir.
         nome: identificação do modelo na tabela comparativa.
-        recall_alvo: restrição de recall do ponto de operação (D-004, provisório
-            em 0,80 — confirmar com o orientador).
+        recall_alvo: restrição de recall do ponto de operação. Provisório em 0,80,
+            a confirmar com o orientador.
         conjunto: conjunto de atributos, registrado para a comparação.
         limiar: quando informado, **dispensa a calibração** e usa este valor. É o
-            caso dos comparadores não-ML da §7: a regra clínica ADA devolve uma
-            indicadora 0/1, não um escore, e calibrar limiar sobre ela produziria
-            um ponto de operação sem significado. `limiar_calibrado` no retorno
-            distingue os dois regimes.
+            caso dos comparadores não-ML: a regra clínica ADA devolve uma indicadora
+            0/1, não um escore, e calibrar limiar sobre ela daria um ponto de
+            operação sem significado. `limiar_calibrado` no retorno distingue os
+            dois regimes.
 
     Returns:
-        Dicionário com o limiar, as métricas assinadas e complementares, a matriz
-        de confusão, os caminhos das figuras e o estimador ajustado.
+        Dicionário com o limiar, as métricas assinadas e complementares, a matriz de
+        confusão, os caminhos das figuras e o estimador ajustado.
 
-    O estimador recebido não é modificado: a CV e o ajuste final operam sobre
-    clones.
+    O estimador recebido não é modificado: a CV e o ajuste final operam sobre clones.
     """
     rotulo = f"{nome}_{conjunto}" if conjunto else nome
 
-    # Etapas 1 e 2 — tudo no treino.
+    # Calibração do limiar: tudo no treino.
     proba_cv = probabilidades_por_cv(estimador, X_tr, y_tr)
     if limiar is None:
         escolha = selecionar_limiar(y_tr, proba_cv, recall_alvo)
         escolha["limiar_calibrado"] = True
     else:
         # Limiar imposto: nenhuma busca, nenhuma curva. `recall_alvo_atingido`
-        # deixa de ser garantia de projeto e passa a ser constatação.
+        # deixa de ser garantia e vira constatação.
         predito_cv = (proba_cv >= limiar).astype(int)
         recall_cv = float(recall_score(y_tr, predito_cv, zero_division=0))
         escolha = {
@@ -509,15 +506,16 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
     por_fold = metricas_por_fold(y_tr, proba_cv, limiar, X_tr=X_tr)
     dispersao = resumir_folds(por_fold)
 
-    # Etapa 3 — ajuste final no treino completo e medição no teste.
+    # Ajuste final no treino completo e medição no teste.
     ajustado = clone(estimador).fit(X_tr, y_tr)
     proba_te = ajustado.predict_proba(X_te)[:, 1]
     metricas = metricas_no_limiar(y_te, proba_te, limiar)
     calibracao = diagnostico_calibracao(y_te, proba_te)
 
     # Classificador de corte único: a saída assume no máximo dois valores, então
-    # não há curva a percorrer. Detectado pela saída, não pelo tipo do estimador —
-    # o que vale é o que ele produz. Governa a nota de rodapé de `comparar`.
+    # não há curva a percorrer. Detectado pela saída, não pelo tipo do estimador,
+    # porque o que vale é o que ele produz. É isso que governa a nota de rodapé de
+    # `comparar`.
     corte_unico = bool(len(np.unique(proba_te)) <= 2)
 
     figuras = {}
@@ -554,11 +552,11 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
 
 
 def comparar(resultados: list[dict]) -> pd.DataFrame:
-    """Tabela comparativa: uma linha por (modelo × conjunto de atributos).
+    """Tabela comparativa: uma linha por modelo e conjunto de atributos.
 
-    As métricas assinadas na §6.3 fase 5 vêm primeiro e estão sempre presentes,
-    cada uma seguida da média e do desvio padrão entre os folds da CV; as
-    complementares vêm depois. Exportável via `.to_latex()`.
+    As métricas assinadas vêm primeiro e estão sempre presentes, cada uma seguida da
+    média e do desvio padrão entre os folds da CV; as complementares vêm depois.
+    Exportável via `.to_latex()`.
     """
     assinadas_com_dispersao = [
         coluna
@@ -581,8 +579,8 @@ def comparar(resultados: list[dict]) -> pd.DataFrame:
 def comparar_formatado(resultados: list[dict], casas: int = 3) -> pd.DataFrame:
     """Tabela das métricas assinadas no formato `teste (CV: média ± dp)`.
 
-    Versão para o texto do TCC: o valor de teste é o resultado; a dispersão entre
-    folds é a escala que diz se a diferença entre conjuntos significa algo.
+    É a versão para o texto do TCC: o valor de teste é o resultado, e a dispersão
+    entre folds é a escala que diz se a diferença entre conjuntos significa algo.
     """
     linhas = []
     for r in resultados:
@@ -623,9 +621,9 @@ def nota_corte_unico(tabela: pd.DataFrame) -> str:
     """Nota de rodapé sobre as linhas cuja saída assume no máximo dois valores.
 
     Devolve string vazia quando a tabela não tem nenhuma. A nota existe porque a
-    tabela comparativa põe lado a lado objetos diferentes: sem ela, um leitor
-    compara a AUC-ROC 0,656 da regra ADA com a 0,781 do modelo como se medissem a
-    mesma coisa.
+    tabela comparativa põe lado a lado objetos diferentes: sem ela, quem lê compara
+    a AUC-ROC 0,656 da regra ADA com a 0,781 do modelo como se medissem a mesma
+    coisa.
     """
     if "corte_unico" not in tabela.columns or not tabela["corte_unico"].any():
         return ""
@@ -642,15 +640,15 @@ def nota_corte_unico(tabela: pd.DataFrame) -> str:
 def exportar_latex(tabela: pd.DataFrame, nome_arquivo: str,
                    path_reports: Path | None = None, nota: str | None = None,
                    **kwargs) -> Path:
-    """Exporta a tabela comparativa para `.tex` em `reports/`.
+    """Exporta a tabela comparativa para `.tex` em `reports/tabelas/`.
 
     Args:
-        nota: rodapé anexado após o `tabular`. Quando omitido, a nota de corte
-            único é gerada automaticamente se a tabela tiver linhas que a exijam —
-            uma advertência que depende do conteúdo não deveria depender de alguém
-            lembrar de pedi-la. Passe `nota=""` para suprimir.
+        nota: rodapé anexado depois do `tabular`. Omitido, a nota de corte único sai
+            sozinha quando a tabela tem linhas que a exijam: advertência que depende
+            do conteúdo não deveria depender de alguém lembrar de pedir. Passe
+            `nota=""` para suprimir.
     """
-    path_reports = cfg.PATH_REPORTS if path_reports is None else Path(path_reports)
+    path_reports = cfg.PATH_TABELAS if path_reports is None else Path(path_reports)
     path_reports.mkdir(parents=True, exist_ok=True)
     destino = path_reports / nome_arquivo
 

@@ -1,0 +1,13 @@
+\begin{tabular}{lrrrrrr}
+\toprule
+regime & encaminhados & taxa_encaminhamento & casos_detectados & casos_perdidos & recall & nns \\
+\midrule
+Regra ADA & 974 & 0.576 & 103 & 16 & 0.866 & 9.456 \\
+LogReg · B_composto, recall equiparado (alvo 0.8945 no treino) & 1000 & 0.591 & 109 & 10 & 0.916 & 9.174 \\
+LogReg · B_composto, ponto padrão (recall-alvo 0.80) & 661 & 0.391 & 91 & 28 & 0.765 & 7.264 \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize Volume de encaminhamentos só é comparável entre estratégias que operam no mesmo recall. Quando os recalls realizados diferem, a comparação é por NNS, que normaliza por casos detectados — no regime de recall equiparado um modelo pode encaminhar mais pessoas que a regra em números absolutos e ainda assim ter NNS menor, por detectar mais casos.
+\end{flushleft}

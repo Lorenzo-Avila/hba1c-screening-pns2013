@@ -1,8 +1,8 @@
-"""Testes dos invariantes de ortogonalidade e do preprocessador (§4 da spec).
+"""Testes dos invariantes de ortogonalidade e do preprocessador.
 
-Dois blocos. O primeiro valida os conjuntos de atributos como estrutura — não
-depende dos microdados e roda sempre. O segundo executa o pipeline de ponta a
-ponta sobre a base real e depende do CSV bruto, não versionado.
+Dois blocos. O primeiro valida os conjuntos de atributos como estrutura: não depende
+dos microdados e roda sempre. O segundo executa o pipeline de ponta a ponta sobre a
+base real e depende do CSV bruto, que não é versionado.
 """
 
 import numpy as np
@@ -14,7 +14,7 @@ from src import config as cfg
 from src import features as ft
 from src.data import carregar_bruto, limpar, separar
 
-# As 16 variáveis conceituais da §6.4.1, agrupadas nos cinco blocos temáticos.
+# As 16 variáveis conceituais do TCC I, agrupadas nos cinco blocos temáticos.
 VARIAVEIS_TCC = {
     "antropometrico": ["idade", "sexo", "imc", "circ_cintura", "rcest"],
     "pressao": ["pas", "pad", "has_autorrelato", "has_combinada"],
@@ -23,13 +23,13 @@ VARIAVEIS_TCC = {
     "autopercepcao": ["saude_autoaval"],
 }
 
-# Componentes do bloco de pressão e de diagnóstico autorrelatado — as variáveis
-# cuja duplicação a §4.1 identifica como violação do Princípio 4.
+# Componentes dos blocos de pressão e de diagnóstico autorrelatado: são as
+# variáveis cuja duplicação quebra a ortogonalidade.
 COMPONENTES_CRITICOS = {"pas", "pad", "has_autorrelato", "colesterol_alto"}
 
 
 # ---------------------------------------------------------------------------
-# §4.2 — invariantes dos conjuntos de atributos
+# Invariantes dos conjuntos de atributos
 # ---------------------------------------------------------------------------
 
 
@@ -45,12 +45,12 @@ def test_toda_coluna_tem_proveniencia_declarada():
 
 
 def test_A_tem_ortogonalidade_plena():
-    """Em A nenhuma variável fonte alimenta o modelo por dois canais (§4.2)."""
+    """Em A, nenhuma variável fonte alimenta o modelo por dois canais."""
     assert ft.fontes_em_canal_duplo("A_atomico") == set()
 
 
 def test_A_e_B_cumprem_o_invariante_estrito():
-    """Nenhuma fonte entra como coluna própria e parcela idêntica de agregada (§4.2 v2)."""
+    """Nenhuma fonte entra como coluna própria e parcela idêntica de agregada."""
     assert ft.fontes_isoladas_e_agregadas("A_atomico") == set()
     assert ft.fontes_isoladas_e_agregadas("B_composto") == set()
 
@@ -64,11 +64,11 @@ def test_B_tem_sobreposicao_apenas_por_coarsening():
 
 
 def test_B_nao_carrega_has_combinada_ao_lado_do_escore():
-    """D-012: `has_combinada` é parcela literal de `multimorbidade`.
+    """`has_combinada` é parcela literal de `multimorbidade`.
 
-    Mantê-la ao lado do escore reproduziria em B a violação que a §4.1 acusa no
-    baseline, e o modelo recuperaria a parcela linearmente — esvaziando a
-    hipótese de sinergia que B existe para testar.
+    Mantê-la ao lado do escore repetiria em B a duplicação do baseline, e o modelo
+    recuperaria a parcela linearmente, esvaziando a hipótese de sinergia que B existe
+    para testar.
     """
     colunas = ft.colunas_do_conjunto("B_composto")
     assert "has_combinada" not in colunas
@@ -79,7 +79,7 @@ def test_B_nao_carrega_has_combinada_ao_lado_do_escore():
 def test_diagnostico_autorrelatado_entra_uma_unica_vez(nome):
     """`has_autorrelato` e `colesterol_alto` não entram isolados e agregados em A e B.
 
-    É exatamente a duplicação do baseline corrigida por D-001: três canais para
+    É exatamente a duplicação que o baseline tinha: três canais para
     `has_autorrelato`, dois para `colesterol_alto`.
     """
     colunas = ft.colunas_do_conjunto(nome)
@@ -92,33 +92,33 @@ def test_diagnostico_autorrelatado_entra_uma_unica_vez(nome):
 
 
 def test_C_reproduz_a_redundancia_do_baseline():
-    """Falha se a redundância desaparecer: em C ela é proposital (§4.2 v2)."""
+    """Falha se a redundância sumir: em C ela é proposital."""
     duplicadas = ft.fontes_isoladas_e_agregadas("C_completo")
     assert {"has_autorrelato", "colesterol_alto"} <= duplicadas
     assert "has_combinada" in ft.colunas_do_conjunto("C_completo")
 
 
 def test_rcest_apenas_em_C():
-    """Remoção de `rcest` em A e B é a experimentação prevista na §6.5."""
+    """Tirar `rcest` de A e B é a ablação prevista na metodologia."""
     assert "rcest" in ft.colunas_do_conjunto("C_completo")
     assert "rcest" not in ft.colunas_do_conjunto("A_atomico")
     assert "rcest" not in ft.colunas_do_conjunto("B_composto")
 
 
 def test_C_contem_as_16_variaveis_da_secao_641():
-    """Nenhuma variável justificada no TCC I pode deixar de ser avaliada."""
+    """Nenhuma variável justificada no TCC I pode ficar sem avaliação."""
     esperadas = [v for bloco in VARIAVEIS_TCC.values() for v in bloco]
     assert len(esperadas) == 16
 
     colunas = ft.colunas_do_conjunto("C_completo")
     fontes_de_c = {f for c in colunas for f in ft.FONTES[c]} | set(colunas)
-    # `sexo` e `plano_saude` entram recodificadas (§4.3); `imc`, pelas fontes.
+    # `sexo` e `plano_saude` entram recodificadas; `imc` entra pelas fontes.
     for variavel in esperadas:
-        assert variavel in fontes_de_c, f"§6.4.1: {variavel} ausente de C"
+        assert variavel in fontes_de_c, f"{variavel} ausente de C"
 
 
 def test_nenhum_conjunto_usa_hba1c_peso_lab_ou_comportamentais():
-    """R6 (HbA1c só como desfecho), R10 (`peso_lab` fora do treino) e R5."""
+    """HbA1c só como desfecho, `peso_lab` fora do treino e nada de comportamentais."""
     proibidas = {"hba1c", "target", "peso_lab",
                  "dieta", "atividade_fisica", "tabagismo"}
     for nome in ft.FEATURE_SETS:
@@ -128,7 +128,7 @@ def test_nenhum_conjunto_usa_hba1c_peso_lab_ou_comportamentais():
 
 
 def test_raca_cor_nao_agrupada():
-    """D-007 está com status 'não implementada' — as cinco categorias permanecem."""
+    """O agrupamento de `raca_cor` não foi implementado: seguem as cinco categorias."""
     for nome in ft.FEATURE_SETS:
         colunas = ft.colunas_do_conjunto(nome)
         assert "raca_cor" in colunas
@@ -141,12 +141,12 @@ def test_conjunto_desconhecido_falha_alto():
 
 
 # ---------------------------------------------------------------------------
-# §4.4 e §4.5 — compostas e imputação dentro do pipeline
+# Compostas e imputação dentro do pipeline
 # ---------------------------------------------------------------------------
 
 
 def test_compostas_sao_transformador_nao_funcao_de_dataframe():
-    """R2: as compostas dependem de imputação, logo só existem dentro do pipeline."""
+    """As compostas dependem de imputação, então só existem dentro do pipeline."""
     pre = ft.construir_preprocessador("B_composto")
     assert [nome for nome, _ in pre.steps] == ["imputacao", "compostas", "preparo"]
     assert isinstance(pre.named_steps["compostas"], ft.ConstrutorCompostas)
@@ -154,7 +154,7 @@ def test_compostas_sao_transformador_nao_funcao_de_dataframe():
 
 
 def test_imputador_categorico_arredonda_para_codigo_valido():
-    """§4.5: o KNN devolve médias; o one-hot exige código inteiro da PNS."""
+    """O KNN devolve médias; o one-hot exige código inteiro da PNS."""
     treino = pd.DataFrame({
         "raca_cor": [1.0, 1.0, 2.0, 4.0, 5.0, 4.0],
         "regiao": [1.0, 2.0, 3.0, 4.0, 5.0, 3.0],
@@ -171,7 +171,7 @@ def test_imputador_categorico_arredonda_para_codigo_valido():
 
 
 def test_multimorbidade_e_has_combinada_seguem_a_secao_44():
-    """Escore ordinal 0–3; código 2 de Q002 ('apenas na gravidez') não é HAS crônica."""
+    """Escore ordinal de 0 a 3; código 2 de Q002 ("apenas na gravidez") não é HAS crônica."""
     entrada = pd.DataFrame({
         "idade": [50.0, 60.0, 40.0],
         "sexo": [2.0, 1.0, 2.0],            # feminino, masculino, feminino
@@ -208,7 +208,7 @@ def test_multimorbidade_e_has_combinada_seguem_a_secao_44():
 
 @pytest.fixture(scope="module")
 def split():
-    """Divisão 80/20 estratificada pelo alvo (R1), com a semente do projeto (R10)."""
+    """Divisão 80/20 estratificada pelo alvo, com a semente do projeto."""
     if not cfg.PATH_RAW.exists():
         pytest.skip(f"CSV bruto ausente em {cfg.PATH_RAW} (não versionado).")
     X, y, _ = separar(limpar(carregar_bruto()))
@@ -232,7 +232,7 @@ def test_pipeline_roda_e_nao_deixa_ausentes(split, nome):
 
 
 def test_imputacao_ajustada_apenas_no_treino(split):
-    """R2: o `fit` não pode ter visto o conjunto de teste."""
+    """O `fit` não pode ter visto o conjunto de teste."""
     X_train, X_test, y_train, _ = split
     pre = ft.construir_preprocessador("A_atomico")
     pre.fit(X_train, y_train)
@@ -247,7 +247,7 @@ def test_imputacao_ajustada_apenas_no_treino(split):
 
 
 def test_raca_cor_gera_quatro_dummies(split):
-    """Cinco categorias com `drop='first'` -> quatro colunas. D-007 não implementada."""
+    """Cinco categorias com `drop='first'` dão quatro colunas, sem agrupamento."""
     X_train, _, y_train, _ = split
     pre = ft.construir_preprocessador("A_atomico")
     pre.fit(X_train, y_train)
@@ -256,7 +256,7 @@ def test_raca_cor_gera_quatro_dummies(split):
 
 
 def test_colesterol_alto_imputado_por_knn(split):
-    """R3: o KNN é o método primário; D-008 (categoria explícita) não entra agora."""
+    """O KNN é o método primário; a categoria explícita de ausência fica para depois."""
     X_train, _, y_train, _ = split
     assert X_train["colesterol_alto"].isna().sum() > 0
 
@@ -270,7 +270,7 @@ def test_colesterol_alto_imputado_por_knn(split):
 
 
 def test_preprocessador_nao_recebe_peso_lab(split):
-    """R10/§9: nenhuma função de `features.py` aceita o peso amostral."""
+    """Nenhuma função de `features.py` aceita o peso amostral."""
     X_train, _, y_train, _ = split
     assert cfg.PESO not in X_train.columns
     pre = ft.construir_preprocessador("C_completo")
@@ -279,30 +279,30 @@ def test_preprocessador_nao_recebe_peso_lab(split):
 
 
 # ---------------------------------------------------------------------------
-# D-014 — espaço métrico da imputação
+# Espaço métrico da imputação
 # ---------------------------------------------------------------------------
 
 
 def _participacao_na_distancia(matriz: pd.DataFrame) -> pd.Series:
-    """Fração da distância euclidiana quadrática média atribuível a cada coluna.
+    """Fração da distância euclidiana quadrática média que cabe a cada coluna.
 
-    Para pares de pontos, a contribuição esperada de cada dimensão à distância
+    Entre pares de pontos, a contribuição esperada de cada dimensão à distância
     quadrática é proporcional à variância daquela coluna. A participação relativa
-    mede, portanto, quanto cada variável de fato pesa na escolha dos vizinhos.
+    mede, então, quanto cada variável realmente pesa na escolha dos vizinhos.
     """
     variancias = matriz.astype("float64").var(ddof=0)
     return variancias / variancias.sum()
 
 
 def test_espaco_metrico_equaliza_a_contribuicao_das_continuas(split):
-    """D-014: padronizadas, todas as contínuas pesam igual na distância."""
+    """Padronizadas, todas as contínuas pesam igual na distância."""
     X_train, _, _, _ = split
     imp = ft.ImputadorPNS().fit(X_train)
     metrico = imp.espaco_metrico(X_train)
 
     desvios = metrico[imp.continuas_].std(ddof=0)
     assert np.allclose(desvios, 1.0, atol=1e-6)
-    # `sexo_fem` entra em 0/1, sem padronizar: peso deliberadamente menor.
+    # `sexo_fem` entra em 0/1, sem padronizar: peso menor de propósito.
     assert 0.3 < metrico[ft.ImputadorPNS.METRICA_BINARIA].std(ddof=0) < 0.6
 
 
@@ -325,10 +325,10 @@ def test_imc_e_rcest_deixam_de_ser_irrelevantes_na_distancia(split):
 
 
 def test_vizinhos_mudam_em_relacao_a_escala_bruta(split):
-    """A correção precisa alterar resultados — caso contrário não corrigiu nada.
+    """A correção precisa mudar resultados, senão não corrigiu nada.
 
-    Comparador: a versão anterior imputava as categóricas por distância entre os
-    próprios códigos nominais, sem padronização e sem as contínuas.
+    O comparador é a versão anterior, que imputava as categóricas pela distância
+    entre os próprios códigos nominais, sem padronizar e sem as contínuas.
     """
     X_train, _, _, _ = split
     imp = ft.ImputadorPNS().fit(X_train)
@@ -353,7 +353,7 @@ def test_vizinhos_mudam_em_relacao_a_escala_bruta(split):
 
 
 def test_nominais_ficam_fora_do_espaco_metrico(split):
-    """Códigos de `raca_cor` e `regiao` não são distância — mas seguem sendo alvo."""
+    """Códigos de `raca_cor` e `regiao` não são distância, mas seguem sendo alvo."""
     X_train, _, _, _ = split
     imp = ft.ImputadorPNS().fit(X_train)
     metrico = imp.espaco_metrico(X_train)
@@ -367,7 +367,7 @@ def test_nominais_ficam_fora_do_espaco_metrico(split):
 
 
 def test_continuas_voltam_a_escala_original(split):
-    """As compostas da §4.4 comparam com cortes clínicos em unidades reais."""
+    """As compostas comparam com cortes clínicos em unidades reais."""
     X_train, _, _, _ = split
     imp = ft.ImputadorPNS().fit(X_train)
     saida = imp.transform(X_train)
@@ -393,12 +393,12 @@ def test_sexo_ausente_nao_vira_masculino():
 
 
 def test_escalonador_interno_ajustado_apenas_no_treino(split):
-    """R2: o espaço métrico é definido pelo treino e aplicado ao teste."""
+    """O espaço métrico é definido pelo treino e aplicado ao teste."""
     X_train, X_test, _, _ = split
     imp = ft.ImputadorPNS().fit(X_train)
 
     assert imp.escalonador_.n_samples_seen_ == len(X_train)
-    # No teste, as médias não são zero — sinal de que a escala veio do treino.
+    # No teste as médias não são zero, sinal de que a escala veio do treino.
     metrico_teste = imp.espaco_metrico(X_test)
     assert not np.allclose(metrico_teste[imp.continuas_].mean(), 0.0, atol=1e-9)
     # E o escalonador do ColumnTransformer segue sendo outro, intacto.

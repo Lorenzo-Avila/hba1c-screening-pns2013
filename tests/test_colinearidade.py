@@ -1,8 +1,8 @@
-"""Testes do diagnóstico de multicolinearidade (§6.5 · D-002 · D-003).
+"""Testes do diagnóstico de multicolinearidade.
 
-O ponto central: o VIF precisa enxergar a matriz de design **inteira**, dummies
+O ponto central é que o VIF precisa enxergar a matriz de design **inteira**, dummies
 incluídas. Foi por calcular VIF só sobre o bloco numérico cru que o baseline não
-detectou a redundância de D-001.
+detectou a redundância entre as variáveis compostas e seus componentes.
 """
 
 import numpy as np
@@ -21,7 +21,7 @@ from src.data import carregar_bruto, limpar, separar
 
 @pytest.fixture(scope="module")
 def split():
-    """Divisão 80/20 estratificada, com a semente do projeto (R1/R11)."""
+    """Divisão 80/20 estratificada, com a semente do projeto."""
     if not cfg.PATH_RAW.exists():
         pytest.skip(f"CSV bruto ausente em {cfg.PATH_RAW} (não versionado).")
     X, y, _ = separar(limpar(carregar_bruto()))
@@ -32,7 +32,7 @@ def split():
 
 @pytest.fixture(scope="module")
 def preprocessadores(split):
-    """Um preprocessador ajustado no treino por conjunto de atributos (R2)."""
+    """Um preprocessador por conjunto de atributos, ajustado no treino."""
     X_train, _, y_train, _ = split
     return {
         nome: ft.construir_preprocessador(nome).fit(X_train, y_train)
@@ -47,7 +47,7 @@ def preprocessadores(split):
 
 @pytest.mark.parametrize("nome", ["A_atomico", "B_composto", "C_completo"])
 def test_linhas_batem_com_get_feature_names_out(split, preprocessadores, nome):
-    """Uma linha por coluna da matriz de design — nenhuma a mais, nenhuma a menos."""
+    """Uma linha por coluna da matriz de design: nem a mais, nem a menos."""
     X_train, _, _, _ = split
     pre = preprocessadores[nome]
 
@@ -61,7 +61,7 @@ def test_linhas_batem_com_get_feature_names_out(split, preprocessadores, nome):
 
 @pytest.mark.parametrize("nome", ["A_atomico", "B_composto", "C_completo"])
 def test_vif_inclui_colunas_dummy(split, preprocessadores, nome):
-    """D-002: sem as dummies no cálculo, o diagnóstico não vê a redundância nominal."""
+    """Sem as dummies no cálculo, o diagnóstico não vê a redundância nominal."""
     X_train, _, _, _ = split
     tabela = col.vif_matriz_design(preprocessadores[nome], X_train, nome)
 
@@ -71,7 +71,7 @@ def test_vif_inclui_colunas_dummy(split, preprocessadores, nome):
 
 
 def test_vif_de_C_inclui_has_combinada_e_has_autorrelato(split, preprocessadores):
-    """As duas colunas que o baseline deixou fora do diagnóstico (D-002)."""
+    """As duas colunas que o baseline deixava fora do diagnóstico."""
     X_train, _, _, _ = split
     tabela = col.vif_matriz_design(preprocessadores["C_completo"], X_train, "C_completo")
     variaveis = set(tabela["variavel"])
@@ -82,7 +82,7 @@ def test_vif_de_C_inclui_has_combinada_e_has_autorrelato(split, preprocessadores
 
 
 def test_matriz_de_design_tem_mais_colunas_que_o_bloco_numerico(split, preprocessadores):
-    """A matriz pós-transformação é maior que as contínuas: é esse o ponto."""
+    """A matriz pós-transformação é maior que as contínuas, e o ponto é esse."""
     X_train, _, _, _ = split
     design = col.matriz_de_design(preprocessadores["C_completo"], X_train)
     numericas = ft.FEATURE_SETS["C_completo"]["num"]
@@ -92,7 +92,7 @@ def test_matriz_de_design_tem_mais_colunas_que_o_bloco_numerico(split, preproces
 
 
 def test_pipeline_completo_descarta_o_estimador(split, preprocessadores):
-    """`pipeline[:-1]` só se aplica quando o último estágio é o estimador (§5)."""
+    """`pipeline[:-1]` só vale quando o último estágio é o estimador."""
     X_train, _, y_train, _ = split
     pre = preprocessadores["A_atomico"]
     modelo = Pipeline([
@@ -109,7 +109,7 @@ def test_pipeline_completo_descarta_o_estimador(split, preprocessadores):
 
 
 def test_pipeline_nao_ajustado_falha_alto():
-    """R2: não há diagnóstico válido sobre pipeline que nunca viu o treino."""
+    """Não há diagnóstico válido sobre pipeline que nunca viu o treino."""
     with pytest.raises(NotFittedError):
         col.matriz_de_design(
             ft.construir_preprocessador("A_atomico"),
@@ -144,7 +144,7 @@ def test_coluna_constante_devolve_infinito():
 
 
 def test_colunas_independentes_tem_vif_proximo_de_um():
-    """Sem correlação, VIF ≈ 1 — o piso da escala."""
+    """Sem correlação, VIF fica perto de 1, que é o piso da escala."""
     rng = np.random.default_rng(cfg.RANDOM_STATE)
     base = pd.DataFrame(rng.normal(size=(500, 3)), columns=["a", "b", "c"])
     for coluna in base.columns:
@@ -162,7 +162,7 @@ def test_vif_cresce_com_a_correlacao():
 
 
 def test_sinalizacao_usa_o_limiar_do_config():
-    """§6.5: o limiar é 10, e vem de `config.VIF_LIMIAR`."""
+    """O limiar é 10 e vem de `config.VIF_LIMIAR`."""
     assert cfg.VIF_LIMIAR == 10
     tabela = pd.DataFrame({
         "feature_set": ["X", "X"],
@@ -179,7 +179,7 @@ def test_sinalizacao_usa_o_limiar_do_config():
 
 
 def test_matriz_pearson_forma_e_simetria(split):
-    """§6.5 exige Pearson **e** VIF — o baseline entregou só o segundo (D-003)."""
+    """A metodologia pede Pearson **e** VIF; o baseline entregava só o segundo."""
     X_train, _, _, _ = split
     continuas = ["idade", "imc", "circ_cintura", "pas", "pad"]
     matriz = col.matriz_pearson(X_train, continuas)
@@ -192,7 +192,7 @@ def test_matriz_pearson_forma_e_simetria(split):
 
 
 def test_matriz_pearson_so_no_treino(split):
-    """R2: a correlação é estatística entre linhas, estimada apenas no treino."""
+    """Correlação é estatística entre linhas, estimada só no treino."""
     X_train, X_test, _, _ = split
     continuas = ["idade", "imc"]
     do_treino = col.matriz_pearson(X_train, continuas)
@@ -218,7 +218,7 @@ def test_heatmap_salva_figura_e_devolve_path(split, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Tabela comparativa — resultado do TCC
+# Tabela comparativa: resultado do TCC
 # ---------------------------------------------------------------------------
 
 
@@ -234,7 +234,7 @@ def test_tabela_comparativa_cobre_os_tres_conjuntos(split):
 
 
 def test_escore_e_reconstruido_exatamente_pelas_parcelas(split, preprocessadores):
-    """Identidade algébrica da §4.4: o escore É a soma das três parcelas."""
+    """Identidade algébrica: o escore É a soma das três parcelas."""
     X_train, _, _, _ = split
     preditoras = col.preditoras_pos_compostas(preprocessadores["C_completo"], X_train)
     soma = (
@@ -246,7 +246,7 @@ def test_escore_e_reconstruido_exatamente_pelas_parcelas(split, preprocessadores
 
 
 def test_r2_da_identidade_e_um_e_o_do_vif_e_menor(split, preprocessadores):
-    """A distância entre os dois R² é a redundância que o VIF não enxerga (D-016)."""
+    """A distância entre os dois R² é a redundância que o VIF não enxerga."""
     X_train, _, _, _ = split
     d = col.decomposicao_do_escore(preprocessadores["C_completo"], X_train)
 
@@ -268,7 +268,7 @@ def test_obesidade_reconstruida_segue_os_cortes_da_secao_44():
 
 
 def test_tabela_traz_r2_auxiliar_coerente_com_o_vif(split, preprocessadores):
-    """`R² = 1 - 1/VIF`: o VIF isolado subestima a leitura da redundância."""
+    """`R² = 1 - 1/VIF`: o VIF sozinho subestima a leitura da redundância."""
     X_train, _, _, _ = split
     tabela = col.vif_matriz_design(preprocessadores["C_completo"], X_train, "C_completo")
 
@@ -290,7 +290,7 @@ def test_r2_de_vif_trata_colinearidade_perfeita():
 
 
 def test_pares_pearson_traz_os_coeficientes_exigidos(split, preprocessadores):
-    """§6.5 cobra Pearson como resultado, não só como figura (D-003)."""
+    """Pearson é resultado, não só figura: os coeficientes vão para a tabela."""
     X_train, _, _, _ = split
     preditoras = col.preditoras_pos_compostas(preprocessadores["C_completo"], X_train)
     matriz = col.matriz_pearson(preditoras, ft.FEATURE_SETS["C_completo"]["num"])
@@ -311,7 +311,7 @@ def test_pares_pearson_traz_os_coeficientes_exigidos(split, preprocessadores):
 
 
 def test_ablacao_de_rcest_reduz_o_vif_da_cintura(split):
-    """Protocolo da §6.5: remover a variável de maior VIF do bloco e recalcular."""
+    """Protocolo de ablação: remover a variável de maior VIF do bloco e recalcular."""
     X_train, _, y_train, _ = split
     comparativo = col.ablacao_vif(X_train, y_train, "C_completo", "rcest")
 

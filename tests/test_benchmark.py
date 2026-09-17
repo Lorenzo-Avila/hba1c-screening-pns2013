@@ -2,7 +2,7 @@
 
 A regra ADA precisa ser exatamente a regra: determinística, em escala clínica, sem
 nada estimado. E precisa atravessar o mesmo harness dos modelos, sobre as mesmas
-partições — caso contrário a comparação não é comparação.
+partições, senão a comparação não é comparação.
 """
 
 import numpy as np
@@ -71,7 +71,7 @@ def test_regra_e_clonavel_e_tem_parametros_explicitos():
 
 
 def test_predict_proba_devolve_a_indicadora_como_zero_ou_um(split):
-    """Compatibilidade com o harness — e não são probabilidades."""
+    """Compatibilidade com o harness, e não são probabilidades."""
     X_train, _, y_train, _ = split
     regra = bm.RegraClinicaADA().fit(X_train, y_train)
     proba = regra.predict_proba(X_train)
@@ -90,8 +90,8 @@ def test_regra_opera_em_escala_clinica_original(split):
                           columns=pre.get_feature_names_out())
 
     # A matriz de design tem `idade` e `imc` padronizados: comparar z-score com
-    # 45 e 30 daria zero positivos. O estimador recusa a entrada errada por
-    # exigir as colunas cruas — aqui elas existem, mas em escala trocada.
+    # 45 e 30 daria zero positivos. O estimador recusa a entrada errada por exigir
+    # as colunas cruas; aqui elas existem, mas em escala trocada.
     padronizada = bm.RegraClinicaADA().fit(design).predict(design)
     clinica = bm.RegraClinicaADA().fit(X_train).predict(X_train)
     assert padronizada.sum() == 0
@@ -120,7 +120,7 @@ def test_comparadores_usam_limiar_fixo(comparadores):
 
 
 def test_dummy_seria_destruido_por_calibracao(split):
-    """Sem limiar fixo, o piso viraria "prevê sempre positivo" — e deixaria de ser piso."""
+    """Sem limiar fixo, o piso viraria "prevê sempre positivo" e deixaria de ser piso."""
     X_train, X_test, y_train, y_test = split
     dummy = bm.construir_comparadores()["Dummy (maioria)"]
 
@@ -135,7 +135,7 @@ def test_dummy_seria_destruido_por_calibracao(split):
 
 
 def test_dummy_expoe_a_armadilha_da_acuracia(comparadores):
-    """Acurácia ≈ 0,93 com recall zero (§7)."""
+    """Acurácia perto de 0,93 com recall zero."""
     dummy = next(r for r in comparadores if r["modelo"] == "Dummy (maioria)")
     assert dummy["acuracia"] == pytest.approx(0.93, abs=0.01)
     assert dummy["recall"] == 0.0
@@ -151,13 +151,13 @@ def test_regra_avaliada_nas_mesmas_particoes(split, comparadores):
 
 @pytest.mark.parametrize("metrica", ev.METRICAS_ASSINADAS)
 def test_comparadores_trazem_as_metricas_assinadas(comparadores, metrica):
-    """Mesmo harness, mesma tabela: as cinco métricas da §6.3 fase 5."""
+    """Mesmo harness, mesma tabela: as métricas assinadas."""
     for r in comparadores:
         assert metrica in r and np.isfinite(r[metrica])
 
 
 # ---------------------------------------------------------------------------
-# NNS e critério de sucesso da §7
+# NNS e critério de sucesso
 # ---------------------------------------------------------------------------
 
 
@@ -207,7 +207,7 @@ def test_criterio_falha_sem_a_regra_nos_resultados():
 
 
 def test_recall_da_regra_no_treino_e_medido_so_no_treino(split):
-    """R1/R2: usar o recall da regra no teste vazaria o teste para a calibração."""
+    """Usar o recall da regra no teste vazaria o teste para dentro da calibração."""
     X_train, X_test, y_train, y_test = split
     no_treino = bm.recall_da_regra_no_treino(X_train, y_train)
     no_teste = bm.recall_da_regra_no_treino(X_test, y_test)
@@ -217,7 +217,7 @@ def test_recall_da_regra_no_treino_e_medido_so_no_treino(split):
 
 
 def test_tabela_separa_recall_alvo_de_recall_obtido(split):
-    """A equiparação é do alvo, no treino; o obtido no teste desvia — e aparece."""
+    """A equiparação é do alvo, no treino; o obtido no teste desvia, e isso aparece."""
     X_train, X_test, y_train, y_test = split
     alvo = bm.recall_da_regra_no_treino(X_train, y_train)
     modelo = Pipeline([
