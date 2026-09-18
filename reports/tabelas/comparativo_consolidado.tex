@@ -2,11 +2,16 @@
 \toprule
 modelo & conjunto & limiar & limiar_calibrado & recall_alvo_atingido & recall & recall_cv_media & recall_cv_dp & especificidade & especificidade_cv_media & especificidade_cv_dp & f1 & f1_cv_media & f1_cv_dp & auc_roc & auc_roc_cv_media & auc_roc_cv_dp & pr_auc & brier & nns & precisao & acuracia & brier_trivial & brier_skill & razao_inflacao & ece & vp & fp & fn & vn & auc_roc_cv & recall_cv & corte_unico \\
 \midrule
+LogReg & A_atomico & 0.424 & True & True & 0.748 & 0.802 & 0.027 & 0.627 & 0.644 & 0.015 & 0.224 & 0.246 & 0.010 & 0.775 & 0.786 & 0.015 & 0.253 & 0.192 & 7.584 & 0.132 & 0.636 & 0.065 & -1.937 & 5.592 & 0.323 & 89 & 586 & 30 & 986 & 0.786 & 0.802 & False \\
 LogReg & B_composto & 0.445 & True & True & 0.765 & 0.802 & 0.008 & 0.637 & 0.640 & 0.023 & 0.233 & 0.244 & 0.011 & 0.781 & 0.782 & 0.013 & 0.244 & 0.196 & 7.264 & 0.138 & 0.646 & 0.065 & -1.995 & 5.665 & 0.328 & 91 & 570 & 28 & 1002 & 0.783 & 0.802 & False \\
+LogReg & C_completo & 0.419 & True & True & 0.756 & 0.802 & 0.026 & 0.625 & 0.642 & 0.015 & 0.226 & 0.245 & 0.007 & 0.770 & 0.787 & 0.014 & 0.246 & 0.193 & 7.544 & 0.133 & 0.635 & 0.065 & -1.945 & 5.579 & 0.322 & 90 & 589 & 29 & 983 & 0.787 & 0.802 & False \\
+Random Forest & A_atomico & 0.320 & True & True & 0.782 & 0.802 & 0.024 & 0.632 & 0.635 & 0.017 & 0.235 & 0.242 & 0.011 & 0.786 & 0.791 & 0.016 & 0.233 & 0.133 & 7.215 & 0.139 & 0.643 & 0.065 & -1.031 & 4.341 & 0.235 & 93 & 578 & 26 & 994 & 0.791 & 0.802 & False \\
+Random Forest & B_composto & 0.306 & True & True & 0.807 & 0.802 & 0.031 & 0.625 & 0.624 & 0.021 & 0.239 & 0.236 & 0.011 & 0.778 & 0.788 & 0.015 & 0.226 & 0.139 & 7.135 & 0.140 & 0.638 & 0.065 & -1.130 & 4.416 & 0.240 & 96 & 589 & 23 & 983 & 0.788 & 0.802 & False \\
 Regra ADA & — & 0.500 & False & True & 0.866 & 0.894 & 0.025 & 0.446 & 0.454 & 0.017 & 0.188 & 0.196 & 0.008 & 0.656 & 0.674 & 0.018 & 0.101 & 0.525 & 9.456 & 0.106 & 0.475 & 0.065 & -7.018 & 8.185 & 0.525 & 103 & 871 & 16 & 701 & 0.674 & 0.895 & True \\
+Dummy (maioria) & — & 0.500 & False & False & 0.000 & 0.000 & 0.000 & 1.000 & 1.000 & 0.000 & 0.000 & 0.000 & 0.000 & 0.500 & 0.500 & 0.000 & 0.070 & 0.070 & inf & 0.000 & 0.930 & 0.065 & -0.076 & 0.000 & 0.070 & 0 & 0 & 119 & 1572 & 0.500 & 0.000 & True \\
 \bottomrule
 \end{tabular}
 
 \begin{flushleft}
-\footnotesize Nota: Regra ADA são classificadores de corte único — a saída assume dois valores, não um escore. AUC-ROC, PR-AUC, Brier e a curva de calibração dependem de percorrer limiares e, para essas linhas, ficam degradadas por construção, não por desempenho. As métricas comparáveis entre todas as linhas são Recall, Especificidade e NNS.
+\footnotesize Nota: Dummy (maioria), Regra ADA são classificadores de corte único — a saída assume dois valores, não um escore. AUC-ROC, PR-AUC, Brier e a curva de calibração dependem de percorrer limiares e, para essas linhas, ficam degradadas por construção, não por desempenho. As métricas comparáveis entre todas as linhas são Recall, Especificidade e NNS.
 \end{flushleft}

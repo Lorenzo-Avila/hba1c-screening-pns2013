@@ -260,7 +260,11 @@ def test_nota_da_equiparacao_acompanha_a_tabela(split, comparadores):
 
 
 def test_leitura_operacional_enuncia_a_taxa_de_encaminhamento(split, comparadores):
-    """57,6% é o número que sustenta o argumento de aplicabilidade."""
+    """A taxa de encaminhamento é o número que sustenta o argumento de aplicabilidade.
+
+    O veredito sobre a carga acompanha a taxa em vez de vir escrito fixo, pelo mesmo
+    motivo que o de NNS acompanha o número desde D-045.
+    """
     X_train, X_test, y_train, y_test = split
     modelo = Pipeline([
         ("pre", ft.construir_preprocessador("B_composto")),
@@ -278,7 +282,10 @@ def test_leitura_operacional_enuncia_a_taxa_de_encaminhamento(split, comparadore
     taxa = 100 * (regra["vp"] + regra["fp"]) / len(X_test)
     assert f"{taxa:.1f}%" in frase
     assert str(regra["vp"] + regra["fp"]) in frase
-    assert "metade da população" in frase
+    if taxa / 100 > bm.CORTE_TRIAGEM_AMPLA:
+        assert "mais da metade da população" in frase
+    else:
+        assert "menos da metade da população" in frase
 
 
 def test_leitura_explica_o_volume_maior_no_regime_equiparado(split, comparadores):
@@ -307,6 +314,26 @@ def test_leitura_explica_o_volume_maior_no_regime_equiparado(split, comparadores
     assert f"{modelo_eq['recall']:.3f} contra {regra['recall']:.3f}" in frase
     # A mesma estratégia nas duas metades da frase.
     assert frase.count("B_composto") == 2
+
+
+@pytest.mark.parametrize("delta, esperado", [
+    (48, "48 pessoas a mais"),
+    (-48, "48 pessoas a menos"),
+    (1, "1 pessoa a mais"),
+    (0, "o mesmo número de pessoas"),
+])
+def test_diferenca_escreve_o_sinal_inclusive_no_zero(delta, esperado):
+    """Zero não é desvantagem, e "0 pessoas a menos" diz que é."""
+    assert bm._diferenca(delta, "pessoa", "pessoas") == esperado
+
+
+def test_veredito_da_carga_acompanha_a_taxa():
+    """O julgamento da carga sai da comparação com o corte, não de frase fixa."""
+    acima = bm._veredito_da_carga("Regra ADA", bm.CORTE_TRIAGEM_AMPLA + 0.08)
+    abaixo = bm._veredito_da_carga("Regra ADA", bm.CORTE_TRIAGEM_AMPLA - 0.08)
+
+    assert "mais da metade" in acima and "menos da metade" not in acima
+    assert "menos da metade" in abaixo and "mais da metade" not in abaixo
 
 
 def test_tabela_nns_carrega_a_advertencia_de_volume(comparadores):

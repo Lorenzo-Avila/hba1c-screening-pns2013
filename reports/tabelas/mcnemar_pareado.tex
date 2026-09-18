@@ -1,0 +1,11 @@
+\begin{tabular}{llrrrrrrr}
+\toprule
+modelo_a & modelo_b & n & concordam & so_a_acerta & so_b_acerta & positivos_so_a_detecta & positivos_so_b_detecta & p_valor \\
+\midrule
+Random Forest · B_composto & LogReg · B_composto & 1691 & 1551 & 63 & 77 & 5 & 0 & 0.272 \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize Teste de McNemar pareado entre Random Forest · B_composto e LogReg · B_composto, nas predições do teste, cada modelo no seu limiar calibrado. O p-valor vem do teste binomial exato sobre os 140 casos discordantes.
+\end{flushleft}

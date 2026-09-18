@@ -1,0 +1,2 @@
+modelo_a,modelo_b,n,concordam,so_a_acerta,so_b_acerta,positivos_so_a_detecta,positivos_so_b_detecta,p_valor
+Random Forest · B_composto,LogReg · B_composto,1691,1551,63,77,5,0,0.27184203624171244

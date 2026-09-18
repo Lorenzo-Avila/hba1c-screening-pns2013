@@ -167,8 +167,19 @@ def test_reexecucao_reproduz_a_tabela_consolidada(tabelas_preservadas):
             f"Modelos emitidos: {sorted(set(emitida['modelo']))}; "
             f"esperados: {sorted(xp.MODELOS_PADRAO)}"
         )
-        # LogReg nos três conjuntos, mais uma linha por comparador invariante.
-        assert len(emitida) == 5, f"Esperadas 5 linhas, obtidas {len(emitida)}"
+        # Logística nos três conjuntos, floresta nos dois que sobreviveram ao
+        # diagnóstico de colinearidade, mais uma linha por comparador invariante. A
+        # contagem vem da composição declarada, e não de um número escrito aqui: número
+        # mágico em teste envelhece calado quando o grid muda.
+        esperada = xp.composicao_esperada()
+        assert len(emitida) == len(esperada), (
+            f"Esperadas {len(esperada)} linhas, obtidas {len(emitida)}"
+        )
+        faltando = xp.conferir_composicao(emitida, esperada)
+        assert faltando.empty, (
+            f"Composição errada na tabela do notebook:\n"
+            f"{faltando.to_string(index=False)}"
+        )
         invariantes = emitida[emitida["conjunto"] == xp.SEM_CONJUNTO]
         assert len(invariantes) == 2, (
             "Comparadores invariantes deveriam render uma linha cada."

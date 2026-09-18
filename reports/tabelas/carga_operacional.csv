@@ -1,4 +1,4 @@
 regime,encaminhados,taxa_encaminhamento,casos_detectados,casos_perdidos,recall,nns
 Regra ADA,974,0.5759905381431106,103,16,0.865546218487395,9.45631067961165
-"LogReg · B_composto, recall equiparado (alvo 0.8945 no treino)",1000,0.5913660555884093,109,10,0.9159663865546218,9.174311926605505
-"LogReg · B_composto, ponto padrão (recall-alvo 0.80)",661,0.3908929627439385,91,28,0.7647058823529411,7.263736263736263
+"Random Forest · B_composto, recall equiparado (alvo 0.8945 no treino)",1048,0.6197516262566529,110,9,0.9243697478991597,9.527272727272727
+"Random Forest · B_composto, ponto padrão (recall-alvo 0.80)",685,0.4050857480780603,96,23,0.8067226890756303,7.135416666666666

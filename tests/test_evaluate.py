@@ -442,3 +442,56 @@ def test_exportacao_latex(resultados, tmp_path):
     assert destino.exists()
     assert "tabular" in conteudo
     assert "LogReg" in conteudo
+
+
+# ---------------------------------------------------------------------------
+# McNemar pareado
+# ---------------------------------------------------------------------------
+
+def test_mcnemar_conta_discordancias_e_nao_concordancias():
+    """A 2x2 separa quem acerta o quê, e o p-valor olha só para as discordâncias.
+
+    Monta as predições à mão para o resultado ser verificável na unha: dez casos, dois
+    em que só A acerta e um em que só B acerta.
+    """
+    y = np.array([1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    a = {"modelo": "A", "conjunto": "", "limiar": 0.5,
+         "proba_teste": np.array([.9, .9, .9, .1, .1, .1, .1, .1, .9, .1])}
+    b = {"modelo": "B", "conjunto": "", "limiar": 0.5,
+         "proba_teste": np.array([.9, .1, .1, .1, .1, .1, .1, .1, .1, .1])}
+
+    teste = ev.mcnemar_pareado(y, a, b)
+
+    assert teste["so_a_acerta"] == 2      # casos 2 e 3: A pega, B perde
+    assert teste["so_b_acerta"] == 1      # caso 9: B acerta o negativo, A erra
+    assert teste["discordantes"] == 3
+    assert teste["concordam"] == 7
+    assert teste["positivos_so_a_detecta"] == 2
+    assert teste["positivos_so_b_detecta"] == 0
+    assert teste["tabela"].to_numpy().sum() == len(y)
+
+
+def test_mcnemar_sem_discordancia_devolve_p_igual_a_um():
+    """Modelos idênticos não têm o que testar, e o teste não pode dividir por zero."""
+    y = np.array([1, 0, 1, 0])
+    igual = {"modelo": "A", "conjunto": "", "limiar": 0.5,
+             "proba_teste": np.array([.9, .1, .9, .1])}
+    outro = dict(igual, modelo="B")
+
+    teste = ev.mcnemar_pareado(y, igual, outro)
+    assert teste["discordantes"] == 0
+    assert teste["p_valor"] == 1.0
+
+
+def test_mcnemar_usa_o_limiar_de_cada_modelo():
+    """Limiar por modelo, porque a escala de probabilidade de um não é a do outro."""
+    y = np.array([1, 1, 0, 0])
+    alto = {"modelo": "A", "conjunto": "", "limiar": 0.8,
+            "proba_teste": np.array([.9, .5, .1, .1])}
+    baixo = {"modelo": "B", "conjunto": "", "limiar": 0.3,
+             "proba_teste": np.array([.9, .5, .1, .1])}
+
+    teste = ev.mcnemar_pareado(y, alto, baixo)
+    # Com limiar 0,8 o segundo positivo passa despercebido; com 0,3 ele é detectado.
+    assert teste["positivos_so_b_detecta"] == 1
+    assert teste["positivos_so_a_detecta"] == 0

@@ -37,6 +37,12 @@ LIMIAR_INDICADORA = 0.5
 # Cortes da regra de rastreamento da American Diabetes Association.
 CORTE_IDADE_ADA = 45
 
+# Acima desta fração da população adulta, a estratégia deixa de selecionar quem
+# examinar e passa a empurrar a fila inteira para o laboratório. É o corte que a
+# leitura operacional usa para julgar a carga, e ele fica explícito aqui para o
+# veredito sair de uma comparação e não de uma frase escrita à mão.
+CORTE_TRIAGEM_AMPLA = 0.5
+
 NOTA_VOLUME_ABSOLUTO = (
     "Volume de encaminhamentos só é comparável entre estratégias que operam no "
     "mesmo recall. Quando os recalls realizados diferem, a comparação é por NNS, "
@@ -171,10 +177,11 @@ def tabela_nns(resultados: list[dict], n_teste: int | None = None) -> pd.DataFra
     enxerga.
 
     `taxa_encaminhamento` é a coluna que sustenta o argumento de aplicabilidade e
-    costuma passar batida ao lado do NNS: a regra ADA encaminha **57,6% das
-    pessoas** (974 de 1.691 no teste). Uma triagem que manda mais da metade da
-    população adulta ao laboratório não tria, só desloca a fila. O modelo, no ponto
-    de operação padrão, encaminha 39,1%. Ver `leitura_operacional`.
+    costuma passar batida ao lado do NNS. Triagem que manda mais da metade da
+    população adulta ao laboratório não tria, só desloca a fila, e é a taxa que diz
+    de qual lado do corte cada estratégia cai. Os valores de cada execução saem em
+    `reports/tabelas/carga_operacional.csv`; a leitura em texto fica em
+    `leitura_operacional`, que deriva o veredito do número em vez de o afirmar.
 
     Returns:
         DataFrame com `estrategia`, `encaminhados`, `taxa_encaminhamento`,
@@ -209,13 +216,18 @@ def leitura_operacional(resultados: list[dict], nome_regra: str = "Regra ADA",
     estratégia manda ao laboratório, que é o que decide se a triagem cabe na
     capacidade instalada da rede.
 
+    O veredito sobre a carga sai da taxa, não de uma afirmação fixa: a frase que
+    fecha a leitura dizia sempre que a triagem manda mais da metade da população ao
+    laboratório, e isso vale enquanto a taxa da regra estiver acima do corte. Mesmo
+    defeito que D-045 corrigiu na comparação de NNS.
+
     Args:
         equiparados: resultados do regime de recall equiparado, quando houver.
             Acrescenta a linha que impede ler as duas tabelas isoladamente: nesse
-            regime o modelo encaminha **mais** gente que a regra, e quem olhar só a
-            tabela de carga operacional vê 1.000 contra 974 sem perceber que os
-            recalls realizados diferem. Ali a comparação válida é por NNS, que
-            normaliza por casos detectados.
+            regime o modelo encaminha **mais** gente que a regra em números
+            absolutos, e quem olhar só a tabela de carga operacional vê o volume sem
+            perceber que os recalls realizados diferem. Ali a comparação válida é por
+            NNS, que normaliza por casos detectados.
     """
     regra = next((r for r in resultados if r["modelo"] == nome_regra), None)
     if regra is None:
@@ -239,9 +251,8 @@ def leitura_operacional(resultados: list[dict], nome_regra: str = "Regra ADA",
         f"{linha_regra['casos_detectados']:.0f} casos. "
         f"{melhor['estrategia']} encaminha {melhor['encaminhados']:.0f} "
         f"({100 * melhor['taxa_encaminhamento']:.1f}%) para detectar "
-        f"{melhor['casos_detectados']:.0f}. Uma triagem que encaminha mais da "
-        f"metade da população adulta não seleciona quem examinar — apenas desloca "
-        f"a fila para o laboratório."
+        f"{melhor['casos_detectados']:.0f}. "
+        + _veredito_da_carga(nome_regra, linha_regra["taxa_encaminhamento"])
     )
     if equiparados:
         # Mesma estratégia nas duas metades da frase: o que se compara são os dois
@@ -251,15 +262,47 @@ def leitura_operacional(resultados: list[dict], nome_regra: str = "Regra ADA",
     return frase
 
 
+def _veredito_da_carga(nome: str, taxa: float) -> str:
+    """Julga a carga de encaminhamento comparando a taxa com `CORTE_TRIAGEM_AMPLA`.
+
+    A frase que fecha a leitura operacional afirmava sempre que a triagem manda mais
+    da metade da população ao laboratório. Vale para a regra clínica hoje e deixa de
+    valer no dia em que a taxa cair, e aí o texto contradiz o número que ele mesmo
+    acabou de citar. Mesmo defeito que D-045 corrigiu na comparação de NNS.
+    """
+    if taxa > CORTE_TRIAGEM_AMPLA:
+        return (f"{nome} encaminha mais da metade da população adulta, o que não "
+                f"seleciona quem examinar: apenas desloca a fila para o laboratório.")
+    return (f"{nome} encaminha menos da metade da população adulta, então a carga "
+            f"ainda responde à pergunta de quem examinar, em vez de deslocar a fila "
+            f"inteira para o laboratório.")
+
+
+def _diferenca(delta: float, singular: str, plural: str) -> str:
+    """Escreve uma diferença em palavras, inclusive quando ela é zero.
+
+    Sem o caso do zero, a frase sai como "0 casos a menos", que afirma desvantagem
+    onde não há diferença nenhuma.
+    """
+    if delta == 0:
+        return f"o mesmo número de {plural}"
+    nome = singular if abs(delta) == 1 else plural
+    return f"{abs(delta):.0f} {nome} {'a mais' if delta > 0 else 'a menos'}"
+
+
 def _linha_do_regime_equiparado(equiparados: list[dict],
                                 nome_regra: str = "Regra ADA",
                                 estrategia: str | None = None) -> str:
     """Impede que a tabela de carga operacional seja lida sozinha.
 
     No regime equiparado o modelo encaminha mais gente que a regra em números
-    absolutos. Sem esta linha, quem olha só o volume conclui o oposto do que os
-    dados dizem: o modelo detecta mais casos por encaminhamento, e é isso que o NNS
-    mede.
+    absolutos. Sem esta linha, quem olha só o volume lê o sinal errado, porque os
+    recalls realizados diferem e o que normaliza a comparação é o NNS.
+
+    O sentido da comparação de NNS sai do número, e não de uma afirmação fixa na
+    frase. Quando a logística era o modelo de referência, ela vencia a regra também
+    neste regime, e o texto dizia isso direto; com outro modelo de referência o sinal
+    pode inverter, e frase que afirma vitória por escrito passaria a mentir sozinha.
     """
     tabela = tabela_nns(equiparados)
     regra = tabela[tabela["estrategia"] == nome_regra].iloc[0]
@@ -280,15 +323,19 @@ def _linha_do_regime_equiparado(equiparados: list[dict],
 
     d_pessoas = alvo["encaminhados"] - regra["encaminhados"]
     d_casos = alvo["casos_detectados"] - regra["casos_detectados"]
+    if alvo["nns"] < regra["nns"]:
+        veredito_nns = "mantendo NNS inferior"
+    elif alvo["nns"] > regra["nns"]:
+        veredito_nns = "mas com NNS superior, ou seja, pior"
+    else:
+        veredito_nns = "com NNS idêntico"
     return (
         f"No regime de recall equiparado, {alvo['estrategia']} encaminha "
-        f"{abs(d_pessoas):.0f} {'pessoa' if abs(d_pessoas) == 1 else 'pessoas'} "
-        f"{'a mais' if d_pessoas > 0 else 'a menos'} "
+        f"{_diferenca(d_pessoas, 'pessoa', 'pessoas')} "
         f"({alvo['encaminhados']:.0f} contra {regra['encaminhados']:.0f}) e detecta "
-        f"{abs(d_casos):.0f} {'caso' if abs(d_casos) == 1 else 'casos'} "
-        f"{'a mais' if d_casos > 0 else 'a menos'} "
+        f"{_diferenca(d_casos, 'caso', 'casos')} "
         f"({alvo['casos_detectados']:.0f} contra {regra['casos_detectados']:.0f}), "
-        f"mantendo NNS inferior ({alvo['nns']:.2f} contra {regra['nns']:.2f}): "
+        f"{veredito_nns} ({alvo['nns']:.2f} contra {regra['nns']:.2f}): "
         f"a comparação válida é por NNS, não por volume absoluto, já que os recalls "
         f"realizados diferem ({recall_modelo:.3f} contra {recall_regra:.3f})."
     )

@@ -127,11 +127,13 @@ def grid_dois_conjuntos(particao):
 
 
 def test_produto_cartesiano_nao_e_cheio(grid_dois_conjuntos):
-    """Dois modelos calibráveis × 2 conjuntos + 2 pisos × 1 = 4 linhas."""
+    """Dois modelos calibráveis × 2 conjuntos + 2 pisos × 1 = 6 linhas, não 8."""
     linhas = [(r["modelo"], r["conjunto"]) for r in grid_dois_conjuntos]
     assert linhas == [
         ("LogReg", "A_atomico"),
         ("LogReg", "B_composto"),
+        (xp.NOME_FLORESTA, "A_atomico"),
+        (xp.NOME_FLORESTA, "B_composto"),
         ("Regra ADA", xp.SEM_CONJUNTO),
         ("Dummy (maioria)", xp.SEM_CONJUNTO),
     ]
@@ -153,9 +155,57 @@ def test_pisos_nao_passam_por_calibracao(grid_dois_conjuntos):
     assert dummy["recall"] == 0.0  # o piso continua sendo piso
 
 
-def test_random_forest_fora_do_padrao():
-    """Placeholder declarado não vira número reportado antes da Sprint 2."""
-    assert "Random Forest" not in xp.MODELOS_PADRAO
+def test_floresta_no_padrao_mas_fora_do_conjunto_descartado():
+    """A floresta publica em A e B, e não em `C_completo`.
+
+    `C_completo` saiu pelo diagnóstico de multicolinearidade (D-016), e publicar
+    desempenho de conjunto descartado sugere que ele ainda está em disputa. A logística
+    continua nos três porque a linha de C é o lastro empírico do descarte (D-042).
+    """
+    assert xp.NOME_FLORESTA in xp.MODELOS_PADRAO
+    assert "C_completo" not in xp.CONJUNTOS_FLORESTA
+
+    celulas = xp.composicao_esperada()
+    assert (xp.NOME_FLORESTA, "C_completo") not in celulas
+    assert ("LogReg", "C_completo") in celulas
+
+
+def test_composicao_publicada_tem_sete_celulas():
+    """Logística em três conjuntos, floresta em dois, mais os dois pisos."""
+    assert xp.composicao_esperada() == [
+        ("LogReg", "A_atomico"),
+        ("LogReg", "B_composto"),
+        ("LogReg", "C_completo"),
+        (xp.NOME_FLORESTA, "A_atomico"),
+        (xp.NOME_FLORESTA, "B_composto"),
+        ("Regra ADA", xp.SEM_CONJUNTO),
+        ("Dummy (maioria)", xp.SEM_CONJUNTO),
+    ]
+
+
+def test_conferencia_de_composicao_acusa_linha_removida():
+    """Linha que some tem que ser acusada, e a conferência de valores não acusa.
+
+    A conferência de reprodução intersecta índices: ela compara o que os dois lados têm
+    em comum e uma tabela truncada passa com os números todos certos. Foi assim que a
+    consolidada sobreviveu com duas linhas e a suíte verde (D-044).
+    """
+    completa = pd.DataFrame(xp.composicao_esperada(), columns=["modelo", "conjunto"])
+    assert xp.conferir_composicao(completa).empty
+
+    truncada = completa.drop(index=4).reset_index(drop=True)
+    faltando = xp.conferir_composicao(truncada)
+    assert len(faltando) == 1
+    assert faltando.loc[0, "situacao"] == "ausente do emitido"
+    assert "B_composto" in faltando.loc[0, "linha"]
+
+    sobrando = xp.conferir_composicao(
+        pd.concat([completa,
+                   pd.DataFrame([{"modelo": xp.NOME_FLORESTA,
+                                  "conjunto": "C_completo"}])],
+                  ignore_index=True)
+    )
+    assert list(sobrando["situacao"]) == ["inesperada no emitido"]
 
 
 def test_modelo_desconhecido_falha_cedo(particao):
@@ -164,10 +214,20 @@ def test_modelo_desconhecido_falha_cedo(particao):
 
 
 def test_modelo_de_referencia_ignora_os_pisos(grid_dois_conjuntos):
-    """O Dummy tem NNS infinito e a regra opera em limiar fixo: nenhum é candidato."""
+    """O Dummy tem NNS infinito e a regra opera em limiar fixo: nenhum é candidato.
+
+    O critério continua sendo o menor NNS entre os calibráveis, sem mudança (D-030). O
+    que mudou foi quem ganha: a floresta entrou no grid e ficou com o menor NNS, então
+    ela assume a carga operacional. Isso é consequência do critério, não escolha nova, e
+    o desempate por parcimônia de D-038 não chega a ser acionado porque não houve empate
+    em recall.
+    """
     escolhido = xp.modelo_de_referencia(grid_dois_conjuntos)
-    assert escolhido["modelo"] == "LogReg"
+    calibraveis = [r for r in grid_dois_conjuntos if r.get("limiar_calibrado", True)]
+
+    assert escolhido["modelo"] not in bm.construir_comparadores()
     assert escolhido["limiar_calibrado"] is True
+    assert escolhido["nns"] == min(r["nns"] for r in calibraveis)
 
 
 # ---------------------------------------------------------------------------
@@ -179,13 +239,47 @@ def test_referencia_da_sprint1_esta_versionada():
     assert (cfg.PATH_TABELAS / xp.REFERENCIA).exists()
 
 
+def test_as_duas_ancoras_estao_versionadas():
+    """A da logística cobre as três linhas dela; a da floresta cobre as duas novas.
+
+    A antiga ganhou função a mais: com a floresta no grid, ela prova que acrescentá-la
+    não moveu nenhum número da logística. Se mover, é defeito no grid (D-039).
+    """
+    for nome in xp.REFERENCIAS:
+        assert (cfg.PATH_TABELAS / nome).exists(), f"âncora ausente: {nome}"
+
+
+def test_tabelas_versionadas_trazem_as_sete_linhas():
+    """Contagem, e não só valor.
+
+    Esta é a guarda que faltava: as conferências comparam a interseção dos índices e
+    deixam passar tabela truncada. Aqui o artefato versionado é medido pelo número de
+    linhas e pela composição (D-044).
+    """
+    esperada = xp.composicao_esperada()
+
+    assert len(esperada) == 7
+
+    for nome in (xp.NOME_CONSOLIDADO, xp.NOME_CALIBRACAO):
+        emitida = pd.read_csv(cfg.PATH_TABELAS / f"{nome}.csv")
+        # A composição vem antes da contagem de propósito: ela nomeia a célula que
+        # falta, e `6 != 7` sozinho não diz qual linha sumiu.
+        faltando = xp.conferir_composicao(emitida, esperada)
+        assert faltando.empty, (
+            f"{nome}.csv com composição errada:\n{faltando.to_string(index=False)}"
+        )
+        assert len(emitida) == len(esperada), (
+            f"{nome}.csv tem {len(emitida)} linhas, esperadas {len(esperada)}."
+        )
+
+
 def test_conferencia_acusa_divergencia_injetada(grid_dois_conjuntos):
     """Uma conferência que nunca reprova não verifica nada."""
     from src import evaluate as ev
 
     tabela = ev.comparar(grid_dois_conjuntos).copy()
     tabela.loc[tabela["conjunto"] == "A_atomico", "recall"] += 0.01
-    divergencias = xp.conferir_reproducao(tabela)
+    divergencias = xp.conferir_reproducao(tabela, exigir_cobertura=False)
     assert not divergencias.empty
     assert (divergencias["coluna"] == "recall").any()
 
@@ -196,16 +290,23 @@ def test_conferencia_tolera_divergencia_abaixo_da_terceira_casa(grid_dois_conjun
 
     tabela = ev.comparar(grid_dois_conjuntos).copy()
     tabela["recall"] += 1e-6
-    assert xp.conferir_reproducao(tabela).empty
+    assert xp.conferir_reproducao(tabela, exigir_cobertura=False).empty
 
 
-def test_conferencia_compara_so_o_que_a_referencia_cobre(grid_dois_conjuntos):
-    """A referência é anterior às colunas novas e só tem as linhas da LogReg."""
+def test_conferencia_compara_so_as_colunas_que_a_referencia_cobre(grid_dois_conjuntos):
+    """A âncora é anterior às colunas de dispersão e de calibração.
+
+    Coluna que a âncora não tem fica de fora da comparação. Linha que ela tem, não: a
+    tabela de dois conjuntos não traz `C_completo`, e isso passa a ser acusado.
+    """
     from src import evaluate as ev
 
-    divergencias = xp.conferir_reproducao(ev.comparar(grid_dois_conjuntos))
-    assert isinstance(divergencias, pd.DataFrame)
-    assert divergencias.empty
+    tabela = ev.comparar(grid_dois_conjuntos)
+    assert xp.conferir_reproducao(tabela, exigir_cobertura=False).empty
+
+    faltando = xp.conferir_reproducao(tabela)
+    assert list(faltando["coluna"].unique()) == ["(linha inteira)"]
+    assert faltando["linha"].str.contains("C_completo").all()
 
 
 # ---------------------------------------------------------------------------
@@ -220,12 +321,39 @@ def test_carga_operacional_tem_tres_regimes(particao, grid_dois_conjuntos):
     assert "ponto padrão" in tabela["regime"].iloc[2]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="O critério de sucesso do projeto não é cumprido no regime equiparado pelo "
+           "modelo de referência atual: a floresta detecta mais casos que a regra e "
+           "gasta mais encaminhamento por caso, NNS 9,53 contra 9,46 (D-046). A falha "
+           "fica visível de propósito, e não é ajustada. `strict=True` porque se o "
+           "critério voltar a ser cumprido a suíte tem que avisar, em vez de passar "
+           "calada.",
+)
 def test_regime_equiparado_supera_a_regra_em_nns(particao, grid_dois_conjuntos):
     """O argumento é esse: mais casos por encaminhamento, não menos volume."""
     tabela = xp.carga_operacional(grid_dois_conjuntos, particao)
     regra, equiparado = tabela.iloc[0], tabela.iloc[1]
     assert equiparado["nns"] < regra["nns"]
     assert equiparado["casos_detectados"] > regra["casos_detectados"]
+
+
+def test_leitura_do_equiparado_segue_o_sinal_do_nns(particao, grid_dois_conjuntos):
+    """A frase gerada lê o número, em vez de afirmar vitória por escrito.
+
+    A versão anterior trazia "mantendo NNS inferior" fixo no texto. Com a floresta na
+    referência isso passou a contradizer o número ao lado, e texto gerado que contradiz
+    o próprio dado é pior que texto ausente: ele vai para o documento sem ninguém
+    conferir.
+    """
+    tabela = xp.carga_operacional(grid_dois_conjuntos, particao)
+    regra, equiparado = tabela.iloc[0], tabela.iloc[1]
+    leitura = tabela.attrs["leitura"]
+
+    if equiparado["nns"] > regra["nns"]:
+        assert "NNS superior" in leitura and "mantendo NNS inferior" not in leitura
+    elif equiparado["nns"] < regra["nns"]:
+        assert "mantendo NNS inferior" in leitura
 
 
 def test_carga_operacional_carrega_a_advertencia(particao, grid_dois_conjuntos):

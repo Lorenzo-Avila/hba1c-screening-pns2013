@@ -1,0 +1,17 @@
+\begin{tabular}{llrrrrrrrrr}
+\toprule
+modelo & conjunto & brier & brier_trivial & brier_skill & prevalencia & proba_media & razao_inflacao & ece & slope & intercepto \\
+\midrule
+LogReg & A_atomico & 0.192 & 0.065 & -1.937 & 0.070 & 0.394 & 5.592 & 0.323 & 0.873 & -2.571 \\
+LogReg & B_composto & 0.196 & 0.065 & -1.995 & 0.070 & 0.399 & 5.665 & 0.328 & 0.920 & -2.589 \\
+LogReg & C_completo & 0.193 & 0.065 & -1.945 & 0.070 & 0.393 & 5.579 & 0.322 & 0.836 & -2.561 \\
+Random Forest & A_atomico & 0.133 & 0.065 & -1.031 & 0.070 & 0.305 & 4.341 & 0.235 & 1.020 & -2.060 \\
+Random Forest & B_composto & 0.139 & 0.065 & -1.130 & 0.070 & 0.311 & 4.416 & 0.240 & 0.929 & -2.129 \\
+Regra ADA & — & 0.525 & 0.065 & -7.018 & 0.070 & 0.576 & 8.185 & 0.525 & 0.060 & -2.958 \\
+Dummy (maioria) & — & 0.070 & 0.065 & -0.076 & 0.070 & 0.000 & 0.000 & 0.070 & 0.186 & -0.013 \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize Nota: Dummy (maioria), Regra ADA são classificadores de corte único — a saída assume dois valores, não um escore. AUC-ROC, PR-AUC, Brier e a curva de calibração dependem de percorrer limiares e, para essas linhas, ficam degradadas por construção, não por desempenho. As métricas comparáveis entre todas as linhas são Recall, Especificidade e NNS.
+\end{flushleft}

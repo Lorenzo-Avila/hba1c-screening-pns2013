@@ -25,6 +25,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.stats import binomtest
 from sklearn.base import clone
 from sklearn.calibration import calibration_curve
 from sklearn.linear_model import LogisticRegression
@@ -615,6 +616,94 @@ def tabela_calibracao_comparada(resultados: list[dict]) -> pd.DataFrame:
         }
         for r in resultados
     ])
+
+
+def mcnemar_pareado(y_te, resultado_a: dict, resultado_b: dict) -> dict:
+    """Teste de McNemar entre dois modelos, nas predições do teste.
+
+    Compara os dois no mesmo conjunto de teste e caso a caso, que é o que a comparação
+    de médias não faz: duas tabelas de recall podem diferir porque os modelos acertam
+    pessoas diferentes ou porque um acerta um subconjunto do outro, e a diferença entre
+    esses dois cenários muda o que se pode afirmar.
+
+    Cada modelo entra com o **seu** ponto de operação, o limiar que `selecionar_limiar`
+    calibrou para ele. Igualar o valor numérico do limiar entre modelos não significa
+    nada, porque a escala de probabilidade de um não é a do outro.
+
+    O p-valor sai do teste binomial exato sobre as discordâncias, sem aproximação por
+    qui-quadrado: com poucas dezenas de casos discordantes, a aproximação assintótica é
+    justamente onde ela vale menos.
+
+    Args:
+        y_te: rótulos do teste.
+        resultado_a, resultado_b: saídas de `avaliar`, cada uma com `proba_teste` e
+            `limiar`.
+
+    Returns:
+        Dicionário com `tabela` (a 2x2 de acertos), `p_valor`, as contagens de
+        discordância e, entre os positivos reais, quantos cada modelo detecta que o
+        outro perde.
+    """
+    y_te = np.asarray(y_te)
+    pred_a = (np.asarray(resultado_a["proba_teste"]) >= resultado_a["limiar"]).astype(int)
+    pred_b = (np.asarray(resultado_b["proba_teste"]) >= resultado_b["limiar"]).astype(int)
+
+    acerta_a, acerta_b = pred_a == y_te, pred_b == y_te
+    so_a = int(np.sum(acerta_a & ~acerta_b))
+    so_b = int(np.sum(~acerta_a & acerta_b))
+
+    rotulo_a = _rotulo_resultado(resultado_a)
+    rotulo_b = _rotulo_resultado(resultado_b)
+    tabela = pd.DataFrame(
+        [[int(np.sum(acerta_a & acerta_b)), so_a],
+         [so_b, int(np.sum(~acerta_a & ~acerta_b))]],
+        index=[f"{rotulo_a} acerta", f"{rotulo_a} erra"],
+        columns=[f"{rotulo_b} acerta", f"{rotulo_b} erra"],
+    )
+
+    discordantes = so_a + so_b
+    p_valor = (float(binomtest(min(so_a, so_b), n=discordantes, p=0.5).pvalue)
+               if discordantes else 1.0)
+
+    positivo = y_te == 1
+    return {
+        "modelo_a": rotulo_a,
+        "modelo_b": rotulo_b,
+        "tabela": tabela,
+        "n": int(len(y_te)),
+        "concordam": int(np.sum(acerta_a == acerta_b)),
+        "discordantes": discordantes,
+        "so_a_acerta": so_a,
+        "so_b_acerta": so_b,
+        # Entre os positivos reais: quem cada um detecta que o outro deixa passar. É a
+        # leitura que interessa na triagem, onde o custo do falso negativo é o caso
+        # perdido, não o erro em abstrato.
+        "positivos_so_a_detecta": int(np.sum(positivo & (pred_a == 1) & (pred_b == 0))),
+        "positivos_so_b_detecta": int(np.sum(positivo & (pred_b == 1) & (pred_a == 0))),
+        "p_valor": p_valor,
+    }
+
+
+def _rotulo_resultado(resultado: dict) -> str:
+    """Nome do modelo com o conjunto, quando ele depende de um."""
+    conjunto = resultado.get("conjunto", "")
+    return (f"{resultado['modelo']} · {conjunto}" if conjunto and conjunto != "—"
+            else resultado["modelo"])
+
+
+def tabela_mcnemar(teste: dict) -> pd.DataFrame:
+    """A saída do McNemar em uma linha, pronta para virar artefato."""
+    return pd.DataFrame([{
+        "modelo_a": teste["modelo_a"],
+        "modelo_b": teste["modelo_b"],
+        "n": teste["n"],
+        "concordam": teste["concordam"],
+        "so_a_acerta": teste["so_a_acerta"],
+        "so_b_acerta": teste["so_b_acerta"],
+        "positivos_so_a_detecta": teste["positivos_so_a_detecta"],
+        "positivos_so_b_detecta": teste["positivos_so_b_detecta"],
+        "p_valor": teste["p_valor"],
+    }])
 
 
 def nota_corte_unico(tabela: pd.DataFrame) -> str:

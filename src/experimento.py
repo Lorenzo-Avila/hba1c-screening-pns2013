@@ -41,21 +41,39 @@ from . import evaluate as ev
 from . import features as ft
 from . import models as md
 
-# Modelos com resultado publicável hoje. A Random Forest fica de fora até a Sprint 2
-# definir seus hiperparâmetros: os valores em `models.random_forest` são placeholder
-# declarado, e reportar número saído de placeholder é pior que não reportar. Quem
-# quiser rodá-la passa `--modelos`.
-MODELOS_PADRAO = ["LogReg", "Regra ADA", "Dummy (maioria)"]
+# Modelos com resultado publicável. A Random Forest entra depois de a busca fixar seus
+# hiperparâmetros: enquanto eles eram placeholder declarado, reportar número saído dali
+# seria pior que não reportar.
+MODELOS_PADRAO = ["LogReg", "Random Forest", "Regra ADA", "Dummy (maioria)"]
 
-# Referência da reprodução: único artefato da Sprint 1 rastreado em git com os
-# números da tabela consolidada.
+NOME_FLORESTA = "Random Forest"
+
+# A floresta não roda em `C_completo`. O conjunto foi descartado pelo diagnóstico de
+# multicolinearidade (D-016), e publicar desempenho de conjunto descartado sugere que ele
+# ainda está em disputa. A logística continua aparecendo nos três porque a linha de
+# `C_completo` é o lastro empírico do descarte: sem ela, D-016 vira afirmação sem número.
+CONJUNTOS_FLORESTA = ["A_atomico", "B_composto"]
+
+# Ordem das linhas na tabela publicada: os modelos primeiro, os pisos depois.
+ORDEM_MODELOS = ["LogReg", NOME_FLORESTA, "Regra ADA", "Dummy (maioria)"]
+
+# Referências da reprodução. A primeira cobre as três linhas da logística e vem da
+# Sprint 1; a segunda cobre as duas da floresta. A antiga ganhou função nova ao lado da
+# que já tinha: ela agora prova que acrescentar a floresta ao grid não moveu nenhum
+# número da logística. Se mover, é defeito no grid, não resultado (D-039).
 REFERENCIA = "comparativo_logreg.tex"
+REFERENCIA_FLORESTA = "comparativo_rf.tex"
+REFERENCIAS = [REFERENCIA, REFERENCIA_FLORESTA]
 
 NOME_CONSOLIDADO = "comparativo_consolidado"
 NOME_CARGA = "carga_operacional"
 NOME_RESUMO = "resumo_amostra"
 NOME_AUSENTES = "ausentes_por_variavel"
 NOME_CALIBRACAO = "calibracao_comparada"
+NOME_MCNEMAR = "mcnemar_pareado"
+
+# Par que o McNemar compara: os dois modelos no conjunto em que a floresta venceu.
+PAR_MCNEMAR = ((NOME_FLORESTA, "B_composto"), ("LogReg", "B_composto"))
 
 # Conjunto vazio na coluna, para as linhas invariantes. É o mesmo símbolo que
 # `benchmark.avaliar_comparadores` usa, senão as tabelas não se juntam.
@@ -144,6 +162,40 @@ def rodar_grid(modelos: list[str] | None = None,
     return resultados
 
 
+def compor_grid(modelos: list[str] | None = None,
+                conjuntos: list[str] | None = None,
+                particao: Particao | None = None,
+                recall_alvo: float = cfg.RECALL_ALVO,
+                salvar_figuras: bool = False) -> list[dict]:
+    """O grid publicado, onde nem todo modelo roda em todo conjunto.
+
+    `rodar_grid` aplica os mesmos conjuntos a todos os modelos que dependem de um, e a
+    tabela publicada não é assim: a logística aparece nos três conjuntos e a floresta só
+    em `A_atomico` e `B_composto`, porque `C_completo` foi descartado por D-016. Daí duas
+    passadas e uma concatenação, em vez de um cartesiano com uma célula recortada depois.
+
+    A ordem final segue `ORDEM_MODELOS`, e dentro de cada modelo a ordem dos conjuntos
+    que o chamador pediu. Ordenação estável, então nada se embaralha.
+    """
+    modelos = list(MODELOS_PADRAO) if modelos is None else list(modelos)
+    conjuntos = list(ft.FEATURE_SETS) if conjuntos is None else list(conjuntos)
+    particao = preparar_particao() if particao is None else particao
+
+    demais = [nome for nome in modelos if nome != NOME_FLORESTA]
+    resultados = rodar_grid(demais, conjuntos, particao=particao,
+                            recall_alvo=recall_alvo, salvar_figuras=salvar_figuras)
+
+    if NOME_FLORESTA in modelos:
+        da_floresta = [c for c in conjuntos if c in CONJUNTOS_FLORESTA]
+        resultados += rodar_grid([NOME_FLORESTA], da_floresta, particao=particao,
+                                 recall_alvo=recall_alvo,
+                                 salvar_figuras=salvar_figuras)
+
+    posicao = {nome: i for i, nome in enumerate(ORDEM_MODELOS)}
+    resultados.sort(key=lambda r: posicao.get(r["modelo"], len(posicao)))
+    return resultados
+
+
 def _rotulo(resultado: dict) -> str:
     """Nome da estratégia como `benchmark.tabela_nns` o escreve."""
     conjunto = resultado["conjunto"]
@@ -156,8 +208,10 @@ def modelo_de_referencia(resultados: list[dict]) -> dict:
 
     Critério declarado e reprodutível, o mesmo que `benchmark.leitura_operacional` já
     aplica ao escolher a estratégia que enfrenta a regra: menor NNS é menos
-    encaminhamento por caso detectado, que é a pergunta operacional. Hoje devolve
-    `LogReg · B_composto`, com NNS 7,26.
+    encaminhamento por caso detectado, que é a pergunta operacional. Quem ganha sai
+    do grid da execução e está em `reports/tabelas/carga_operacional.csv`; escrever o
+    vencedor aqui deixa o docstring mentir na primeira vez que o grid mudar, e ele já
+    mudou uma vez (D-045).
 
     Raises:
         ValueError: se não houver nenhum estimador calibrável nos resultados.
@@ -173,9 +227,9 @@ def carga_operacional(resultados: list[dict],
                       nome_regra: str = "Regra ADA") -> pd.DataFrame:
     """Os três regimes de encaminhamento.
 
-    É o resultado que sustenta a conclusão do trabalho: a regra clínica encaminha
-    57,6% da população adulta e opera em ponto único, enquanto o modelo escolhe onde
-    operar. Sem esta tabela, o argumento de aplicabilidade não tem lastro.
+    É o resultado que sustenta a conclusão do trabalho: a regra clínica encaminha mais
+    da metade da população adulta e opera em ponto único, enquanto o modelo escolhe
+    onde operar. Sem esta tabela, o argumento de aplicabilidade não tem lastro.
 
     O regime equiparado exige uma **segunda avaliação** do modelo de referência, com
     `recall_alvo = benchmark.recall_da_regra_no_treino`. É o cálculo mais frágil da
@@ -299,7 +353,8 @@ def _ler_referencia(path: Path) -> pd.DataFrame:
 
 def conferir_reproducao(tabela: pd.DataFrame,
                         referencia: Path | None = None,
-                        casas: int = 3) -> pd.DataFrame:
+                        casas: int = 3,
+                        exigir_cobertura: bool = True) -> pd.DataFrame:
     """Compara a tabela emitida com o artefato rastreado da Sprint 1.
 
     Confere só as colunas e as linhas presentes nos dois lados: a referência é
@@ -326,6 +381,16 @@ def conferir_reproducao(tabela: pd.DataFrame,
     comuns = esperado.index.intersection(obtido.index)
 
     divergencias = []
+    # Linha da âncora que sumiu do emitido. Sem esta varredura, a conferência compara só
+    # a interseção e uma tabela truncada passa: foi assim que a consolidada sobreviveu
+    # com duas linhas e a suíte verde (D-044). Quem roda um recorte de propósito desliga
+    # com `exigir_cobertura=False`, e aí a conferência volta a olhar só a interseção.
+    if exigir_cobertura:
+        for linha in esperado.index.difference(obtido.index):
+            divergencias.append({
+                "linha": " · ".join(linha), "coluna": "(linha inteira)",
+                "referencia": "presente na âncora", "obtido": "ausente do emitido",
+            })
     for linha in comuns:
         for coluna in numericas:
             a = round(float(esperado.loc[linha, coluna]), casas)
@@ -337,6 +402,84 @@ def conferir_reproducao(tabela: pd.DataFrame,
                 })
     return pd.DataFrame(divergencias,
                         columns=["linha", "coluna", "referencia", "obtido"])
+
+
+def mcnemar_do_par(resultados: list[dict], particao: Particao,
+                   par: tuple = PAR_MCNEMAR) -> dict | None:
+    """Roda o McNemar entre as duas células do par, se as duas estiverem no grid.
+
+    Retorna `None` quando o grid não traz as duas, que é o caso de qualquer execução
+    com recorte. Exigir o par faria um teste de recorte falhar por ausência de célula
+    que ele nunca pediu.
+    """
+    por_celula = {(r["modelo"], r["conjunto"]): r for r in resultados}
+    if any(celula not in por_celula for celula in par):
+        return None
+    return ev.mcnemar_pareado(particao.y_te,
+                              por_celula[par[0]], por_celula[par[1]])
+
+
+def congelar_ancora(consolidado: pd.DataFrame,
+                    modelo: str = NOME_FLORESTA,
+                    nome: str = REFERENCIA_FLORESTA) -> Path:
+    """Grava as linhas de um modelo como âncora de reprodução.
+
+    Só depois de uma execução sair limpa: âncora congelada sobre resultado não conferido
+    transforma um defeito em referência, e a partir daí a conferência passa a atestar o
+    defeito.
+
+    Raises:
+        ValueError: se o modelo não aparece na tabela.
+    """
+    recorte = consolidado[consolidado["modelo"] == modelo]
+    if recorte.empty:
+        raise ValueError(f"{modelo!r} ausente da tabela; nada a congelar.")
+    return ev.exportar_latex(recorte, nome, nota="")
+
+
+def composicao_esperada(modelos: list[str] | None = None,
+                        conjuntos: list[str] | None = None) -> list[tuple[str, str]]:
+    """As células que a tabela publicada tem que trazer, na ordem em que saem."""
+    modelos = list(MODELOS_PADRAO) if modelos is None else list(modelos)
+    conjuntos = list(ft.FEATURE_SETS) if conjuntos is None else list(conjuntos)
+    disponiveis = md.estimadores()
+
+    celulas = []
+    for nome in sorted(modelos, key=lambda n: ORDEM_MODELOS.index(n)
+                       if n in ORDEM_MODELOS else len(ORDEM_MODELOS)):
+        if disponiveis[nome].invariante_ao_conjunto:
+            celulas.append((nome, SEM_CONJUNTO))
+        elif nome == NOME_FLORESTA:
+            celulas += [(nome, c) for c in conjuntos if c in CONJUNTOS_FLORESTA]
+        else:
+            celulas += [(nome, c) for c in conjuntos]
+    return celulas
+
+
+def conferir_composicao(tabela: pd.DataFrame,
+                        esperada: list[tuple[str, str]] | None = None) -> pd.DataFrame:
+    """Confere quais células a tabela traz, e não só os valores das que ela traz.
+
+    A conferência de reprodução compara a interseção dos índices, então ela flagra valor
+    errado numa linha existente e deixa passar linha que sumiu. Uma tabela truncada por
+    execução com recorte de grid tem números todos certos e conteúdo errado, e é
+    exatamente esse o defeito que passou despercebido até agora.
+
+    Returns:
+        DataFrame com `linha` e `situacao`, uma entrada por célula ausente ou inesperada.
+        Vazio significa composição exata.
+    """
+    esperada = composicao_esperada() if esperada is None else list(esperada)
+    obtida = list(zip(tabela["modelo"], tabela["conjunto"]))
+
+    faltando = [c for c in esperada if c not in obtida]
+    sobrando = [c for c in obtida if c not in esperada]
+
+    linhas = ([{"linha": " · ".join(c), "situacao": "ausente do emitido"}
+               for c in faltando]
+              + [{"linha": " · ".join(c), "situacao": "inesperada no emitido"}
+                 for c in sobrando])
+    return pd.DataFrame(linhas, columns=["linha", "situacao"])
 
 
 # ---------------------------------------------------------------------------
@@ -365,8 +508,8 @@ def executar(modelos: list[str] | None = None,
         `divergencias` e `particao`.
     """
     particao = preparar_particao() if particao is None else particao
-    resultados = rodar_grid(modelos, conjuntos, particao=particao,
-                            salvar_figuras=salvar_figuras)
+    resultados = compor_grid(modelos, conjuntos, particao=particao,
+                             salvar_figuras=salvar_figuras)
 
     consolidado = ev.comparar(resultados)
     carga = carga_operacional(resultados, particao)
@@ -385,9 +528,31 @@ def executar(modelos: list[str] | None = None,
     if descritivas:
         artefatos.update(exportar_descritivas(particao))
 
+    mcnemar = mcnemar_do_par(resultados, particao)
+    if mcnemar is not None:
+        artefatos[NOME_MCNEMAR] = exportar(
+            ev.tabela_mcnemar(mcnemar), NOME_MCNEMAR,
+            nota=(f"Teste de McNemar pareado entre {mcnemar['modelo_a']} e "
+                  f"{mcnemar['modelo_b']}, nas predições do teste, cada modelo no seu "
+                  f"limiar calibrado. O p-valor vem do teste binomial exato sobre os "
+                  f"{mcnemar['discordantes']} casos discordantes."),
+        )
+
     divergencias = pd.DataFrame()
+    composicao = pd.DataFrame()
     if conferir:
-        divergencias = conferir_reproducao(consolidado)
+        # Uma conferência por âncora, concatenadas. A da logística prova que a floresta
+        # entrou no grid sem mover número dela; a da floresta cobre as linhas novas.
+        # Âncora ainda não congelada é pulada, senão a primeira execução nunca sairia.
+        partes = [conferir_reproducao(consolidado, cfg.PATH_TABELAS / nome)
+                  for nome in REFERENCIAS
+                  if (cfg.PATH_TABELAS / nome).exists()]
+        divergencias = (pd.concat(partes, ignore_index=True) if partes
+                        else pd.DataFrame(columns=["linha", "coluna",
+                                                   "referencia", "obtido"]))
+        composicao = conferir_composicao(
+            consolidado, composicao_esperada(modelos, conjuntos)
+        )
 
     return {
         "resultados": resultados,
@@ -395,6 +560,8 @@ def executar(modelos: list[str] | None = None,
         "carga": carga,
         "artefatos": artefatos,
         "divergencias": divergencias,
+        "composicao": composicao,
+        "mcnemar": mcnemar,
         "particao": particao,
     }
 
@@ -412,7 +579,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--figuras", action="store_true",
                         help="salva as figuras do teste em reports/figuras/")
     parser.add_argument("--sem-conferencia", action="store_true",
-                        help="não compara com o artefato da Sprint 1")
+                        help="não compara com as âncoras nem confere a composição")
+    parser.add_argument("--congelar-ancora", action="store_true",
+                        help=f"grava {REFERENCIA_FLORESTA} a partir desta execução")
     args = parser.parse_args(argv)
 
     saida = executar(modelos=args.modelos, conjuntos=args.conjuntos,
@@ -425,20 +594,54 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print(saida["carga"].attrs["leitura"])
     print()
+    if saida["mcnemar"] is not None:
+        teste = saida["mcnemar"]
+        print(teste["tabela"].to_string())
+        print(f"McNemar pareado: {teste['discordantes']} discordantes "
+              f"({teste['so_a_acerta']} só {teste['modelo_a']}, "
+              f"{teste['so_b_acerta']} só {teste['modelo_b']}), "
+              f"p = {teste['p_valor']:.4f}")
+        print(f"Entre os positivos: {teste['positivos_so_a_detecta']} detectados só por "
+              f"{teste['modelo_a']}, {teste['positivos_so_b_detecta']} só por "
+              f"{teste['modelo_b']}")
+        print()
     for nome, caminhos in saida["artefatos"].items():
         print(f"{nome}: {caminhos['tex'].name}, {caminhos['csv'].name}")
 
-    divergencias = saida["divergencias"]
     if args.sem_conferencia:
         return 0
-    if divergencias.empty:
-        print(f"\nReprodução conferida contra {REFERENCIA}: sem divergência "
-              f"na terceira casa.")
-        return 0
 
-    print(f"\nDIVERGÊNCIA contra {REFERENCIA}:")
-    print(divergencias.to_string(index=False))
-    return 1
+    divergencias, composicao = saida["divergencias"], saida["composicao"]
+    ancoras = [nome for nome in REFERENCIAS if (cfg.PATH_TABELAS / nome).exists()]
+    status = 0
+
+    if composicao.empty:
+        print(f"\nComposição conferida: {len(saida['consolidado'])} linhas, "
+              f"as esperadas.")
+    else:
+        print("\nCOMPOSIÇÃO ERRADA:")
+        print(composicao.to_string(index=False))
+        status = 1
+
+    if divergencias.empty:
+        print(f"Reprodução conferida contra {', '.join(ancoras)}: sem divergência "
+              f"na terceira casa.")
+    else:
+        print(f"DIVERGÊNCIA contra {', '.join(ancoras)}:")
+        print(divergencias.to_string(index=False))
+        status = 1
+
+    faltam = [nome for nome in REFERENCIAS if nome not in ancoras]
+    if faltam:
+        print(f"Âncora ainda não congelada, fora da conferência: {', '.join(faltam)}")
+
+    if args.congelar_ancora:
+        if status != 0:
+            print("\nExecução com divergência: âncora não congelada.")
+            return status
+        destino = congelar_ancora(saida["consolidado"])
+        print(f"\nÂncora congelada: {destino.name}")
+    return status
 
 
 if __name__ == "__main__":
