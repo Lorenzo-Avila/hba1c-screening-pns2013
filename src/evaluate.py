@@ -706,6 +706,47 @@ def tabela_mcnemar(teste: dict) -> pd.DataFrame:
     }])
 
 
+def leitura_do_mcnemar(teste: dict, alfa: float = 0.05) -> str:
+    """Escreve o resultado do McNemar, com o veredito derivado do p-valor.
+
+    Duas frases que dizem coisas diferentes e precisam andar juntas. A primeira é o
+    acerto global: se a diferença entre os modelos sobrevive ao teste sobre as
+    discordâncias. A segunda é o recorte dos positivos, que é o que a triagem compra,
+    e ela pode ser assimétrica mesmo quando a primeira dá empate.
+
+    Nenhum adjetivo fica escrito à mão: significância sai da comparação com `alfa`, e
+    a assimetria dos positivos sai da contagem. Ver D-043 e o defeito que D-045
+    registra.
+    """
+    significativo = teste["p_valor"] < alfa
+    veredito = ("é significativa" if significativo
+                else "não é significativa")
+
+    so_a, so_b = teste["positivos_so_a_detecta"], teste["positivos_so_b_detecta"]
+    if so_a and not so_b:
+        leitura = (f"{teste['modelo_a']} detecta um superconjunto estrito dos "
+                   f"positivos que {teste['modelo_b']} pega: {so_a} a mais e nenhum "
+                   f"no sentido inverso")
+    elif so_b and not so_a:
+        leitura = (f"{teste['modelo_b']} detecta um superconjunto estrito dos "
+                   f"positivos que {teste['modelo_a']} pega: {so_b} a mais e nenhum "
+                   f"no sentido inverso")
+    elif so_a or so_b:
+        leitura = (f"cada um detecta positivos que o outro perde, {so_a} contra "
+                   f"{so_b}, então nenhum domina o outro caso a caso")
+    else:
+        leitura = "os dois detectam exatamente os mesmos positivos"
+
+    return (
+        f"Entre {teste['n']} casos do teste, os dois modelos discordam em "
+        f"{teste['discordantes']}: {teste['so_a_acerta']} em que só "
+        f"{teste['modelo_a']} acerta e {teste['so_b_acerta']} em que só "
+        f"{teste['modelo_b']} acerta. Pelo teste binomial exato, p = "
+        f"{teste['p_valor']:.4f}, e a diferença de acerto global {veredito} ao nível "
+        f"de {alfa:.2f}. No recorte que interessa à triagem, {leitura}."
+    )
+
+
 def nota_corte_unico(tabela: pd.DataFrame) -> str:
     """Nota de rodapé sobre as linhas cuja saída assume no máximo dois valores.
 

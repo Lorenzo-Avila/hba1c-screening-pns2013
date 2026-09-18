@@ -203,6 +203,26 @@ def _rotulo(resultado: dict) -> str:
             if conjunto not in ("", SEM_CONJUNTO) else resultado["modelo"])
 
 
+def celula(resultados: list[dict], modelo: str,
+           conjunto: str = SEM_CONJUNTO) -> dict:
+    """Localiza uma célula do grid pelo par modelo e conjunto.
+
+    Existe para o notebook não precisar montar filtro a cada gráfico que quer exibir.
+    Falha alto quando a célula não está no grid, em vez de devolver vazio e deixar o
+    erro aparecer três células adiante como `IndexError`.
+
+    Raises:
+        KeyError: se o par não estiver nos resultados.
+    """
+    for r in resultados:
+        if r["modelo"] == modelo and r["conjunto"] == conjunto:
+            return r
+    disponiveis = sorted({(r["modelo"], r["conjunto"]) for r in resultados})
+    raise KeyError(
+        f"Célula ({modelo!r}, {conjunto!r}) ausente do grid. Disponíveis: {disponiveis}"
+    )
+
+
 def modelo_de_referencia(resultados: list[dict]) -> dict:
     """O resultado de menor NNS entre os estimadores calibráveis.
 
@@ -285,7 +305,78 @@ def carga_operacional(resultados: list[dict],
     tabela.attrs["leitura"] = bm.leitura_operacional(
         resultados, nome_regra=nome_regra, equiparados=[equiparado, regra]
     )
+    tabela.attrs["criterio"] = veredito_do_criterio(tabela, nome_regra=nome_regra)
     return tabela
+
+
+def veredito_do_criterio(carga: pd.DataFrame,
+                         nome_regra: str = "Regra ADA") -> pd.DataFrame:
+    """Aplica o critério de sucesso a cada regime da carga operacional.
+
+    O critério do projeto é superar a regra clínica em recall **com NNS menor**, e as
+    duas condições valem juntas. `benchmark.supera_a_regra_clinica` já o aplica ao
+    grid; falta aplicá-lo aos regimes, que é onde a resposta muda de sinal: o modelo de
+    referência cumpre no ponto padrão e não cumpre no regime equiparado (D-046).
+
+    Escrever esse veredito à mão no documento é o defeito que D-045 registra. Aqui ele
+    sai da comparação, então quem trocar o modelo de referência vê o texto acompanhar.
+
+    Returns:
+        DataFrame com `regime`, `delta_recall`, `delta_nns` e `cumpre`, uma linha por
+        regime que não é o da regra.
+    """
+    da_regra = carga[carga["regime"] == nome_regra]
+    if da_regra.empty:
+        raise ValueError(f"Regime {nome_regra!r} ausente da carga operacional.")
+    referencia = da_regra.iloc[0]
+
+    linhas = []
+    for _, r in carga[carga["regime"] != nome_regra].iterrows():
+        delta_recall = r["recall"] - referencia["recall"]
+        delta_nns = r["nns"] - referencia["nns"]
+        linhas.append({
+            "regime": r["regime"],
+            "recall": r["recall"],
+            "recall_regra": referencia["recall"],
+            "delta_recall": delta_recall,
+            "nns": r["nns"],
+            "nns_regra": referencia["nns"],
+            "delta_nns": delta_nns,
+            "cumpre": bool(delta_recall > 0 and delta_nns < 0),
+        })
+    return pd.DataFrame(linhas)
+
+
+def leitura_do_criterio(carga: pd.DataFrame,
+                        nome_regra: str = "Regra ADA") -> str:
+    """Diz em voz alta, regime a regime, se o critério de sucesso foi cumprido.
+
+    Um resultado negativo é legítimo e tem que ser reportado como tal. O texto sai do
+    sinal dos deltas, nunca de afirmação fixa.
+    """
+    veredito = carga.attrs.get("criterio")
+    if veredito is None:
+        veredito = veredito_do_criterio(carga, nome_regra=nome_regra)
+
+    partes = []
+    for _, r in veredito.iterrows():
+        situacao = "cumpre" if r["cumpre"] else "NÃO cumpre"
+        partes.append(
+            f"{r['regime']}: {situacao} o critério, recall {r['recall']:.3f} contra "
+            f"{r['recall_regra']:.3f} da regra e NNS {r['nns']:.2f} contra "
+            f"{r['nns_regra']:.2f} (Δ recall {r['delta_recall']:+.3f}, "
+            f"Δ NNS {r['delta_nns']:+.2f})."
+        )
+
+    quantos = int(veredito["cumpre"].sum())
+    if quantos == len(veredito):
+        fecho = "O critério é cumprido em todos os regimes avaliados."
+    elif quantos == 0:
+        fecho = "O critério não é cumprido em nenhum regime avaliado."
+    else:
+        fecho = ("O critério é cumprido em um regime e não no outro, então a escolha "
+                 "do ponto de operação decide se o trabalho o cumpre.")
+    return "\n".join(partes + [fecho])
 
 
 def exportar(tabela: pd.DataFrame, nome: str, nota: str | None = None) -> dict[str, Path]:
@@ -594,16 +685,11 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print(saida["carga"].attrs["leitura"])
     print()
+    print(leitura_do_criterio(saida["carga"]))
+    print()
     if saida["mcnemar"] is not None:
-        teste = saida["mcnemar"]
-        print(teste["tabela"].to_string())
-        print(f"McNemar pareado: {teste['discordantes']} discordantes "
-              f"({teste['so_a_acerta']} só {teste['modelo_a']}, "
-              f"{teste['so_b_acerta']} só {teste['modelo_b']}), "
-              f"p = {teste['p_valor']:.4f}")
-        print(f"Entre os positivos: {teste['positivos_so_a_detecta']} detectados só por "
-              f"{teste['modelo_a']}, {teste['positivos_so_b_detecta']} só por "
-              f"{teste['modelo_b']}")
+        print(saida["mcnemar"]["tabela"].to_string())
+        print(ev.leitura_do_mcnemar(saida["mcnemar"]))
         print()
     for nome, caminhos in saida["artefatos"].items():
         print(f"{nome}: {caminhos['tex'].name}, {caminhos['csv'].name}")

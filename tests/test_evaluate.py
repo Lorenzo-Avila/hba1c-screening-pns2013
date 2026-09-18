@@ -15,7 +15,9 @@ from sklearn.utils.validation import check_is_fitted
 
 from src import config as cfg
 from src import evaluate as ev
+from src import experimento as xp
 from src import features as ft
+from src import models as md
 from src.data import carregar_bruto, limpar, separar
 
 
@@ -47,6 +49,23 @@ def resultados(split, tmp_path_factory):
         ev.avaliar(_logreg(nome), X_train, y_train, X_test, y_test,
                    nome="LogReg", conjunto=nome, path_figuras=destino)
         for nome in ft.FEATURE_SETS
+    ]
+
+
+@pytest.fixture(scope="module")
+def resultados_floresta(split):
+    """A floresta publicada, nos conjuntos em que ela publica.
+
+    Sai de `models.estimadores`, e não de uma floresta montada aqui, senão o teste
+    passa a medir uma configuração que não é a do resultado (D-029). Sem figuras: o
+    que interessa é o diagnóstico de calibração.
+    """
+    X_train, X_test, y_train, y_test = split
+    floresta = md.estimadores()["Random Forest"]
+    return [
+        ev.avaliar(md.montar(floresta, nome), X_train, y_train, X_test, y_test,
+                   nome="Random Forest", conjunto=nome, salvar_figuras=False)
+        for nome in xp.CONJUNTOS_FLORESTA
     ]
 
 
@@ -349,36 +368,82 @@ def test_tabela_calibracao_particiona_o_teste(split, resultados):
         assert (tabela["freq_observada"].between(0, 1)).all()
 
 
-def test_probabilidades_infladas_por_class_weight(resultados):
-    """Hipótese confirmada: `class_weight='balanced'` desloca o nível, não a forma.
+def _logito_da_prevalencia(y_train) -> float:
+    """Onde `class_weight='balanced'` põe o intercepto da logística, por álgebra."""
+    p = float(np.mean(y_train))
+    return float(np.log(p / (1 - p)))
+
+
+def test_probabilidades_da_logistica_infladas_por_class_weight(split, resultados):
+    """`class_weight='balanced'` desloca o nível da logística, não a forma.
 
     O modelo treina como se as classes fossem equilibradas, então a probabilidade
-    média sai perto de 0,4 contra prevalência de 0,07. A discriminação (slope perto
-    de 1) fica preservada e o nível (intercepto perto do logito da prevalência) sai
-    deslocado.
+    média sobe muito acima da prevalência. A discriminação fica preservada, com slope
+    perto de 1, e o nível sai deslocado para o logito da prevalência.
+
+    Os limites são estreitos de propósito. Eles descrevem a identidade algébrica da
+    logística e **não valem para a floresta**, que chega a um deslocamento parecido por
+    outro mecanismo. O par deste teste é
+    `test_probabilidades_da_floresta_deslocadas_sem_a_identidade`, e D-040 registra por
+    que os dois não podem compartilhar limite.
     """
+    _, _, y_train, _ = split
+    logito = _logito_da_prevalencia(y_train)
+
     for r in resultados:
         cal = r["calibracao"]
-        assert cal["razao_inflacao"] > 4.0
+        assert cal["razao_inflacao"] > 5.0
         assert cal["proba_media"] > 5 * cal["prevalencia"]
         # Pior que prever sempre a prevalência.
         assert r["brier_skill"] < 0
         assert r["brier"] > r["brier_trivial"]
-        # Forma preservada, nível deslocado.
+        # Forma preservada, nível deslocado para onde a álgebra manda.
         assert 0.7 < cal["slope"] < 1.2
-        assert cal["intercepto"] < -2.0
+        assert cal["intercepto"] == pytest.approx(logito, abs=0.1)
 
 
-def test_intercepto_reproduz_o_logito_da_prevalencia(split, resultados):
-    """O deslocamento é exatamente o reponderamento de classes, não ruído."""
+def test_intercepto_da_logistica_reproduz_o_logito_da_prevalencia(split, resultados):
+    """O deslocamento é exatamente o reponderamento de classes, não ruído.
+
+    Vale para a logística e só para ela. Com o modelo linear, reponderar as classes
+    equivale a somar uma constante ao logito, e a constante é o logito da prevalência
+    de treino. Não há o que transpor para a floresta, que não tem intercepto.
+    """
     _, _, y_train, _ = split
-    p = float(np.mean(y_train))
-    logito_prevalencia = np.log(p / (1 - p))
+    logito = _logito_da_prevalencia(y_train)
 
     for r in resultados:
-        assert r["calibracao"]["intercepto"] == pytest.approx(
-            logito_prevalencia, abs=0.1
-        )
+        assert r["calibracao"]["intercepto"] == pytest.approx(logito, abs=0.1)
+
+
+def test_probabilidades_da_floresta_deslocadas_sem_a_identidade(split,
+                                                               resultados_floresta):
+    """A floresta também desloca o nível, e por um mecanismo que a álgebra não descreve.
+
+    A saída da floresta é **fração de votos**, não a inversa de um logito somado a um
+    intercepto: não existe termo aditivo a que atribuir o deslocamento. O intercepto que
+    `diagnostico_calibracao` mede é o de uma regressão ajustada sobre o logito das
+    probabilidades preditas, e ele erra o logito da prevalência por larga margem, ao
+    contrário do que acontece na logística.
+
+    Por isso os limites são outros, e a distância mínima em relação ao logito é asserção
+    e não observação: transpor os limites da logística faria este teste passar por
+    pouco, dando a entender que os dois modelos têm a mesma patologia. D-040 mostra que
+    não têm.
+    """
+    _, _, y_train, _ = split
+    logito = _logito_da_prevalencia(y_train)
+
+    for r in resultados_floresta:
+        cal = r["calibracao"]
+        # O deslocamento existe, e é grande.
+        assert cal["razao_inflacao"] > 3.0
+        assert cal["proba_media"] > 3 * cal["prevalencia"]
+        assert r["brier_skill"] < 0
+        # A ordenação sobrevive, que é a condição para o limiar calibrado valer.
+        assert 0.7 < cal["slope"] < 1.3
+        # E a identidade da logística não transfere: o intercepto fica longe do logito.
+        assert abs(cal["intercepto"] - logito) > 0.3
 
 
 def test_modelo_bem_calibrado_tem_slope_um_e_intercepto_zero():

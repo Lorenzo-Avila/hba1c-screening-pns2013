@@ -338,6 +338,38 @@ def test_regime_equiparado_supera_a_regra_em_nns(particao, grid_dois_conjuntos):
     assert equiparado["casos_detectados"] > regra["casos_detectados"]
 
 
+def test_regime_equiparado_calibra_pelo_recall_da_regra_no_treino(particao,
+                                                                 grid_dois_conjuntos):
+    """O mecanismo do regime equiparado, sem congelar quem ganha.
+
+    A guarda que compara NNS contra a regra está marcada `xfail`, porque o critério de
+    sucesso deixou de ser cumprido (D-046), e sob `xfail` nada mais do corpo dela roda.
+    O que se perdeu ali não era resultado, era mecanismo, e mecanismo é o que teste
+    verifica: de onde sai o alvo e se a calibração mirou nele.
+
+    Este teste **não afirma** que o modelo detecta mais casos que a regra. Afirma que o
+    alvo veio do recall da regra medido no treino, e não no teste, e que o recall
+    realizado caiu na vizinhança dele.
+    """
+    alvo = bm.recall_da_regra_no_treino(particao.X_tr, particao.y_tr)
+    tabela = xp.carga_operacional(grid_dois_conjuntos, particao)
+    regra, equiparado = tabela.iloc[0], tabela.iloc[1]
+
+    # O alvo publicado no rótulo é o do treino. Se alguém trocasse a medição para o
+    # teste, o vazamento passaria despercebido: os dois números são próximos e o
+    # resultado continuaria plausível. Por isso o teste exige um e recusa o outro.
+    assert f"alvo {alvo:.4f} no treino" in equiparado["regime"]
+    assert f"alvo {regra['recall']:.4f}" not in equiparado["regime"]
+    assert alvo != pytest.approx(regra["recall"])
+
+    # O limiar é fixado fora da amostra de avaliação, então o recall realizado desvia
+    # do alvo. O desvio é esperado; o que não pode é o realizado ignorar o alvo.
+    assert equiparado["recall"] == pytest.approx(alvo, abs=0.10)
+    # E o regime equiparado tem que operar acima do ponto padrão, que é o que o
+    # distingue dele: alvo maior, mais gente encaminhada.
+    assert equiparado["encaminhados"] > tabela.iloc[2]["encaminhados"]
+
+
 def test_leitura_do_equiparado_segue_o_sinal_do_nns(particao, grid_dois_conjuntos):
     """A frase gerada lê o número, em vez de afirmar vitória por escrito.
 

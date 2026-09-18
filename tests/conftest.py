@@ -19,15 +19,25 @@ em `reports/tabelas/`, que é diretório **versionado**.
    O padrão é rodar tudo. O teste lento existe porque o notebook é commitado com
    outputs e não falha sozinho quando `src/` muda; desativá-lo por padrão devolveria
    o projeto ao estado que ele existe para impedir.
+
+3. **Backend `Agg` do matplotlib**, fixado antes de qualquer import de `pyplot`. A
+   suíte só gera figura para arquivo, nunca para tela, e o backend interativo padrão
+   abre janela Tk que o coletor de lixo depois destrói fora da thread principal,
+   soltando `PytestUnraisableExceptionWarning` no meio de um teste que não tem nada a
+   ver com figura. `Agg` é o mesmo rasterizador que `savefig` já usa para PNG, então o
+   arquivo emitido não muda. Vale só para a suíte: `src/` não é tocado.
 """
 
 import shutil
 import tempfile
 from pathlib import Path
 
+import matplotlib
 import pytest
 
-from src import config as cfg
+matplotlib.use("Agg")
+
+from src import config as cfg  # noqa: E402  depois do backend, de propósito
 
 
 def pytest_configure(config):

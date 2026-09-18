@@ -134,10 +134,15 @@ def test_dummy_seria_destruido_por_calibracao(split):
     assert calibrado["fp"] == fixo["vn"]
 
 
-def test_dummy_expoe_a_armadilha_da_acuracia(comparadores):
-    """Acurácia perto de 0,93 com recall zero."""
+def test_dummy_expoe_a_armadilha_da_acuracia(comparadores, split):
+    """Prever sempre a maioria acerta `1 − prevalência` e não detecta ninguém.
+
+    A acurácia sai da prevalência do teste, não de um número escrito aqui: é o que
+    torna a armadilha um invariante do desenho e não um resultado desta partição.
+    """
+    _, _, _, y_test = split
     dummy = next(r for r in comparadores if r["modelo"] == "Dummy (maioria)")
-    assert dummy["acuracia"] == pytest.approx(0.93, abs=0.01)
+    assert dummy["acuracia"] == pytest.approx(1.0 - float(np.mean(y_test)))
     assert dummy["recall"] == 0.0
     assert dummy["especificidade"] == 1.0
     assert np.isinf(dummy["nns"])
@@ -289,7 +294,13 @@ def test_leitura_operacional_enuncia_a_taxa_de_encaminhamento(split, comparadore
 
 
 def test_leitura_explica_o_volume_maior_no_regime_equiparado(split, comparadores):
-    """1.000 > 974 parece desvantagem até se ver que os recalls diferem."""
+    """Volume maior parece desvantagem até se ver que os recalls diferem.
+
+    As três comparações da frase acompanham o sinal do número, em vez de conferir
+    string fixa. Um teste que exige "NNS inferior" por escrito é o espelho do defeito
+    que D-045 corrigiu: ele trava a prosa num veredito e reprova a correção no dia em
+    que o sinal virar, que é exatamente o dia em que a frase precisa mudar.
+    """
     X_train, X_test, y_train, y_test = split
     modelo = Pipeline([
         ("pre", ft.construir_preprocessador("B_composto")),
@@ -308,12 +319,23 @@ def test_leitura_explica_o_volume_maior_no_regime_equiparado(split, comparadores
     modelo_eq = equiparados[0]
 
     assert "regime de recall equiparado" in frase
-    assert "pessoas a mais" in frase          # o volume maior é dito, não escondido
-    assert "casos a mais" in frase
-    assert "NNS inferior" in frase
     assert f"{modelo_eq['recall']:.3f} contra {regra['recall']:.3f}" in frase
     # A mesma estratégia nas duas metades da frase.
     assert frase.count("B_composto") == 2
+
+    # Volume, detecção e NNS: cada veredito da frase tem que bater com o sinal do
+    # número que ela mesma cita ao lado.
+    d_pessoas = (modelo_eq["vp"] + modelo_eq["fp"]) - (regra["vp"] + regra["fp"])
+    d_casos = modelo_eq["vp"] - regra["vp"]
+    assert bm._diferenca(d_pessoas, "pessoa", "pessoas") in frase
+    assert bm._diferenca(d_casos, "caso", "casos") in frase
+
+    if modelo_eq["nns"] < regra["nns"]:
+        assert "NNS inferior" in frase and "NNS superior" not in frase
+    elif modelo_eq["nns"] > regra["nns"]:
+        assert "NNS superior" in frase and "NNS inferior" not in frase
+    else:
+        assert "NNS idêntico" in frase
 
 
 @pytest.mark.parametrize("delta, esperado", [
@@ -343,8 +365,17 @@ def test_tabela_nns_carrega_a_advertencia_de_volume(comparadores):
     assert "NNS" in nota
 
 
-def test_comparacao_em_pe_de_igualdade_de_recall(split):
-    """No mesmo regime de recall, a comparação de NNS passa a significar algo."""
+def test_regressao_logistica_equiparada_mantem_o_nns_medido_abaixo_da_regra(split):
+    """Guarda de regressão sobre um resultado medido, e o nome diz isso.
+
+    Não é contrato de código: é a logística no regime equiparado, com o NNS que ela
+    obteve, congelado para acusar deriva. A floresta, no mesmo regime, não cumpre esta
+    condição, e isso é resultado registrado em D-046, não defeito.
+
+    **Quando falha, investiga.** Nunca se afrouxa a asserção nem se troca a métrica
+    para ela voltar ao verde: D-016 proíbe ajustar o código para produzir o esperado, e
+    foi assim que o par desta guarda em `test_experimento` acabou marcado `xfail`.
+    """
     X_train, X_test, y_train, y_test = split
     alvo = bm.recall_da_regra_no_treino(X_train, y_train)
 
