@@ -1,0 +1,8 @@
+item,n,proporcao
+Linhas no CSV bruto,8952,
+Duplicadas removidas,0,
+Excluídas: HbA1c ausente,-411,
+Excluídas: bloco de medição integralmente ausente,-90,
+Amostra analítica,8451,
+"Positivos (HbA1c ≥ 6,5%)",593,0.07016921074429061
+Prevalência ponderada por peso_lab (descritiva),,0.06357479534995021

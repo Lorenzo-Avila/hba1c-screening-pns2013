@@ -1,0 +1,30 @@
+\begin{tabular}{lrrrlrllr}
+\toprule
+conjunto & posicao & pr_auc_media & pr_auc_desvio & max_depth & min_samples_leaf & max_features & class_weight & n_estimators \\
+\midrule
+A_atomico & 1 & 0.2494 & 0.0261 & None & 20 & 0.5000 & balanced_subsample & 500 \\
+A_atomico & 2 & 0.2487 & 0.0258 & 14 & 20 & 0.5000 & balanced_subsample & 500 \\
+A_atomico & 3 & 0.2485 & 0.0237 & None & 20 & 0.3000 & balanced_subsample & 500 \\
+A_atomico & 4 & 0.2484 & 0.0266 & 10 & 20 & 0.3000 & balanced & 500 \\
+A_atomico & 5 & 0.2481 & 0.0244 & 14 & 20 & 0.3000 & balanced_subsample & 500 \\
+A_atomico & 6 & 0.2465 & 0.0241 & 14 & 40 & sqrt & balanced_subsample & 500 \\
+A_atomico & 7 & 0.2463 & 0.0242 & 20 & 40 & log2 & balanced_subsample & 500 \\
+A_atomico & 7 & 0.2463 & 0.0242 & 20 & 40 & sqrt & balanced_subsample & 500 \\
+A_atomico & 9 & 0.2457 & 0.0273 & 10 & 20 & 0.5000 & balanced_subsample & 500 \\
+A_atomico & 10 & 0.2457 & 0.0248 & 10 & 10 & 0.3000 & balanced & 500 \\
+B_composto & 1 & 0.2482 & 0.0296 & 10 & 20 & sqrt & balanced_subsample & 500 \\
+B_composto & 2 & 0.2465 & 0.0247 & 14 & 40 & sqrt & balanced_subsample & 500 \\
+B_composto & 2 & 0.2465 & 0.0247 & 14 & 40 & 0.3000 & balanced_subsample & 500 \\
+B_composto & 4 & 0.2464 & 0.0248 & 20 & 40 & sqrt & balanced_subsample & 500 \\
+B_composto & 4 & 0.2464 & 0.0248 & 20 & 40 & log2 & balanced_subsample & 500 \\
+B_composto & 6 & 0.2446 & 0.0273 & 10 & 10 & 0.3000 & balanced & 500 \\
+B_composto & 7 & 0.2438 & 0.0234 & 6 & 20 & sqrt & balanced_subsample & 500 \\
+B_composto & 8 & 0.2437 & 0.0285 & None & 40 & 0.5000 & balanced & 500 \\
+B_composto & 9 & 0.2433 & 0.0258 & 10 & 20 & 0.3000 & balanced & 500 \\
+B_composto & 10 & 0.2431 & 0.0249 & 20 & 40 & 0.3000 & balanced & 500 \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize As dez melhores configurações de cada conjunto de atributos, por PR-AUC média entre os cinco folds da validação cruzada no treino. A busca sorteia a mesma lista de candidatos para os dois conjuntos, o que torna os scores diretamente comparáveis linha a linha. A lista completa está em \texttt{busca\_rf.csv}.
+\end{flushleft}

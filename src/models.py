@@ -72,19 +72,22 @@ def logistica() -> LogisticRegression:
 
 
 def random_forest() -> RandomForestClassifier:
-    """Segundo algoritmo do projeto.
+    """Segundo algoritmo do projeto, configurado pela busca de hiperparâmetros.
 
-    **Os hiperparâmetros são placeholder.** Os valores abaixo estão aqui para o
-    grid rodar de ponta a ponta antes da Sprint 2, não porque foram escolhidos: a
-    busca é o objeto da Sprint 2 e nenhum resultado de RF deve ser reportado antes
-    disso. `class_weight` e `random_state` não são placeholder, são metodologia.
+    Os valores saíram da busca aleatória de `tuning.py`, vencedor de `B_composto`
+    aplicado também a `A_atomico` por D-036. Estão aqui como literais copiados à
+    mão: ler o vencedor do CSV em tempo de execução faria a configuração publicada
+    depender de um arquivo que não é código, e uma reexecução da busca mudaria o
+    modelo sem commit e sem diff. `tests/test_tuning.py` é quem confere que o
+    literal e o artefato continuam de acordo.
     """
     return RandomForestClassifier(
-        class_weight="balanced",       # mesma decisão da logística
-        n_estimators=300,              # PLACEHOLDER: Sprint 2
-        max_depth=None,                # PLACEHOLDER: Sprint 2
-        min_samples_leaf=1,            # PLACEHOLDER: Sprint 2
-        n_jobs=-1,
+        class_weight="balanced_subsample",   # Cost-Sensitive Learning por R4, variante de D-034
+        n_estimators=500,                    # convergência, não capacidade: fixo fora do espaço, ver D-033
+        max_depth=10,                        # vencedor da busca, ver busca_rf.csv e D-036
+        min_samples_leaf=20,                 # vencedor da busca; piso de 5 no espaço, ver D-033
+        max_features="sqrt",                 # vencedor da busca, ver busca_rf.csv e D-036
+        n_jobs=-1,                           # roda fora da busca, então não aninha paralelismo
         random_state=cfg.RANDOM_STATE,
     )
 

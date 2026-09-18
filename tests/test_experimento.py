@@ -77,10 +77,26 @@ def test_piso_nao_recebe_preprocessador():
 
 
 def test_parametros_metodologicos_dos_modelos():
-    """Cost-sensitive e semente fixa valem para os dois algoritmos, placeholder ou não."""
-    for construir in (md.logistica, md.random_forest):
+    """Cost-sensitive e semente fixa valem para os dois algoritmos, cada um no seu grau.
+
+    A exigência é por estimador, e não uma lista branca comum, para o teste marcar onde
+    a variação mora. A logística tem que trazer o literal `"balanced"`, que é o que o
+    texto assinado nomeia e onde não existe variação a admitir; afrouxar ali perderia a
+    conformidade literal sem ganho nenhum. A floresta aceita os dois por D-034, porque
+    com bootstrap o peso precisa ser recalculado dentro de cada subamostra e `balanced`
+    não faz isso.
+
+    O que está sob guarda nos dois casos é R4: reponderamento de classes no lugar de
+    reamostragem sintética.
+    """
+    admitidos = {md.logistica: ("balanced",),
+                 md.random_forest: ("balanced", "balanced_subsample")}
+    for construir, esperados in admitidos.items():
         params = construir().get_params()
-        assert params["class_weight"] == "balanced"
+        assert params["class_weight"] in esperados, (
+            f"{construir.__name__}: class_weight {params['class_weight']!r} fora de "
+            f"{esperados}."
+        )
         assert params["random_state"] == cfg.RANDOM_STATE
 
 
@@ -240,3 +256,38 @@ def test_executar_aceita_e_devolve_a_particao(particao, tabelas_preservadas):
     saida = xp.executar(modelos=["LogReg", "Regra ADA"], conjuntos=["B_composto"],
                         particao=particao, conferir=False)
     assert saida["particao"] is particao
+
+
+def test_executar_emite_a_calibracao(particao, tabelas_preservadas):
+    """Slope e intercepto ganham arquivo, porque `comparar` não tem coluna para eles.
+
+    São o par que sustenta a leitura de D-022 e de D-040: slope perto de 1 diz que a
+    ordenação está preservada, e o intercepto diz o tamanho do deslocamento de nível.
+    Sem esta exportação eles só existiriam dentro de um dicionário em memória, e quem
+    transcreve para o texto não teria contra o que conferir.
+    """
+    saida = xp.executar(modelos=["LogReg", "Regra ADA"], conjuntos=["B_composto"],
+                        particao=particao, conferir=False)
+    assert xp.NOME_CALIBRACAO in saida["artefatos"]
+
+    emitido = pd.read_csv(cfg.PATH_TABELAS / f"{xp.NOME_CALIBRACAO}.csv")
+    assert {"slope", "intercepto"} <= set(emitido.columns)
+    assert len(emitido) == len(saida["resultados"])
+
+
+def test_descritivas_ganham_artefato(particao, tabelas_preservadas):
+    """O quadro da amostra e as contagens de ausentes saem em arquivo.
+
+    A prevalência ponderada por `peso_lab` (D-031) e a contagem de ausentes de
+    `colesterol_alto` (D-011) vão ao texto, e até agora saíam de `data` direto para o
+    documento, sem passar por artefato nenhum.
+    """
+    artefatos = xp.exportar_descritivas(particao)
+    assert set(artefatos) == {xp.NOME_RESUMO, xp.NOME_AUSENTES}
+
+    resumo = pd.read_csv(cfg.PATH_TABELAS / f"{xp.NOME_RESUMO}.csv")
+    assert resumo["item"].str.contains("ponderada").any()
+
+    ausentes = pd.read_csv(cfg.PATH_TABELAS / f"{xp.NOME_AUSENTES}.csv")
+    assert "no_treino" in ausentes.columns
+    assert ausentes.loc[0, "variavel"] == "colesterol_alto"

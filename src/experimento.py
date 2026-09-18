@@ -53,6 +53,9 @@ REFERENCIA = "comparativo_logreg.tex"
 
 NOME_CONSOLIDADO = "comparativo_consolidado"
 NOME_CARGA = "carga_operacional"
+NOME_RESUMO = "resumo_amostra"
+NOME_AUSENTES = "ausentes_por_variavel"
+NOME_CALIBRACAO = "calibracao_comparada"
 
 # Conjunto vazio na coluna, para as linhas invariantes. É o mesmo símbolo que
 # `benchmark.avaliar_comparadores` usa, senão as tabelas não se juntam.
@@ -246,6 +249,35 @@ def exportar(tabela: pd.DataFrame, nome: str, nota: str | None = None) -> dict[s
     return {"tex": destino_tex, "csv": destino_csv}
 
 
+def exportar_descritivas(particao: Particao,
+                         analitico: pd.DataFrame | None = None) -> dict[str, dict]:
+    """Emite o quadro da amostra e as contagens de ausentes.
+
+    Os dois números saíam de `data` direto para o texto, sem passar por arquivo
+    nenhum. É a mesma lacuna que a tabela consolidada tinha antes de existir ponto de
+    reprodução: quem transcreve não tem contra o que conferir, e o valor no documento
+    envelhece sem que nada acuse.
+
+    O quadro da amostra traz as duas prevalências, a amostral e a ponderada por
+    `peso_lab`. A ponderada é estimativa de parâmetro populacional e vive só na
+    descrição da amostra; nenhum estimador a enxerga (D-009, D-031). As contagens de
+    ausentes são as que o `KNNImputer` vai tratar, e a coluna do treino é a que vale,
+    porque é onde a imputação ajusta (D-011).
+
+    Args:
+        analitico: base limpa. Omitida, relê o CSV bruto. Passe a sua se já tiver uma
+            em mãos, para não pagar a leitura duas vezes.
+    """
+    analitico = dt.carregar_analitico() if analitico is None else analitico
+    return {
+        NOME_RESUMO: exportar(dt.resumo_amostra(analitico), NOME_RESUMO, nota=""),
+        NOME_AUSENTES: exportar(
+            dt.ausentes_por_variavel(analitico, treino=particao.X_tr),
+            NOME_AUSENTES, nota="",
+        ),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Conferência de reprodução
 # ---------------------------------------------------------------------------
@@ -315,8 +347,9 @@ def executar(modelos: list[str] | None = None,
              conjuntos: list[str] | None = None,
              salvar_figuras: bool = False,
              conferir: bool = True,
-             particao: Particao | None = None) -> dict:
-    """Roda o grid, emite os dois artefatos e confere a reprodução.
+             particao: Particao | None = None,
+             descritivas: bool = True) -> dict:
+    """Roda o grid, emite os artefatos e confere a reprodução.
 
     Args:
         particao: split pronto. Omitido, `preparar_particao` constrói um. O parâmetro
@@ -324,6 +357,8 @@ def executar(modelos: list[str] | None = None,
             diagnostica colinearidade sobre `X_tr` antes de chamar aqui, e reler o CSV
             só para refazer o mesmo split seria gasto sem ganho. A partição volta no
             retorno para o chamador não ter de reconstruí-la depois.
+        descritivas: emite também o quadro da amostra e as contagens de ausentes.
+            Desligue em teste que só precisa do grid.
 
     Returns:
         Dicionário com `resultados`, `consolidado`, `carga`, `artefatos`,
@@ -336,10 +371,19 @@ def executar(modelos: list[str] | None = None,
     consolidado = ev.comparar(resultados)
     carga = carga_operacional(resultados, particao)
 
+    # Slope e intercepto de calibração saem de `diagnostico_calibracao` e não têm
+    # coluna em `comparar`, então sem esta linha eles não existem em arquivo nenhum.
+    # São a evidência que sustenta D-022 e D-040.
+    calibracao = ev.tabela_calibracao_comparada(resultados)
+
     artefatos = {
         NOME_CONSOLIDADO: exportar(consolidado, NOME_CONSOLIDADO),
         NOME_CARGA: exportar(carga, NOME_CARGA),
+        NOME_CALIBRACAO: exportar(calibracao, NOME_CALIBRACAO,
+                                  nota=ev.nota_corte_unico(consolidado)),
     }
+    if descritivas:
+        artefatos.update(exportar_descritivas(particao))
 
     divergencias = pd.DataFrame()
     if conferir:
