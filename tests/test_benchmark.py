@@ -368,9 +368,11 @@ def test_tabela_nns_carrega_a_advertencia_de_volume(comparadores):
 def test_regressao_logistica_equiparada_mantem_o_nns_medido_abaixo_da_regra(split):
     """Guarda de regressão sobre um resultado medido, e o nome diz isso.
 
-    Não é contrato de código: é a logística no regime equiparado, com o NNS que ela
-    obteve, congelado para acusar deriva. A floresta, no mesmo regime, não cumpre esta
-    condição, e isso é resultado registrado em D-046, não defeito.
+    Não é contrato de código: é a logística em `B_composto` no regime equiparado, com o
+    NNS que ela obteve, congelado para acusar deriva. A floresta no mesmo conjunto e no
+    mesmo regime não cumpre esta condição, e isso é resultado registrado em D-046, não
+    defeito. Em `A_atomico` a floresta cumpre, então a afirmação é sobre a célula e
+    nunca sobre o algoritmo (D-047).
 
     **Quando falha, investiga.** Nunca se afrouxa a asserção nem se troca a métrica
     para ela voltar ao verde: D-016 proíbe ajustar o código para produzir o esperado, e

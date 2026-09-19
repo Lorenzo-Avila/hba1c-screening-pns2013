@@ -1,0 +1,16 @@
+\begin{tabular}{lllrrrrrr}
+\toprule
+estrategia & modelo & conjunto & recall_alvo & recall_obtido & recall_regra & encaminhados & casos_detectados & nns \\
+\midrule
+Regra ADA & Regra ADA & — & — & 0.866 & 0.866 & 974 & 103 & 9.456 \\
+LogReg · A_atomico & LogReg & A_atomico & 0.895 & 0.899 & 0.866 & 986 & 107 & 9.215 \\
+LogReg · B_composto & LogReg & B_composto & 0.895 & 0.916 & 0.866 & 1000 & 109 & 9.174 \\
+LogReg · C_completo & LogReg & C_completo & 0.895 & 0.874 & 0.866 & 946 & 104 & 9.096 \\
+Random Forest · A_atomico & Random Forest & A_atomico & 0.895 & 0.908 & 0.866 & 985 & 108 & 9.120 \\
+Random Forest · B_composto & Random Forest & B_composto & 0.895 & 0.924 & 0.866 & 1048 & 110 & 9.527 \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize A equiparação de recall ocorre no TREINO, por construção: o limiar do modelo é calibrado para o recall que a regra clínica obtém no treino (`recall_alvo`). O valor realizado no teste (`recall_obtido`) desvia desse alvo, e o desvio é esperado — o limiar é fixado fora da amostra de avaliação, sob pena de vazamento. As colunas de recall NÃO são iguais entre modelo e regra no teste, e não deveriam ser: o que está equiparado é o regime de operação, não o resultado. O NNS permanece a métrica de comparação.
+\end{flushleft}

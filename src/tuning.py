@@ -44,6 +44,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import ParameterSampler, RandomizedSearchCV, StratifiedKFold
 from sklearn.pipeline import Pipeline
 
+from . import artefatos as art
 from . import config as cfg
 from . import evaluate as ev
 from . import experimento as xp
@@ -341,9 +342,8 @@ def exportar(tabela: pd.DataFrame, topo: int = TOPO_TEX) -> dict[str, Path]:
     exportação é melhor que cortar na fonte: quem quiser auditar o espaço inteiro abre o
     CSV.
     """
-    cfg.PATH_TABELAS.mkdir(parents=True, exist_ok=True)
-    destino_csv = cfg.PATH_TABELAS / f"{NOME_ARTEFATO}.csv"
-    tabela.to_csv(destino_csv, index=False, encoding="utf-8")
+    destino_csv = art.salvar_csv(tabela,
+                                 cfg.PATH_TABELAS / f"{NOME_ARTEFATO}.csv")
 
     recorte = (tabela.sort_values(["conjunto", "posicao"])
                      .groupby("conjunto", sort=True)

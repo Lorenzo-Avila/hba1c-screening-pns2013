@@ -395,6 +395,150 @@ def test_carga_operacional_carrega_a_advertencia(particao, grid_dois_conjuntos):
     assert "recall equiparado" in tabela.attrs["leitura"]
 
 
+# ---------------------------------------------------------------------------
+# Regime equiparado, célula a célula
+# ---------------------------------------------------------------------------
+
+def test_equiparado_cobre_toda_celula_calibravel(particao, grid_dois_conjuntos):
+    """Uma linha por célula calibrável do grid, mais a da regra.
+
+    `carga_operacional` equipara só o modelo de referência, e o número que falta é
+    metade do contraste que sustenta o achado da sprint: no regime equiparado a
+    floresta gasta mais encaminhamento por caso que a logística. Publicar a comparação
+    emitindo um lado só repete a lacuna que D-027 fechou (D-047).
+    """
+    tabela = xp.equiparado_por_modelo(grid_dois_conjuntos, particao)
+    calibraveis = [r for r in grid_dois_conjuntos if r.get("limiar_calibrado", True)]
+
+    assert len(tabela) == len(calibraveis) + 1
+    assert tabela["estrategia"].iloc[0] == "Regra ADA"
+    assert set(zip(tabela["modelo"].iloc[1:], tabela["conjunto"].iloc[1:])) == {
+        (r["modelo"], r["conjunto"]) for r in calibraveis
+    }
+    assert {"recall_alvo", "recall_obtido", "recall_regra",
+            "encaminhados", "casos_detectados", "nns"} <= set(tabela.columns)
+
+
+def test_equiparado_calibra_pelo_recall_da_regra_no_treino(particao,
+                                                           grid_dois_conjuntos):
+    """O alvo vem do treino, e é o mesmo para todas as células.
+
+    Calibrar pelo recall que a regra obtém no **teste** vazaria o teste para dentro da
+    decisão de limiar, e o vazamento passaria despercebido: os dois números são
+    próximos e o resultado continuaria plausível. Por isso o teste exige um e recusa o
+    outro.
+    """
+    alvo = bm.recall_da_regra_no_treino(particao.X_tr, particao.y_tr)
+    tabela = xp.equiparado_por_modelo(grid_dois_conjuntos, particao)
+    regra = next(r for r in grid_dois_conjuntos if r["modelo"] == "Regra ADA")
+
+    assert pd.isna(tabela["recall_alvo"].iloc[0])   # a regra opera em limiar fixo
+    assert (tabela["recall_alvo"].iloc[1:] == alvo).all()
+    assert alvo != pytest.approx(regra["recall"])
+    assert (tabela["recall_alvo"] != tabela["recall_regra"]).iloc[1:].all()
+
+    # O limiar é fixado fora da amostra de avaliação, então o realizado desvia do
+    # alvo. O desvio é esperado; o que não pode é o realizado ignorar o alvo.
+    assert tabela["recall_obtido"].iloc[1:].to_numpy() == pytest.approx(alvo, abs=0.10)
+
+
+def test_equiparado_bate_com_a_carga_operacional(particao, grid_dois_conjuntos):
+    """As duas tabelas medem a mesma célula por caminhos independentes.
+
+    A linha do modelo de referência é reavaliada aqui em vez de aproveitada da carga
+    operacional, e é isso que faz uma conferir a outra. Divergência entre elas significa
+    que uma das duas mudou de alvo, de partição ou de estimador sem que nada acusasse.
+    """
+    carga = xp.carga_operacional(grid_dois_conjuntos, particao)
+    referencia = xp.modelo_de_referencia(grid_dois_conjuntos)
+    tabela = xp.equiparado_por_modelo(grid_dois_conjuntos, particao)
+
+    linha = tabela[(tabela["modelo"] == referencia["modelo"])
+                   & (tabela["conjunto"] == referencia["conjunto"])].iloc[0]
+    da_carga = carga.iloc[1]
+
+    assert linha["encaminhados"] == da_carga["encaminhados"]
+    assert linha["casos_detectados"] == da_carga["casos_detectados"]
+    assert round(linha["nns"], 3) == round(da_carga["nns"], 3)
+    assert round(linha["recall_obtido"], 3) == round(da_carga["recall"], 3)
+
+
+def test_equiparado_exige_a_regra(particao, grid_dois_conjuntos):
+    sem_regra = [r for r in grid_dois_conjuntos if r["modelo"] != "Regra ADA"]
+    with pytest.raises(ValueError, match="ausente"):
+        xp.equiparado_por_modelo(sem_regra, particao)
+
+
+def test_artefato_equiparado_traz_as_seis_linhas_publicadas():
+    """O artefato versionado, com os dois lados do contraste dentro dele.
+
+    Cinco células calibráveis mais a regra. A linha da logística em `B_composto` é o
+    número que o `ESTADO.md` e D-046 citavam sem ter `.csv` para apontar, e agora tem.
+    Está fixado aqui de propósito: quando uma guarda que fixa resultado medido falha,
+    investiga-se, não se ajusta a asserção (D-016, D-046).
+    """
+    caminho = cfg.PATH_TABELAS / f"{xp.NOME_EQUIPARADO}.csv"
+    assert caminho.exists(), f"artefato ausente: {caminho}"
+
+    emitido = pd.read_csv(caminho)
+    calibraveis = [c for c in xp.composicao_esperada()
+                   if c[1] != xp.SEM_CONJUNTO]
+    assert len(emitido) == len(calibraveis) + 1 == 6
+
+    logreg = emitido[(emitido["modelo"] == "LogReg")
+                     & (emitido["conjunto"] == "B_composto")].iloc[0]
+    assert logreg["encaminhados"] == 1000
+    assert logreg["casos_detectados"] == 109
+    assert round(logreg["recall_obtido"], 3) == 0.916
+    assert round(logreg["nns"], 6) == 9.174312
+
+    floresta = emitido[(emitido["modelo"] == xp.NOME_FLORESTA)
+                       & (emitido["conjunto"] == "B_composto")].iloc[0]
+    da_carga = pd.read_csv(cfg.PATH_TABELAS / f"{xp.NOME_CARGA}.csv").iloc[1]
+    assert floresta["encaminhados"] == da_carga["encaminhados"]
+    assert round(floresta["nns"], 3) == round(da_carga["nns"], 3)
+
+
+# ---------------------------------------------------------------------------
+# Gravação dos CSV
+# ---------------------------------------------------------------------------
+
+def test_csv_sai_arredondado(tabelas_preservadas):
+    """Ponto flutuante cru no CSV fazia `reports/tabelas/` diferir a cada execução.
+
+    O `n_jobs=-1` da floresta muda a ordem em que os processos reduzem, e o último bit
+    acompanha. Nenhum resultado muda, o `.tex` nem mostra, mas o diretório versionado
+    passa a ter diff permanente, e é o único do projeto onde ninguém pode se acostumar
+    a passar o olho sem ler (D-048).
+    """
+    from src import artefatos as art
+
+    tabela = pd.DataFrame([{"modelo": "X", "conjunto": "—",
+                            "valor": 0.1234567891234567, "n": 7, "flag": True}])
+    caminhos = xp.exportar(tabela, "_teste_arredondamento", nota="")
+    lido = pd.read_csv(caminhos["csv"])
+
+    assert lido.loc[0, "valor"] == round(0.1234567891234567, art.CASAS_CSV)
+    assert lido.loc[0, "n"] == 7          # inteiro atravessa intacto
+    assert bool(lido.loc[0, "flag"]) is True
+    assert lido.loc[0, "conjunto"] == "—"
+
+
+def test_duas_gravacoes_do_mesmo_numero_dao_o_mesmo_byte(tabelas_preservadas):
+    """Ruído abaixo da nona casa não pode chegar ao arquivo.
+
+    É a condição que fecha o diff permanente: dois valores que diferem no último bit
+    têm de sair idênticos, senão o `git status` volta a sujar a cada execução.
+    """
+    valor = 0.30550177603514955
+    bytes_gravados = set()
+    for deslocado in (valor, valor - 5e-17):
+        caminho = xp.exportar(pd.DataFrame([{"v": deslocado}]),
+                              "_teste_arredondamento", nota="")["csv"]
+        bytes_gravados.add(caminho.read_bytes())
+    assert len(bytes_gravados) == 1
+
+
 def test_carga_operacional_exige_a_regra(particao, grid_dois_conjuntos):
     sem_regra = [r for r in grid_dois_conjuntos if r["modelo"] != "Regra ADA"]
     with pytest.raises(ValueError, match="ausente"):

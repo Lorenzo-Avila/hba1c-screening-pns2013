@@ -18,6 +18,7 @@ from sklearn.exceptions import NotFittedError
 from sklearn.linear_model import LinearRegression
 from sklearn.utils.validation import check_is_fitted
 
+from . import artefatos as art
 from . import config as cfg
 from . import features as ft
 
@@ -428,14 +429,7 @@ def diagnostico_completo(X_train: pd.DataFrame, y_train=None,
         "tex_resumo": exportar_latex(resumo, "vif_resumo.tex"),
         "tex_pearson": exportar_latex(tabela_pares, "pearson_coeficientes.tex"),
         "tex_ablacao": exportar_latex(ablacao, "vif_ablacao_rcest.tex"),
-        "csv_vif": _salvar_csv(vif, "vif_comparativo.csv"),
-        "csv_pearson": _salvar_csv(tabela_pares, "pearson_coeficientes.csv"),
+        "csv_vif": art.salvar_csv(vif, cfg.PATH_TABELAS / "vif_comparativo.csv"),
+        "csv_pearson": art.salvar_csv(
+            tabela_pares, cfg.PATH_TABELAS / "pearson_coeficientes.csv"),
     }
-
-
-def _salvar_csv(tabela: pd.DataFrame, nome_arquivo: str) -> Path:
-    """Salva a tabela em `reports/tabelas/` como CSV e devolve o caminho."""
-    cfg.PATH_TABELAS.mkdir(parents=True, exist_ok=True)
-    destino = cfg.PATH_TABELAS / nome_arquivo
-    tabela.to_csv(destino, index=False, encoding="utf-8")
-    return destino

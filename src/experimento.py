@@ -7,11 +7,13 @@ cinco linhas da tabela consolidada só três tinham artefato rastreado
 não tinham nenhum. Este módulo fecha a lacuna: o que ele emite passa a ser a fonte e
 o `ESTADO.md` passa a ser a transcrição, não o contrário.
 
-Dois artefatos, ambos em `reports/tabelas/`:
+Os artefatos que sustentam o argumento, todos em `reports/tabelas/`:
 
-- `comparativo_consolidado.tex`, uma linha por célula do grid.
-- `carga_operacional.tex`, os três regimes que sustentam o argumento de
-  aplicabilidade.
+- `comparativo_consolidado`, uma linha por célula do grid.
+- `carga_operacional`, os três regimes de encaminhamento.
+- `equiparado_por_modelo`, o regime de recall equiparado de cada célula calibrável.
+  A carga operacional equipara só o modelo de referência, e o contraste entre os dois
+  modelos nesse regime tem dois lados (D-047).
 
 O produto cartesiano **não é cheio**. `RegraClinicaADA` lê idade e IMC das preditoras
 cruas e o `DummyClassifier` ignora `X`: rodá-los sobre A, B e C daria três linhas
@@ -34,6 +36,7 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from . import artefatos as art
 from . import benchmark as bm
 from . import config as cfg
 from . import data as dt
@@ -67,6 +70,7 @@ REFERENCIAS = [REFERENCIA, REFERENCIA_FLORESTA]
 
 NOME_CONSOLIDADO = "comparativo_consolidado"
 NOME_CARGA = "carga_operacional"
+NOME_EQUIPARADO = "equiparado_por_modelo"
 NOME_RESUMO = "resumo_amostra"
 NOME_AUSENTES = "ausentes_por_variavel"
 NOME_CALIBRACAO = "calibracao_comparada"
@@ -309,14 +313,90 @@ def carga_operacional(resultados: list[dict],
     return tabela
 
 
+def equiparado_por_modelo(resultados: list[dict],
+                          particao: Particao,
+                          nome_regra: str = "Regra ADA") -> pd.DataFrame:
+    """O regime de recall equiparado de **cada** célula calibrável do grid.
+
+    `carga_operacional` equipara só o modelo de referência, e o formato dela está
+    certo: três regimes, uma leitura, e é essa a tabela que a narrativa usa. O
+    problema é o que fica de fora. O contraste que sustenta o achado da floresta tem
+    dois lados, ela gasta mais encaminhamento por caso no regime equiparado do que a
+    logística, e publicar a comparação emitindo só um lado repete, em escala menor, a
+    lacuna que D-027 fechou (D-047).
+
+    O alvo é `benchmark.recall_da_regra_no_treino`, medido **no treino**, o mesmo de
+    `carga_operacional`. Calibrar pelo recall que a regra obtém no teste vazaria o
+    teste para dentro da decisão de limiar.
+
+    Custa uma avaliação por célula calibrável, cada uma com validação cruzada e ajuste
+    final. A célula do modelo de referência é reavaliada aqui em vez de aproveitada da
+    carga operacional: sai mais cara e paga, porque as duas tabelas passam a conferir
+    uma à outra em vez de repetirem o mesmo cálculo.
+
+    Returns:
+        DataFrame com uma linha por célula calibrável mais a da regra, trazendo
+        `recall_alvo`, `recall_obtido`, `recall_regra`, `encaminhados`,
+        `casos_detectados` e `nns`. A linha da regra vai primeiro, e tem `recall_alvo`
+        ausente: ela opera em limiar fixo e não mira alvo nenhum.
+    """
+    regra = next((r for r in resultados if r["modelo"] == nome_regra), None)
+    if regra is None:
+        raise ValueError(f"Comparador {nome_regra!r} ausente dos resultados.")
+
+    alvo = bm.recall_da_regra_no_treino(particao.X_tr, particao.y_tr)
+    disponiveis = md.estimadores()
+
+    def linha(r: dict, recall_alvo: float) -> dict:
+        return {
+            "estrategia": _rotulo(r),
+            "modelo": r["modelo"],
+            "conjunto": r["conjunto"],
+            # `recall_alvo` é onde a equiparação acontece, no treino;
+            # `recall_obtido` é o que se realizou no teste. Duas colunas, senão a
+            # tabela parece comparar recalls iguais quando o que está equiparado é o
+            # alvo, não o resultado.
+            "recall_alvo": recall_alvo,
+            "recall_obtido": r["recall"],
+            "recall_regra": regra["recall"],
+            "encaminhados": r["vp"] + r["fp"],
+            "casos_detectados": r["vp"],
+            "nns": r["nns"],
+        }
+
+    linhas = [linha(regra, float("nan"))]
+    for r in resultados:
+        if not r.get("limiar_calibrado", True):
+            continue
+        equiparado = ev.avaliar(
+            md.montar(disponiveis[r["modelo"]], r["conjunto"]),
+            particao.X_tr, particao.y_tr, particao.X_te, particao.y_te,
+            nome=r["modelo"],
+            conjunto=r["conjunto"],
+            recall_alvo=alvo,
+            salvar_figuras=False,
+        )
+        linhas.append(linha(equiparado, alvo))
+
+    tabela = pd.DataFrame(linhas)
+    tabela.attrs["nota"] = bm.NOTA_EQUIPARACAO
+    return tabela
+
+
 def veredito_do_criterio(carga: pd.DataFrame,
                          nome_regra: str = "Regra ADA") -> pd.DataFrame:
     """Aplica o critério de sucesso a cada regime da carga operacional.
 
     O critério do projeto é superar a regra clínica em recall **com NNS menor**, e as
     duas condições valem juntas. `benchmark.supera_a_regra_clinica` já o aplica ao
-    grid; falta aplicá-lo aos regimes, que é onde a resposta muda de sinal: o modelo de
-    referência cumpre no ponto padrão e não cumpre no regime equiparado (D-046).
+    grid; falta aplicá-lo aos regimes.
+
+    **O resultado sai mecânico, e só um dos regimes decide o critério.** No ponto
+    padrão o modelo opera em recall abaixo do da regra, então a condição de recall
+    falha e o NNS ao lado dela foi medido em outro ponto de operação: a comparação
+    registra, não decide. Quem decide é o regime de recall equiparado, e lá a célula
+    de referência não cumpre. `leitura_do_criterio` carrega a qualificação junto com
+    os números (D-024, D-046).
 
     Escrever esse veredito à mão no documento é o defeito que D-045 registra. Aqui ele
     sai da comparação, então quem trocar o modelo de referência vê o texto acompanhar.
@@ -347,12 +427,61 @@ def veredito_do_criterio(carga: pd.DataFrame,
     return pd.DataFrame(linhas)
 
 
+def _celula_avaliada(veredito: pd.DataFrame) -> str | None:
+    """A estratégia que os regimes do veredito avaliam, quando é uma só.
+
+    Os rótulos saem de `carga_operacional` como "<estratégia>, <regime>", e as duas
+    linhas não invariantes da tabela são sempre da mesma célula, porque a carga
+    equipara o modelo de referência e mais ninguém. Devolve `None` no dia em que isso
+    deixar de valer, e aí o fecho não nomeia ninguém em vez de nomear errado.
+    """
+    nomes = {str(regime).split(",")[0].strip() for regime in veredito["regime"]}
+    return nomes.pop() if len(nomes) == 1 else None
+
+
+def _nota_de_recall_menor(veredito: pd.DataFrame) -> str:
+    """Qualifica os regimes que operam em recall abaixo do da regra.
+
+    O critério pede recall maior **e** NNS menor ao mesmo tempo. Onde o recall fica
+    abaixo, o NNS ao lado dele foi medido em outro ponto de operação, e comparar NNS
+    entre recalls diferentes não ordena ninguém: encaminhar menos gente para achar
+    menos casos também baixa o NNS. O número continua saindo, com a ressalva colada
+    nele, que é o mesmo tratamento que `evaluate.nota_corte_unico` dá às métricas de
+    curva dos comparadores de corte único (D-024).
+
+    Devolve string vazia quando todos os regimes operam em recall igual ou maior.
+    """
+    fora = [str(r["regime"]) for _, r in veredito.iterrows() if r["delta_recall"] <= 0]
+    if not fora:
+        return ""
+    verbo = "operam" if len(fora) > 1 else "opera"
+    return (
+        f"Nota: {', '.join(fora)} {verbo} em recall abaixo do da regra. O critério "
+        f"pede recall maior com NNS menor ao mesmo tempo, e NNS medido em recalls "
+        f"diferentes não decide nada. Aí a comparação registra o resultado, não o "
+        f"critério. Quem decide é o regime de recall equiparado, onde os dois lados "
+        f"miram o mesmo recall."
+    )
+
+
 def leitura_do_criterio(carga: pd.DataFrame,
                         nome_regra: str = "Regra ADA") -> str:
     """Diz em voz alta, regime a regime, se o critério de sucesso foi cumprido.
 
     Um resultado negativo é legítimo e tem que ser reportado como tal. O texto sai do
     sinal dos deltas, nunca de afirmação fixa.
+
+    **O fecho nomeia a célula, não o algoritmo.** A carga operacional avalia os dois
+    regimes do modelo de referência e mais ninguém, então dizer "o critério não é
+    cumprido" sem sujeito faz o leitor estender o veredito a todas as células, e o
+    artefato diz o contrário: das cinco calibráveis, quatro cumprem no regime
+    equiparado. Quem responde por todas é `equiparado_por_modelo` (D-046, D-047).
+
+    **E nem todo regime decide o critério.** No ponto padrão o modelo opera em
+    recall abaixo do da regra, e `_nota_de_recall_menor` cola a ressalva no
+    resultado em vez de suprimi-lo. Regime que roda em outro ponto de operação
+    entra como registro; o critério se decide no regime de recall equiparado
+    (D-024).
     """
     veredito = carga.attrs.get("criterio")
     if veredito is None:
@@ -369,28 +498,37 @@ def leitura_do_criterio(carga: pd.DataFrame,
         )
 
     quantos = int(veredito["cumpre"].sum())
+    sujeito = _celula_avaliada(veredito) or "A estratégia avaliada"
     if quantos == len(veredito):
-        fecho = "O critério é cumprido em todos os regimes avaliados."
+        fecho = f"{sujeito} cumpre o critério em todos os regimes avaliados aqui."
     elif quantos == 0:
-        fecho = "O critério não é cumprido em nenhum regime avaliado."
+        fecho = f"{sujeito} não cumpre o critério em nenhum regime avaliado aqui."
     else:
-        fecho = ("O critério é cumprido em um regime e não no outro, então a escolha "
-                 "do ponto de operação decide se o trabalho o cumpre.")
-    return "\n".join(partes + [fecho])
+        fecho = (f"{sujeito} cumpre o critério em um regime e não no outro, então a "
+                 f"escolha do ponto de operação decide se ela o cumpre.")
+    fecho += (" O veredito vale para esta célula: as demais estão em "
+              "equiparado_por_modelo.")
+    nota = _nota_de_recall_menor(veredito)
+    return "\n".join(partes + [fecho] + ([nota] if nota else []))
 
 
-def exportar(tabela: pd.DataFrame, nome: str, nota: str | None = None) -> dict[str, Path]:
+def exportar(tabela: pd.DataFrame, nome: str, nota: str | None = None,
+             **kwargs) -> dict[str, Path]:
     """Grava a tabela como `.tex` e `.csv` em `reports/tabelas/`.
 
     O `.csv` não é cópia redundante do `.tex`: é sobre ele que a conferência de
-    reprodução trabalha, sem ter de reparsear LaTeX.
+    reprodução trabalha, sem ter de reparsear LaTeX. Ele sai arredondado, senão o
+    diretório versionado acusa mudança a cada execução (D-048).
+
+    Args:
+        **kwargs: repassados a `to_latex`, só para o `.tex`. O `.csv` não os vê,
+            porque formatação de apresentação não pode chegar ao arquivo sobre o
+            qual a conferência de reprodução trabalha.
     """
-    cfg.PATH_TABELAS.mkdir(parents=True, exist_ok=True)
-    destino_csv = cfg.PATH_TABELAS / f"{nome}.csv"
-    tabela.to_csv(destino_csv, index=False, encoding="utf-8")
+    destino_csv = art.salvar_csv(tabela, cfg.PATH_TABELAS / f"{nome}.csv")
     if nota is None:
         nota = tabela.attrs.get("nota")
-    destino_tex = ev.exportar_latex(tabela, f"{nome}.tex", nota=nota)
+    destino_tex = ev.exportar_latex(tabela, f"{nome}.tex", nota=nota, **kwargs)
     return {"tex": destino_tex, "csv": destino_csv}
 
 
@@ -595,8 +733,8 @@ def executar(modelos: list[str] | None = None,
             Desligue em teste que só precisa do grid.
 
     Returns:
-        Dicionário com `resultados`, `consolidado`, `carga`, `artefatos`,
-        `divergencias` e `particao`.
+        Dicionário com `resultados`, `consolidado`, `carga`, `equiparado`,
+        `artefatos`, `divergencias` e `particao`.
     """
     particao = preparar_particao() if particao is None else particao
     resultados = compor_grid(modelos, conjuntos, particao=particao,
@@ -604,6 +742,7 @@ def executar(modelos: list[str] | None = None,
 
     consolidado = ev.comparar(resultados)
     carga = carga_operacional(resultados, particao)
+    equiparado = equiparado_por_modelo(resultados, particao)
 
     # Slope e intercepto de calibração saem de `diagnostico_calibracao` e não têm
     # coluna em `comparar`, então sem esta linha eles não existem em arquivo nenhum.
@@ -613,6 +752,10 @@ def executar(modelos: list[str] | None = None,
     artefatos = {
         NOME_CONSOLIDADO: exportar(consolidado, NOME_CONSOLIDADO),
         NOME_CARGA: exportar(carga, NOME_CARGA),
+        # `na_rep`: a linha da regra não tem alvo, e um "NaN" impresso numa tabela
+        # que vai para o LaTeX lê como falha de geração, não como célula vazia.
+        NOME_EQUIPARADO: exportar(equiparado, NOME_EQUIPARADO,
+                                  na_rep=SEM_CONJUNTO),
         NOME_CALIBRACAO: exportar(calibracao, NOME_CALIBRACAO,
                                   nota=ev.nota_corte_unico(consolidado)),
     }
@@ -649,6 +792,7 @@ def executar(modelos: list[str] | None = None,
         "resultados": resultados,
         "consolidado": consolidado,
         "carga": carga,
+        "equiparado": equiparado,
         "artefatos": artefatos,
         "divergencias": divergencias,
         "composicao": composicao,
@@ -686,6 +830,8 @@ def main(argv: list[str] | None = None) -> int:
     print(saida["carga"].attrs["leitura"])
     print()
     print(leitura_do_criterio(saida["carga"]))
+    print()
+    print(saida["equiparado"].to_string(index=False))
     print()
     if saida["mcnemar"] is not None:
         print(saida["mcnemar"]["tabela"].to_string())
