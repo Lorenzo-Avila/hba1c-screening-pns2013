@@ -30,6 +30,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -803,6 +804,16 @@ def executar(modelos: list[str] | None = None,
 
 def main(argv: list[str] | None = None) -> int:
     """Entrada de linha de comando. É o que o `make resultados` chama de fato."""
+    # O console do Windows abre em cp1252, e a reprodução imprime Δ, ·, ± e acentuação
+    # em vários pontos. Sem isto ela sai com status 1 por codificação, que se lê como
+    # divergência de número e não é. Trocar só o caractere que quebrou hoje resolveria
+    # um caso e deixaria o próximo; o que precisa mudar é o canal de saída (D-052).
+    #
+    # Fica aqui e não no import: quem chama `executar` de dentro de teste ou notebook
+    # não deve ter o stdout do processo trocado por baixo por causa de um import.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     parser = argparse.ArgumentParser(
         prog="python -m src.experimento",
         description="Reproduz as tabelas consolidadas a partir do CSV bruto.",
