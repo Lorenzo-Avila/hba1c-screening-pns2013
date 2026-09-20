@@ -1,0 +1,1045 @@
+"""Atribuições SHAP sobre a Random Forest publicada.
+
+Uma responsabilidade só: calcular atribuição e emitir tabela. O módulo não treina
+modelo novo, não calibra limiar próprio, não mede desempenho e não toca no grid
+publicado. O pipeline vem de `features.construir_preprocessador`, a floresta de
+`models.random_forest` e o limiar do mesmo `evaluate.avaliar` que produz a tabela
+consolidada, conferido contra ela antes de qualquer atribuição sair.
+
+Fica fora de `experimento` pelo mesmo motivo que manteve `tuning` fora (D-033): o
+regime de contraste é caro e nenhum número publicado depende dele. `make resultados`
+precisa continuar barato, porque é ele que confere as âncoras.
+
+**Dois regimes de perturbação, sobre dois objetos distintos** (D-053). O principal é
+`tree_path_dependent` sobre as 500 árvores, e é ele que sustenta o SHAP global
+publicado. O de contraste é `interventional`, que assume independência entre colunas e
+é a formulação que a referência aponta como frágil. A divergência entre os dois mede a
+exposição deste trabalho ao problema.
+
+**A floresta reduzida é objeto de diagnóstico e nunca modelo publicado.** O `shap`
+desta versão explica algumas árvores com erro sob `interventional`, e o erro é do
+explicador, não do modelo: as mesmas árvores fecham exato sob `tree_path_dependent`. O
+módulo identifica essas árvores dentro da execução, explicando cada uma isoladamente
+sobre o teste completo, e roda o contraste sobre a floresta sem elas. A floresta
+reduzida sai da mesma floresta ajustada, com a lista de árvores filtrada; reajustar
+produziria outra floresta e invalidaria a comparação. O ramo que decidiu emitir o
+contraste assim está registrado em D-053 e foi selecionado antes destes números.
+
+**Portão de aditividade por regime.** O principal fecha em 1e-9. O de contraste fecha
+quando o erro da floresta fica na ordem do erro de uma árvore isolada sem defeito,
+medido na mesma execução: nenhuma tolerância se fixa abaixo do ruído do método que ela
+mede.
+
+**Restrição de leitura** (D-022, D-040, D-053). As atribuições ficam na escala de
+fração de votos, que é a escala em que o limiar calibrado opera. A soma das
+contribuições reconstrói o escore do indivíduo, nunca o risco dele, e o valor de base
+fica perto de 0,5 por efeito do `class_weight`, não perto da prevalência de 7%.
+
+Uso:
+
+    python -m src.explicabilidade
+    python -m src.explicabilidade --celulas A_atomico
+    python -m src.explicabilidade --sem-artefato
+"""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import shap
+
+from . import artefatos as art
+from . import colinearidade as col
+from . import config as cfg
+from . import evaluate as ev
+from . import experimento as xp
+from . import features as ft
+from . import models as md
+
+# `C_completo` ficou fora do grid publicado por D-016, então não há o que explicar nele.
+CELULAS = ["A_atomico", "B_composto"]
+MODELO = xp.NOME_FLORESTA
+
+REGIME_PRINCIPAL = "tree_path_dependent"
+REGIME_CONTRASTE = "interventional"
+OBJETO_COMPLETA = "floresta completa"
+OBJETO_REDUZIDA = "floresta reduzida (diagnostico)"
+
+# Cada regime roda sobre o seu objeto, e o par viaja junto para nenhuma tabela deixar
+# implícito o que foi explicado.
+REGIMES = [(REGIME_PRINCIPAL, OBJETO_COMPLETA), (REGIME_CONTRASTE, OBJETO_REDUZIDA)]
+
+# Linhas do treino que estimam a expectativa marginal do regime de contraste. Cem é a
+# ordem de grandeza usual, e aumentar reduz variância de estimação sem mudar o que o
+# regime assume. Saem do treino, nunca do teste, por R1 e R2.
+N_BACKGROUND = 100
+
+# Separa as árvores que o explicador erra das que ele acerta. Os dois grupos distam
+# milhares de vezes, então qualquer valor entre eles serve; a execução reporta os
+# extremos dos dois lados para a separação ficar demonstrada em vez de afirmada.
+CORTE_ARVORE = 1e-4
+
+TOL_PRINCIPAL = 1e-9
+CASAS_CONFERENCIA = 3
+TOPO_TEX = 10
+
+# Algarismos significativos das colunas de erro que vêm de agregação sobre as árvores.
+# Três basta para elas: são mínimos, máximos e média sobre centenas de explicações de
+# árvore isolada, que rodam em um núcleo só e saem iguais entre execuções. Três é também
+# a precisão em que o projeto confere tudo, e 5,90e-08 continua legível.
+SIGNIFICATIVOS_ERRO = 3
+
+# Colunas que passam pelo arredondamento acima.
+COLUNAS_DE_ERRO = [
+    "erro_min_mantidas", "erro_max_mantidas",
+    "erro_min_excluidas", "erro_max_excluidas",
+    "piso_por_arvore",
+]
+
+# Colunas gravadas como ordem de grandeza, a potência de dez logo abaixo do valor. As
+# duas medem o erro de arredondamento da floresta, que roda com `n_jobs=-1`, e são
+# máximos sobre o teste inteiro: a ordem em que os processos reduzem move o primeiro
+# algarismo significativo delas, não os últimos. Estabilizar a mantissa não estava ao
+# alcance, e arredondá-la a três algarismos deixava a guarda de byte falhando de vez em
+# quando sem que nada tivesse mudado, que é o jeito de ensinar a ignorar vermelho. A
+# fronteira passa a ser a virada de década: 5,52e-15 e 5,551e-15 saem as duas como
+# 1e-15, e é isso que os documentos afirmam sobre elas. A mantissa nunca carregou
+# informação aqui.
+COLUNAS_DE_ORDEM = ["erro_aditividade_principal", "erro_aditividade_contraste"]
+
+# Casas na gravação da mesma tabela. As nove de `artefatos.CASAS_CSV` zeram a coluna
+# inteira, porque os erros de aditividade vivem entre 1e-15 e 1e-8 e um artefato de
+# diagnóstico cheio de zeros não diagnostica nada. Aqui o número serve só para o
+# arredondamento decimal não truncar o que os dois tratamentos acima já fixaram.
+CASAS_ARVORES = 18
+
+NOME_GLOBAL_ATRIBUTO = "shap_global_atributo"
+NOME_GLOBAL_COLUNA = "shap_global_coluna"
+NOME_PARES = "shap_pares_colineares"
+NOME_CASOS = "shap_casos_locais"
+NOME_ARVORES = "shap_arvores_excluidas"
+
+# As três estruturas de dependência que sobrevivem nas duas células publicadas, nomeadas
+# em D-053 antes de qualquer atribuição existir. Nenhum limiar decide se agrupa: cada
+# bloco sai com o membro e com a soma, lado a lado, nos dois regimes.
+PARES_COLINEARES = [
+    {
+        "bloco": "imc x circ_cintura",
+        "celulas": ["A_atomico", "B_composto"],
+        "membros": ["imc", "circ_cintura"],
+        "evidencia": "Pearson 0,793",
+    },
+    {
+        "bloco": "pas x pad",
+        "celulas": ["A_atomico"],
+        "membros": ["pas", "pad"],
+        "evidencia": "Pearson 0,743",
+    },
+    {
+        "bloco": "imc, circ_cintura, sexo_fem x multimorbidade",
+        "celulas": ["B_composto"],
+        "membros": ["imc", "circ_cintura", "sexo_fem", "multimorbidade"],
+        "evidencia": "canal de coarsening por ponto de corte clinico, D-012",
+    },
+]
+
+CELULAS_CONFUSAO = ["VP", "FP", "FN", "VN"]
+
+NOTA_ESCALA = (
+    "Atribuições na escala de fração de votos da classe positiva, que é a escala em que "
+    "o limiar calibrado opera. A soma das contribuições reconstrói o escore do "
+    "indivíduo, nunca o risco dele, e o valor de base fica perto de 0,5 por efeito do "
+    "class\\_weight, não perto da prevalência (D-022, D-040, D-053)."
+)
+NOTA_REGIMES = (
+    "O regime principal é tree\\_path\\_dependent sobre as 500 árvores ajustadas, e é "
+    "ele que sustenta o SHAP global publicado. O de contraste é interventional sobre a "
+    "floresta reduzida, que exclui as árvores atribuídas com erro pelo explicador desta "
+    "versão. A floresta reduzida é objeto de diagnóstico e nunca modelo publicado "
+    "(D-053)."
+)
+NOTA_REFERENCIA = (
+    "A codificação usa drop=\"first\", então a categoria de referência de cada nominal "
+    "tem atribuição zero por construção, não por irrelevância. A coluna "
+    "categoria\\_referencia\\_omitida registra qual ficou de fora."
+)
+
+
+# ---------------------------------------------------------------------------
+# Proveniência das colunas
+# ---------------------------------------------------------------------------
+
+def proveniencia(preprocessador) -> pd.DataFrame:
+    """Liga cada coluna da matriz de design à variável conceitual que a gerou.
+
+    O mapa sai do estado do `ColumnTransformer` ajustado, nunca de parsing de prefixo
+    de string: prefixo quebra em silêncio quando uma categoria tem underscore no nome.
+    As dummies de uma nominal são particionadas pelas `categories_` do encoder, na
+    mesma ordem em que ele as gera.
+
+    Returns:
+        DataFrame com `coluna`, `atributo` e `categoria_referencia_omitida`, uma linha
+        por coluna da matriz de design, na ordem da matriz.
+
+    Raises:
+        KeyError: se alguma variável conceitual não estiver no mapa de proveniência de
+            `features.FONTES`. Coluna sem proveniência declarada não entra em tabela.
+    """
+    transformador = preprocessador.named_steps["preparo"]
+    linhas = []
+    for nome, estagio, colunas in transformador.transformers_:
+        if nome in ("num", "bin"):
+            linhas += [{"coluna": c, "atributo": c,
+                        "categoria_referencia_omitida": ""} for c in colunas]
+        elif nome == "nom":
+            gerados = list(estagio.get_feature_names_out(colunas))
+            inicio = 0
+            for atributo, categorias in zip(colunas, estagio.categories_):
+                # drop="first": uma dummy a menos que categorias observadas, e a
+                # primeira delas é a que ficou de fora.
+                quantas = len(categorias) - 1
+                omitida = _formatar_categoria(categorias[0])
+                for gerado in gerados[inicio:inicio + quantas]:
+                    linhas.append({"coluna": str(gerado), "atributo": atributo,
+                                   "categoria_referencia_omitida": omitida})
+                inicio += quantas
+            if inicio != len(gerados):
+                raise ValueError(
+                    "A partição das dummies não fechou: o encoder gerou "
+                    f"{len(gerados)} colunas e as categorias somam {inicio}."
+                )
+
+    mapa = pd.DataFrame(linhas)
+    sem_fonte = sorted(set(mapa["atributo"]) - set(ft.FONTES))
+    if sem_fonte:
+        raise KeyError(
+            f"Variáveis sem proveniência declarada em features.FONTES: {sem_fonte}"
+        )
+    return mapa
+
+
+def _formatar_categoria(valor) -> str:
+    """Escreve o código da categoria omitida sem a cauda decimal do float."""
+    if isinstance(valor, (float, np.floating)) and float(valor).is_integer():
+        return str(int(valor))
+    return str(valor)
+
+
+# ---------------------------------------------------------------------------
+# Atribuições
+# ---------------------------------------------------------------------------
+
+def explicar(modelo, design, regime: str,
+             background=None) -> tuple[np.ndarray, np.ndarray]:
+    """Atribuições da classe positiva e valor de base, para um regime.
+
+    Esta versão do `shap` devolve tensor `(n, colunas, 2)` para classificador binário,
+    e a classe positiva é o índice 1 do último eixo. O `expected_value` também vem com
+    dois elementos, e é o índice 1 que importa.
+
+    `check_additivity` fica desligado: com background pequeno ele estoura por
+    tolerância em vez de por erro real. A conferência é feita à mão, pelos portões que
+    `erro_de_aditividade` mede.
+
+    Args:
+        regime: `REGIME_PRINCIPAL` dispensa background; `REGIME_CONTRASTE` exige um.
+
+    Returns:
+        Tupla `(valores, base)`, com `valores` de forma `(n, colunas)` e `base` de
+        comprimento `n`.
+    """
+    if regime == REGIME_CONTRASTE:
+        if background is None:
+            raise ValueError(f"O regime {regime!r} precisa de background.")
+        explicador = shap.TreeExplainer(modelo, data=np.asarray(background),
+                                        feature_perturbation=regime)
+    else:
+        explicador = shap.TreeExplainer(modelo, feature_perturbation=regime)
+
+    saida = explicador(np.asarray(design), check_additivity=False)
+    valores = saida.values[:, :, 1]
+    base = np.asarray(saida.base_values)
+    base = base[:, 1] if base.ndim == 2 else np.full(len(valores), float(base[1]))
+    return valores, base
+
+
+def erro_de_aditividade(valores: np.ndarray, base: np.ndarray,
+                        proba: np.ndarray) -> float:
+    """Maior distância entre a soma das atribuições mais a base e o escore do modelo.
+
+    É a conferência que diz se a atribuição descreve o modelo ou outra coisa.
+    """
+    return float(np.abs(valores.sum(axis=1) + base - proba).max())
+
+
+def arvores_com_defeito(floresta, design, background,
+                        corte: float = CORTE_ARVORE) -> dict:
+    """Aponta as árvores que o explicador atribui com erro sob o regime de contraste.
+
+    Explica cada árvore isoladamente sobre as mesmas linhas que depois são explicadas
+    em conjunto, então a cobertura fica completa por construção. O defeito é esparso em
+    pares de árvore e linha, e a contagem cresce com o número de linhas conferidas: ela
+    vale para o conjunto passado aqui e só para ele (D-053).
+
+    Returns:
+        Dicionário com `mantidas` e `excluidas`, que são posições na lista de árvores,
+        os extremos de erro dos dois grupos, o `piso`, que é o erro médio das mantidas,
+        e o `corte` usado.
+
+    Raises:
+        ValueError: se o corte não separar dois grupos não vazios. A regra de D-053
+            pressupõe a separação, e sem ela o diagnóstico não se sustenta.
+    """
+    matriz = np.asarray(design)
+    erros = []
+    for arvore in floresta.estimators_:
+        valores, base = explicar(arvore, matriz, REGIME_CONTRASTE, background)
+        erros.append(erro_de_aditividade(valores, base,
+                                         arvore.predict_proba(matriz)[:, 1]))
+    erros = np.asarray(erros)
+
+    excluidas = np.flatnonzero(erros > corte)
+    mantidas = np.flatnonzero(erros <= corte)
+    if excluidas.size == 0 or mantidas.size == 0:
+        raise ValueError(
+            f"O corte {corte:g} não separou dois grupos: {mantidas.size} mantidas e "
+            f"{excluidas.size} excluídas, com erro entre {erros.min():.3e} e "
+            f"{erros.max():.3e}."
+        )
+
+    return {
+        "erros": erros,
+        "mantidas": mantidas,
+        "excluidas": excluidas,
+        "corte": float(corte),
+        "erro_min_mantidas": float(erros[mantidas].min()),
+        "erro_max_mantidas": float(erros[mantidas].max()),
+        "erro_min_excluidas": float(erros[excluidas].min()),
+        "erro_max_excluidas": float(erros[excluidas].max()),
+        # Piso numérico do algoritmo sobre este modelo. É contra ele que o portão do
+        # regime de contraste se mede, e não contra um valor escolhido por analogia com
+        # o regime principal (D-053).
+        "piso": float(erros[mantidas].mean()),
+    }
+
+
+def reduzir_floresta(floresta, mantidas: np.ndarray):
+    """Devolve a mesma floresta ajustada, com a lista de árvores filtrada.
+
+    Nada é reajustado. Reajustar sortearia outras amostras bootstrap e produziria uma
+    floresta diferente, o que invalidaria a comparação com a publicada.
+    """
+    reduzida = copy.deepcopy(floresta)
+    reduzida.estimators_ = [floresta.estimators_[i] for i in mantidas]
+    reduzida.n_estimators = len(reduzida.estimators_)
+    if len(reduzida.estimators_) != len(mantidas):
+        raise ValueError("A floresta reduzida não ficou com o número de árvores pedido.")
+    return reduzida
+
+
+# ---------------------------------------------------------------------------
+# Rankings
+# ---------------------------------------------------------------------------
+
+def ranking_por_coluna(valores: np.ndarray, mapa: pd.DataFrame) -> pd.DataFrame:
+    """|SHAP| médio de cada coluna da matriz de design, com a posição no ranking."""
+    tabela = mapa.copy()
+    tabela["shap_medio_abs"] = np.abs(valores).mean(axis=0)
+    return _posicionar(tabela)
+
+
+def ranking_por_atributo(valores: np.ndarray, mapa: pd.DataFrame) -> pd.DataFrame:
+    """|SHAP| médio por variável conceitual, somando as colunas de uma mesma nominal.
+
+    A categoria de referência entra na soma com atribuição zero, porque o `drop="first"`
+    a tirou da matriz. A coluna que declara qual ficou de fora acompanha a linha.
+    """
+    por_coluna = mapa.copy()
+    por_coluna["shap_medio_abs"] = np.abs(valores).mean(axis=0)
+
+    tabela = (por_coluna.groupby("atributo", sort=False)
+              .agg(shap_medio_abs=("shap_medio_abs", "sum"),
+                   n_colunas=("coluna", "count"),
+                   categoria_referencia_omitida=("categoria_referencia_omitida",
+                                                 "first"))
+              .reset_index())
+    return _posicionar(tabela)
+
+
+def _posicionar(tabela: pd.DataFrame) -> pd.DataFrame:
+    """Ordena por |SHAP| médio decrescente e numera as posições, de forma estável.
+
+    Ordenação estável: empate exato de atribuição preserva a ordem da matriz de design,
+    em vez de depender de como o algoritmo de ordenação desempata.
+    """
+    ordenada = tabela.sort_values("shap_medio_abs", ascending=False,
+                                  kind="stable").reset_index(drop=True)
+    ordenada["posicao"] = range(1, len(ordenada) + 1)
+    return ordenada
+
+
+def deslocamento(ranking_a: pd.DataFrame, ranking_b: pd.DataFrame) -> int:
+    """Soma das mudanças absolutas de posição entre dois rankings de variável.
+
+    Métrica única dos dois deslocamentos que a regra de D-053 compara, para que a
+    comparação seja entre grandezas da mesma natureza.
+    """
+    a = ranking_a.set_index("atributo")["posicao"]
+    b = ranking_b.set_index("atributo")["posicao"].reindex(a.index)
+    if b.isna().any():
+        faltando = sorted(a.index[b.isna()])
+        raise ValueError(f"Rankings com variáveis distintas: {faltando}")
+    return int((a - b).abs().sum())
+
+
+def empates(ranking: pd.DataFrame) -> list[str]:
+    """Variáveis com |SHAP| médio exatamente igual ao de outra, se houver alguma.
+
+    Empate exato faz a posição depender da ordem de entrada, e quem lê a tabela precisa
+    saber disso em vez de descobrir numa reexecução.
+    """
+    contagem = ranking["shap_medio_abs"].value_counts()
+    repetidos = contagem[contagem > 1].index
+    return sorted(ranking.loc[ranking["shap_medio_abs"].isin(repetidos), "atributo"])
+
+
+# ---------------------------------------------------------------------------
+# Casos locais
+# ---------------------------------------------------------------------------
+
+def selecionar_casos(y_te: pd.Series, proba: np.ndarray,
+                     limiar: float) -> pd.DataFrame:
+    """Um caso por célula da matriz de confusão, na fronteira do limiar.
+
+    Cada caso é o de menor `|escore - limiar|` dentro da sua célula, com desempate pelo
+    menor índice. A regra é um `argmin` de uma coluna: não admite julgamento e reproduz
+    sozinha, que é o que separa escolha de caso de escolha por conveniência.
+
+    A fronteira é onde a explicação tem valor operacional. Um encaminhado e um não
+    encaminhado com escores quase iguais, e explicações diferentes, mostram que o modelo
+    decide por variável.
+
+    Returns:
+        DataFrame com `caso`, `indice`, `escore` e `distancia_ao_limiar`, uma linha por
+        célula da confusão.
+
+    Raises:
+        ValueError: se alguma célula da confusão ficar vazia no teste.
+    """
+    predito = (proba >= limiar).astype(int)
+    base = pd.DataFrame({
+        "indice": list(y_te.index),
+        "observado": y_te.to_numpy(),
+        "predito": predito,
+        "escore": proba,
+        "distancia_ao_limiar": np.abs(proba - limiar),
+    })
+    pertence = {
+        "VP": (base["observado"] == 1) & (base["predito"] == 1),
+        "FP": (base["observado"] == 0) & (base["predito"] == 1),
+        "FN": (base["observado"] == 1) & (base["predito"] == 0),
+        "VN": (base["observado"] == 0) & (base["predito"] == 0),
+    }
+
+    escolhidos = []
+    for caso in CELULAS_CONFUSAO:
+        candidatos = base[pertence[caso]]
+        if candidatos.empty:
+            raise ValueError(f"Nenhum caso na célula {caso!r} da matriz de confusão.")
+        escolhido = candidatos.sort_values(["distancia_ao_limiar", "indice"],
+                                           kind="stable").iloc[0]
+        escolhidos.append({
+            "caso": caso,
+            "indice": int(escolhido["indice"]),
+            "escore": float(escolhido["escore"]),
+            "distancia_ao_limiar": float(escolhido["distancia_ao_limiar"]),
+        })
+    return pd.DataFrame(escolhidos)
+
+
+def contribuicoes_locais(valores: np.ndarray, mapa: pd.DataFrame,
+                         posicao: int) -> pd.DataFrame:
+    """Contribuição de um indivíduo, com sinal, somada por variável conceitual.
+
+    Aqui a soma é com sinal, e não em módulo: é ela que reconstrói o escore junto com o
+    valor de base, e trocar por módulo quebraria a identidade que a explicação local
+    afirma.
+    """
+    linha = mapa.copy()
+    linha["contribuicao"] = valores[posicao, :]
+    return linha.groupby("atributo", sort=False)["contribuicao"].sum().reset_index()
+
+
+# ---------------------------------------------------------------------------
+# Limiar publicado
+# ---------------------------------------------------------------------------
+
+def limiar_publicado(celula: str, path: Path | None = None) -> float:
+    """Lê o limiar da célula na tabela consolidada versionada.
+
+    Raises:
+        FileNotFoundError: se a tabela consolidada não estiver emitida.
+        KeyError: se a célula não estiver nela.
+    """
+    if path is None:
+        path = cfg.PATH_TABELAS / f"{xp.NOME_CONSOLIDADO}.csv"
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Tabela consolidada ausente: {path}. Rode python -m src.experimento antes."
+        )
+    tabela = pd.read_csv(path, encoding="utf-8")
+    recorte = tabela[(tabela["modelo"] == MODELO) & (tabela["conjunto"] == celula)]
+    if recorte.empty:
+        raise KeyError(f"Célula ({MODELO!r}, {celula!r}) ausente de {path.name}.")
+    return float(recorte.iloc[0]["limiar"])
+
+
+def conferir_limiar(obtido: float, celula: str,
+                    casas: int = CASAS_CONFERENCIA) -> dict:
+    """Compara o limiar desta execução com o publicado, na casa que o projeto confere.
+
+    Raises:
+        ValueError: se divergirem. Parar aqui é o ponto: divergência significa que este
+            módulo ajustou o modelo diferente do experimento, e a atribuição
+            descreveria outro modelo.
+    """
+    esperado = limiar_publicado(celula)
+    if round(obtido, casas) != round(esperado, casas):
+        raise ValueError(
+            f"Limiar de {celula} diverge do publicado: {obtido:.9f} contra "
+            f"{esperado:.9f} em {xp.NOME_CONSOLIDADO}.csv. O modelo explicado não é o "
+            f"da tabela consolidada."
+        )
+    return {"celula": celula, "limiar_obtido": obtido, "limiar_publicado": esperado}
+
+
+# ---------------------------------------------------------------------------
+# Medição de uma célula
+# ---------------------------------------------------------------------------
+
+def preparar(celula: str, particao: xp.Particao) -> dict:
+    """Ajusta a célula pelo mesmo caminho de chamada que produz a tabela consolidada.
+
+    `models.montar` embrulha a floresta no preprocessador do conjunto e
+    `evaluate.avaliar` calibra o limiar por validação cruzada no treino. Montar
+    pipeline próprio aqui daria outro modelo com a mesma cara.
+    """
+    resultado = ev.avaliar(
+        md.montar(md.estimadores()[MODELO], celula),
+        particao.X_tr, particao.y_tr, particao.X_te, particao.y_te,
+        nome=MODELO, conjunto=celula, recall_alvo=cfg.RECALL_ALVO,
+        salvar_figuras=False,
+    )
+    pipeline = resultado["estimador"]
+    preprocessador = pipeline.named_steps["pre"]
+
+    design_tr = col.matriz_de_design(pipeline, particao.X_tr)
+    design_te = col.matriz_de_design(pipeline, particao.X_te)
+
+    # Sorteio por índice, não por posição: sobrevive a qualquer reordenação da matriz.
+    indices_background = design_tr.sample(n=N_BACKGROUND,
+                                          random_state=cfg.RANDOM_STATE).index
+    background = design_tr.loc[indices_background]
+
+    # Valores em escala clínica, depois da imputação e antes da padronização. É o que a
+    # tabela de casos locais mostra ao lado da contribuição, porque 94 cm de cintura se
+    # lê e 0,83 desvio padrão não.
+    clinicos = preprocessador[:2].transform(particao.X_te)
+    if not isinstance(clinicos, pd.DataFrame):
+        clinicos = pd.DataFrame(clinicos, index=particao.X_te.index)
+
+    return {
+        "celula": celula,
+        "resultado": resultado,
+        "pipeline": pipeline,
+        "floresta": pipeline.named_steps["clf"],
+        "design_tr": design_tr,
+        "design_te": design_te,
+        "background": background,
+        "indices_background": list(indices_background),
+        "mapa": proveniencia(preprocessador),
+        "clinicos": clinicos,
+        "limiar": float(resultado["limiar"]),
+        "proba": resultado["proba_teste"],
+        "y_te": particao.y_te,
+    }
+
+
+def medir_celula(celula: str, particao: xp.Particao) -> dict:
+    """Roda os dois regimes na célula, confere os portões e devolve o que as tabelas usam.
+
+    Raises:
+        ValueError: se o limiar divergir do publicado ou se um portão de aditividade
+            falhar. Os dois casos param a execução em vez de emitir tabela.
+    """
+    inicio = time.perf_counter()
+    base = preparar(celula, particao)
+    conferencia = conferir_limiar(base["limiar"], celula)
+
+    floresta = base["floresta"]
+    design = np.asarray(base["design_te"])
+    background = base["background"]
+    mapa = base["mapa"]
+
+    defeito = arvores_com_defeito(floresta, design, background)
+    reduzida = reduzir_floresta(floresta, defeito["mantidas"])
+
+    proba_completa = floresta.predict_proba(design)[:, 1]
+    proba_reduzida = reduzida.predict_proba(design)[:, 1]
+
+    principal, base_principal = explicar(floresta, design, REGIME_PRINCIPAL)
+    principal_reduzida, _ = explicar(reduzida, design, REGIME_PRINCIPAL)
+    contraste, base_contraste = explicar(reduzida, design, REGIME_CONTRASTE,
+                                         background)
+
+    erro_principal = erro_de_aditividade(principal, base_principal, proba_completa)
+    erro_contraste = erro_de_aditividade(contraste, base_contraste, proba_reduzida)
+    if erro_principal > TOL_PRINCIPAL:
+        raise ValueError(
+            f"{celula}: aditividade do regime {REGIME_PRINCIPAL} não fecha em "
+            f"{TOL_PRINCIPAL:g}. Erro máximo {erro_principal:.3e}."
+        )
+    if erro_contraste > defeito["piso"]:
+        raise ValueError(
+            f"{celula}: aditividade do regime {REGIME_CONTRASTE} acima do piso por "
+            f"árvore. Erro máximo {erro_contraste:.3e} contra piso "
+            f"{defeito['piso']:.3e}. A identificação das árvores está incompleta."
+        )
+
+    # Dois caminhos até o mesmo escore: o pipeline inteiro e a matriz de design com a
+    # floresta. Conferir aqui fecha a ponte que a explicação local usa.
+    if not np.allclose(proba_completa, base["proba"], atol=1e-12):
+        raise ValueError(
+            f"{celula}: o escore pela matriz de design não bate com o do pipeline."
+        )
+
+    ranking_principal = ranking_por_atributo(principal, mapa)
+    ranking_reduzida = ranking_por_atributo(principal_reduzida, mapa)
+    ranking_contraste = ranking_por_atributo(contraste, mapa)
+
+    return {
+        **base,
+        "conferencia_limiar": conferencia,
+        "defeito": defeito,
+        "reduzida": reduzida,
+        "proba_reduzida": proba_reduzida,
+        "atribuicoes": {
+            (REGIME_PRINCIPAL, OBJETO_COMPLETA): principal,
+            (REGIME_CONTRASTE, OBJETO_REDUZIDA): contraste,
+        },
+        "bases": {
+            (REGIME_PRINCIPAL, OBJETO_COMPLETA): base_principal,
+            (REGIME_CONTRASTE, OBJETO_REDUZIDA): base_contraste,
+        },
+        "rankings": {
+            (REGIME_PRINCIPAL, OBJETO_COMPLETA): ranking_principal,
+            (REGIME_CONTRASTE, OBJETO_REDUZIDA): ranking_contraste,
+        },
+        "erro_principal": erro_principal,
+        "erro_contraste": erro_contraste,
+        # Os dois deslocamentos que a regra de D-053 comparou, recalculados aqui para a
+        # tabela registrar com que margem o ramo selecionado se sustenta.
+        "delta_arvores": deslocamento(ranking_principal, ranking_reduzida),
+        "delta_regime": deslocamento(ranking_reduzida, ranking_contraste),
+        "empates": {"principal": empates(ranking_principal),
+                    "principal_reduzida": empates(ranking_reduzida),
+                    "contraste": empates(ranking_contraste)},
+        "segundos": time.perf_counter() - inicio,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tabelas
+# ---------------------------------------------------------------------------
+
+def tabela_global_atributo(medidas: list[dict]) -> pd.DataFrame:
+    """Uma linha por célula, regime e variável conceitual."""
+    partes = []
+    for medida in medidas:
+        for chave in REGIMES:
+            regime, objeto = chave
+            ranking = medida["rankings"][chave].copy()
+            ranking.insert(0, "objeto_explicado", objeto)
+            ranking.insert(0, "regime", regime)
+            ranking.insert(0, "celula", medida["celula"])
+            partes.append(ranking)
+    colunas = ["celula", "regime", "objeto_explicado", "atributo", "shap_medio_abs",
+               "posicao", "n_colunas", "categoria_referencia_omitida"]
+    return pd.concat(partes, ignore_index=True)[colunas]
+
+
+def tabela_global_coluna(medidas: list[dict]) -> pd.DataFrame:
+    """Uma linha por célula, regime e coluna da matriz de design."""
+    partes = []
+    for medida in medidas:
+        for chave in REGIMES:
+            regime, objeto = chave
+            ranking = ranking_por_coluna(medida["atribuicoes"][chave], medida["mapa"])
+            ranking.insert(0, "objeto_explicado", objeto)
+            ranking.insert(0, "regime", regime)
+            ranking.insert(0, "celula", medida["celula"])
+            partes.append(ranking)
+    colunas = ["celula", "regime", "objeto_explicado", "coluna", "atributo",
+               "shap_medio_abs", "posicao", "categoria_referencia_omitida"]
+    return pd.concat(partes, ignore_index=True)[colunas]
+
+
+def tabela_pares_colineares(medidas: list[dict]) -> pd.DataFrame:
+    """Os pares e blocos nomeados em D-053, membro a membro e em bloco somado.
+
+    A tabela sai em formato longo, uma linha por membro, porque o bloco de `B_composto`
+    tem quatro membros e uma coluna por membro não fecharia com o par de dois. Cada
+    linha carrega a soma do bloco e a razão entre o maior e o menor membro, então a
+    partição de crédito se lê sem sair da linha.
+    """
+    linhas = []
+    for medida in medidas:
+        celula = medida["celula"]
+        for regime, objeto in REGIMES:
+            ranking = medida["rankings"][(regime, objeto)].set_index("atributo")
+            for par in PARES_COLINEARES:
+                if celula not in par["celulas"]:
+                    continue
+                valores = {m: float(ranking.loc[m, "shap_medio_abs"])
+                           for m in par["membros"]}
+                soma = float(sum(valores.values()))
+                maior = max(valores, key=valores.get)
+                menor = min(valores, key=valores.get)
+                razao = (valores[maior] / valores[menor]
+                         if valores[menor] > 0 else float("inf"))
+                for membro in par["membros"]:
+                    linhas.append({
+                        "celula": celula,
+                        "regime": regime,
+                        "objeto_explicado": objeto,
+                        "bloco": par["bloco"],
+                        "evidencia": par["evidencia"],
+                        "n_membros": len(par["membros"]),
+                        "membro": membro,
+                        "shap_medio_abs": valores[membro],
+                        "posicao": int(ranking.loc[membro, "posicao"]),
+                        "shap_bloco_somado": soma,
+                        "fracao_do_bloco": (valores[membro] / soma if soma
+                                            else float("nan")),
+                        "membro_dominante": maior,
+                        "razao_maior_menor": razao,
+                    })
+    return pd.DataFrame(linhas)
+
+
+def tabela_casos_locais(medidas: list[dict]) -> pd.DataFrame:
+    """Quatro casos por célula, com a contribuição de cada variável e o valor observado.
+
+    Os casos saem do regime principal sobre a floresta completa, que é o modelo
+    publicado: é o escore dele que o limiar calibrado corta, e explicar a fronteira com
+    o escore de outro objeto descreveria uma decisão que ninguém tomou.
+    """
+    linhas = []
+    for medida in medidas:
+        chave = (REGIME_PRINCIPAL, OBJETO_COMPLETA)
+        valores = medida["atribuicoes"][chave]
+        valor_base = medida["bases"][chave]
+        clinicos = medida["clinicos"]
+
+        casos = selecionar_casos(medida["y_te"], medida["proba"], medida["limiar"])
+        posicoes = {indice: p for p, indice in enumerate(medida["design_te"].index)}
+
+        for _, caso in casos.iterrows():
+            posicao = posicoes[int(caso["indice"])]
+            contribuicoes = contribuicoes_locais(valores, medida["mapa"], posicao)
+            for _, contribuicao in contribuicoes.iterrows():
+                atributo = contribuicao["atributo"]
+                linhas.append({
+                    "celula": medida["celula"],
+                    "regime": REGIME_PRINCIPAL,
+                    "objeto_explicado": OBJETO_COMPLETA,
+                    "caso": caso["caso"],
+                    "indice": int(caso["indice"]),
+                    "escore": float(caso["escore"]),
+                    "limiar": medida["limiar"],
+                    "distancia_ao_limiar": float(caso["distancia_ao_limiar"]),
+                    "valor_base": float(valor_base[posicao]),
+                    "atributo": atributo,
+                    "contribuicao": float(contribuicao["contribuicao"]),
+                    "valor_observado": float(
+                        clinicos.loc[int(caso["indice"]), atributo]
+                    ),
+                })
+    return pd.DataFrame(linhas)
+
+
+def _tres_significativos(valor: float) -> float:
+    """Arredonda para `SIGNIFICATIVOS_ERRO` algarismos, preservando a ordem de grandeza.
+
+    Arredondar por casa decimal não serve a uma coluna que vai de 1e-15 a 1e-1: ou zera
+    o topo da escala ou grava o ruído do último bit. Por algarismo significativo, o
+    valor fica legível e o arquivo para de se mover entre execuções.
+    """
+    return float(f"{float(valor):.{SIGNIFICATIVOS_ERRO - 1}e}")
+
+
+def ordem_de_grandeza(valor: float) -> float:
+    """Potência de dez logo abaixo do valor: 5,52e-15 e 5,551e-15 viram as duas 1e-15.
+
+    É a forma estável de gravar um erro de arredondamento cujo primeiro algarismo se
+    move entre execuções. Quem compara esses valores compara ordens, e comparar ordens
+    é o que os documentos afirmam sobre eles.
+
+    Erro exatamente zero não tem logaritmo e devolve zero: aditividade exata é a
+    situação que o portão procura, não um caso a tratar por exceção.
+    """
+    valor = abs(float(valor))
+    if valor == 0.0:
+        return 0.0
+    return float(10.0 ** np.floor(np.log10(valor)))
+
+
+def tabela_arvores_excluidas(medidas: list[dict]) -> pd.DataFrame:
+    """Quantas árvores saíram do regime de contraste, por que, e o que isso moveu.
+
+    A floresta reduzida existe para o contraste fechar exato dos dois lados, e ela não é
+    modelo publicado em momento nenhum. Os dois deslocamentos ficam na mesma linha
+    porque é a comparação entre eles que sustenta o ramo escolhido em D-053.
+
+    As colunas de erro agregadas sobre as árvores saem em `SIGNIFICATIVOS_ERRO`
+    algarismos e as duas de aditividade da floresta saem em ordem de grandeza. Os dois
+    tratamentos acontecem aqui e não na exportação: a tabela em memória e o arquivo
+    versionado precisam trazer o mesmo número, senão a guarda que confere um passa a
+    atestar o outro.
+    """
+    linhas = []
+    for medida in medidas:
+        defeito = medida["defeito"]
+        linhas.append({
+            "celula": medida["celula"],
+            "regime_principal": f"{REGIME_PRINCIPAL} sobre {OBJETO_COMPLETA}",
+            "regime_contraste": f"{REGIME_CONTRASTE} sobre {OBJETO_REDUZIDA}",
+            "arvores_ajustadas": len(medida["floresta"].estimators_),
+            "arvores_mantidas": int(defeito["mantidas"].size),
+            "arvores_excluidas": int(defeito["excluidas"].size),
+            "corte": defeito["corte"],
+            "erro_min_mantidas": defeito["erro_min_mantidas"],
+            "erro_max_mantidas": defeito["erro_max_mantidas"],
+            "erro_min_excluidas": defeito["erro_min_excluidas"],
+            "erro_max_excluidas": defeito["erro_max_excluidas"],
+            "piso_por_arvore": defeito["piso"],
+            "erro_aditividade_principal": medida["erro_principal"],
+            "erro_aditividade_contraste": medida["erro_contraste"],
+            "delta_arvores": medida["delta_arvores"],
+            "delta_regime": medida["delta_regime"],
+        })
+
+    tabela = pd.DataFrame(linhas)
+    for coluna in COLUNAS_DE_ERRO:
+        tabela[coluna] = tabela[coluna].map(_tres_significativos)
+    for coluna in COLUNAS_DE_ORDEM:
+        tabela[coluna] = tabela[coluna].map(ordem_de_grandeza)
+    return tabela
+
+
+# ---------------------------------------------------------------------------
+# Artefatos
+# ---------------------------------------------------------------------------
+
+def _recortar(tabela: pd.DataFrame, topo: int = TOPO_TEX) -> pd.DataFrame:
+    """Os primeiros de cada célula e regime, para o `.tex` caber no documento.
+
+    Sessenta linhas não entram em documento acadêmico, e cortar na exportação é melhor
+    que cortar na fonte: quem quiser o ranking inteiro abre o CSV.
+    """
+    return (tabela.sort_values(["celula", "regime", "posicao"], kind="stable")
+            .groupby(["celula", "regime"], sort=True)
+            .head(topo).reset_index(drop=True))
+
+
+def exportar(tabela: pd.DataFrame, nome: str, nota: str,
+             recorte: pd.DataFrame | None = None,
+             casas: int = art.CASAS_CSV, **kwargs) -> dict[str, Path]:
+    """Grava a tabela como `.csv` completo e `.tex`, com o recorte quando houver um.
+
+    O CSV passa por `artefatos.salvar_csv`, ponto único de gravação do projeto (D-050):
+    valor gravado por caminho próprio escapa do arredondamento e devolve o diff
+    permanente que D-048 fechou.
+
+    Args:
+        casas: precisão do CSV. O padrão de D-048 serve a tabela de resultado, onde
+            nada vive abaixo de 1e-9. Quem grava erro numérico passa `CASAS_ARVORES`.
+    """
+    destino_csv = art.salvar_csv(tabela, cfg.PATH_TABELAS / f"{nome}.csv",
+                                 casas=casas)
+    para_tex = tabela if recorte is None else recorte
+    destino_tex = ev.exportar_latex(para_tex, f"{nome}.tex", nota=nota, **kwargs)
+    return {"tex": destino_tex, "csv": destino_csv}
+
+
+def exportar_tudo(tabelas: dict[str, pd.DataFrame]) -> dict[str, dict]:
+    """Emite os cinco pares de arquivos em `reports/tabelas/`."""
+    nota_topo = (f"{NOTA_REGIMES} {NOTA_ESCALA} {NOTA_REFERENCIA} O .tex traz os "
+                 f"{TOPO_TEX} primeiros de cada célula em cada regime; o .csv traz "
+                 f"todos.")
+    return {
+        NOME_GLOBAL_ATRIBUTO: exportar(
+            tabelas[NOME_GLOBAL_ATRIBUTO], NOME_GLOBAL_ATRIBUTO, nota=nota_topo,
+            recorte=_recortar(tabelas[NOME_GLOBAL_ATRIBUTO]), float_format="%.6f",
+        ),
+        NOME_GLOBAL_COLUNA: exportar(
+            tabelas[NOME_GLOBAL_COLUNA], NOME_GLOBAL_COLUNA, nota=nota_topo,
+            recorte=_recortar(tabelas[NOME_GLOBAL_COLUNA]), float_format="%.6f",
+        ),
+        NOME_PARES: exportar(
+            tabelas[NOME_PARES], NOME_PARES, float_format="%.6f",
+            nota=("Pares e blocos nomeados em D-053 antes de qualquer atribuição "
+                  "existir. Cada membro sai com a sua atribuição e com a soma do bloco, "
+                  f"sem limiar que decida se agrupa. {NOTA_REGIMES} {NOTA_ESCALA}"),
+        ),
+        NOME_CASOS: exportar(
+            tabelas[NOME_CASOS], NOME_CASOS, float_format="%.6f",
+            nota=("Um verdadeiro positivo, um falso positivo, um falso negativo e um "
+                  "verdadeiro negativo por célula, cada um o de menor distância entre "
+                  "escore e limiar dentro da sua célula da confusão, com desempate pelo "
+                  "menor índice. As contribuições saem do regime principal sobre a "
+                  f"floresta completa, que é o modelo publicado. {NOTA_ESCALA}"),
+        ),
+        NOME_ARVORES: exportar(
+            tabelas[NOME_ARVORES], NOME_ARVORES, float_format="%.3e",
+            casas=CASAS_ARVORES,
+            nota=("Árvores que o explicador desta versão atribui com erro sob o regime "
+                  "de contraste, identificadas na própria execução sobre o teste "
+                  "completo. A floresta reduzida é objeto de diagnóstico e nunca modelo "
+                  "publicado: o SHAP global publicado é o tree\\_path\\_dependent sobre "
+                  "as 500 árvores. O portão do regime de contraste é o piso por árvore, "
+                  "medido na mesma execução (D-053)."),
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Execução
+# ---------------------------------------------------------------------------
+
+def executar(celulas: list[str] | None = None,
+             particao: xp.Particao | None = None,
+             salvar: bool = True) -> dict:
+    """Mede as células, monta as cinco tabelas e emite os artefatos.
+
+    Args:
+        celulas: chaves de `features.FEATURE_SETS`. Omitido, usa as duas do grid
+            publicado da floresta.
+        particao: split pronto. Omitido, `experimento.preparar_particao` constrói um, o
+            que implica reler o CSV bruto.
+        salvar: desligado, calcula tudo sem escrever em `reports/tabelas/`.
+
+    Returns:
+        Dicionário com `medidas`, `tabelas`, `artefatos`, `conferencias`, `particao` e
+        `segundos`.
+    """
+    celulas = list(CELULAS) if celulas is None else list(celulas)
+    desconhecidas = [c for c in celulas if c not in ft.FEATURE_SETS]
+    if desconhecidas:
+        raise ValueError(
+            f"Conjunto(s) desconhecido(s): {desconhecidas}. "
+            f"Disponíveis: {sorted(ft.FEATURE_SETS)}"
+        )
+
+    inicio = time.perf_counter()
+    particao = xp.preparar_particao() if particao is None else particao
+    medidas = [medir_celula(celula, particao) for celula in celulas]
+
+    tabelas = {
+        NOME_GLOBAL_ATRIBUTO: tabela_global_atributo(medidas),
+        NOME_GLOBAL_COLUNA: tabela_global_coluna(medidas),
+        NOME_PARES: tabela_pares_colineares(medidas),
+        NOME_CASOS: tabela_casos_locais(medidas),
+        NOME_ARVORES: tabela_arvores_excluidas(medidas),
+    }
+    artefatos = exportar_tudo(tabelas) if salvar else {}
+
+    return {
+        "medidas": medidas,
+        "tabelas": tabelas,
+        "artefatos": artefatos,
+        "conferencias": [m["conferencia_limiar"] for m in medidas],
+        "particao": particao,
+        "segundos": time.perf_counter() - inicio,
+    }
+
+
+def formatar_portoes(medida: dict) -> str:
+    """Os dois erros de aditividade e o piso por árvore, numa linha por célula."""
+    defeito = medida["defeito"]
+    return (
+        f"{medida['celula']}: {REGIME_PRINCIPAL} {medida['erro_principal']:.3e} "
+        f"(portão {TOL_PRINCIPAL:g}), {REGIME_CONTRASTE} "
+        f"{medida['erro_contraste']:.3e} (piso por árvore {defeito['piso']:.3e}), "
+        f"{defeito['excluidas'].size} árvores excluídas de "
+        f"{len(medida['floresta'].estimators_)}, corte {defeito['corte']:g}, "
+        f"mantidas entre {defeito['erro_min_mantidas']:.3e} e "
+        f"{defeito['erro_max_mantidas']:.3e}, excluídas entre "
+        f"{defeito['erro_min_excluidas']:.3e} e {defeito['erro_max_excluidas']:.3e}"
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Entrada de linha de comando. É o que `make shap` chama de fato."""
+    # O console do Windows abre em cp1252 e a saída imprime acentuação. Sem isto a
+    # execução sai com status 1 por codificação, que se lê como portão vermelho e não é
+    # (D-052).
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
+    parser = argparse.ArgumentParser(
+        prog="python -m src.explicabilidade",
+        description=("Calcula as atribuições SHAP da floresta publicada e emite as "
+                     "tabelas de explicabilidade."),
+    )
+    parser.add_argument("--celulas", nargs="+", default=None,
+                        help=f"padrão: {' '.join(CELULAS)}")
+    parser.add_argument("--sem-artefato", action="store_true",
+                        help="calcula sem escrever em reports/tabelas/")
+    args = parser.parse_args(argv)
+
+    saida = executar(celulas=args.celulas, salvar=not args.sem_artefato)
+
+    print("Limiar desta execução contra o publicado:")
+    for conferencia in saida["conferencias"]:
+        print(f"  {conferencia['celula']}: {conferencia['limiar_obtido']:.9f} contra "
+              f"{conferencia['limiar_publicado']:.9f} em {xp.NOME_CONSOLIDADO}.csv")
+    print()
+
+    print("Aditividade e árvores:")
+    for medida in saida["medidas"]:
+        print(f"  {formatar_portoes(medida)}")
+    for medida in saida["medidas"]:
+        for nome, repetidos in medida["empates"].items():
+            if repetidos:
+                print(f"  empate de |SHAP| em {medida['celula']}, {nome}: "
+                      f"{', '.join(repetidos)}")
+    print()
+
+    print("Deslocamento de ranking:")
+    for medida in saida["medidas"]:
+        print(f"  {medida['celula']}: delta_arvores {medida['delta_arvores']}, "
+              f"delta_regime {medida['delta_regime']}")
+    print()
+
+    for nome, tabela in saida["tabelas"].items():
+        print(f"{nome}: {len(tabela)} linhas")
+    if saida["artefatos"]:
+        print()
+        for nome, caminhos in saida["artefatos"].items():
+            print(f"{nome}: {caminhos['tex'].name}, {caminhos['csv'].name}")
+
+    print()
+    print(f"Concluído em {saida['segundos'] / 60:.1f} min.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

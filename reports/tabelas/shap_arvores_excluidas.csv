@@ -1,0 +1,3 @@
+celula,regime_principal,regime_contraste,arvores_ajustadas,arvores_mantidas,arvores_excluidas,corte,erro_min_mantidas,erro_max_mantidas,erro_min_excluidas,erro_max_excluidas,piso_por_arvore,erro_aditividade_principal,erro_aditividade_contraste,delta_arvores,delta_regime
+A_atomico,tree_path_dependent sobre floresta completa,interventional sobre floresta reduzida (diagnostico),500,379,121,0.0001,3.97e-08,8.82e-08,0.000408,0.804,5.9e-08,1e-15,1e-08,2,14
+B_composto,tree_path_dependent sobre floresta completa,interventional sobre floresta reduzida (diagnostico),500,428,72,0.0001,3.82e-08,8.76e-08,0.00167,0.838,5.77e-08,1e-15,1e-08,0,4

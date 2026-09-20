@@ -1,0 +1,12 @@
+\begin{tabular}{lllrrrrrrrrrrrrr}
+\toprule
+celula & regime_principal & regime_contraste & arvores_ajustadas & arvores_mantidas & arvores_excluidas & corte & erro_min_mantidas & erro_max_mantidas & erro_min_excluidas & erro_max_excluidas & piso_por_arvore & erro_aditividade_principal & erro_aditividade_contraste & delta_arvores & delta_regime \\
+\midrule
+A_atomico & tree_path_dependent sobre floresta completa & interventional sobre floresta reduzida (diagnostico) & 500 & 379 & 121 & 1.000e-04 & 3.970e-08 & 8.820e-08 & 4.080e-04 & 8.040e-01 & 5.900e-08 & 1.000e-15 & 1.000e-08 & 2 & 14 \\
+B_composto & tree_path_dependent sobre floresta completa & interventional sobre floresta reduzida (diagnostico) & 500 & 428 & 72 & 1.000e-04 & 3.820e-08 & 8.760e-08 & 1.670e-03 & 8.380e-01 & 5.770e-08 & 1.000e-15 & 1.000e-08 & 0 & 4 \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize Árvores que o explicador desta versão atribui com erro sob o regime de contraste, identificadas na própria execução sobre o teste completo. A floresta reduzida é objeto de diagnóstico e nunca modelo publicado: o SHAP global publicado é o tree\_path\_dependent sobre as 500 árvores. O portão do regime de contraste é o piso por árvore, medido na mesma execução (D-053).
+\end{flushleft}

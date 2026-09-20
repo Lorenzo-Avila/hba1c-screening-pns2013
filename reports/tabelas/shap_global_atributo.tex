@@ -1,0 +1,50 @@
+\begin{tabular}{llllrrrl}
+\toprule
+celula & regime & objeto_explicado & atributo & shap_medio_abs & posicao & n_colunas & categoria_referencia_omitida \\
+\midrule
+A_atomico & interventional & floresta reduzida (diagnostico) & idade & 0.077800 & 1 & 1 &  \\
+A_atomico & interventional & floresta reduzida (diagnostico) & circ_cintura & 0.056826 & 2 & 1 &  \\
+A_atomico & interventional & floresta reduzida (diagnostico) & has_autorrelato & 0.032199 & 3 & 2 & 1 \\
+A_atomico & interventional & floresta reduzida (diagnostico) & imc & 0.029789 & 4 & 1 &  \\
+A_atomico & interventional & floresta reduzida (diagnostico) & pas & 0.027935 & 5 & 1 &  \\
+A_atomico & interventional & floresta reduzida (diagnostico) & saude_autoaval & 0.023805 & 6 & 1 &  \\
+A_atomico & interventional & floresta reduzida (diagnostico) & colesterol_alto & 0.015879 & 7 & 1 & 1 \\
+A_atomico & interventional & floresta reduzida (diagnostico) & regiao & 0.009476 & 8 & 4 & 1 \\
+A_atomico & interventional & floresta reduzida (diagnostico) & raca_cor & 0.008326 & 9 & 4 & 1 \\
+A_atomico & interventional & floresta reduzida (diagnostico) & sexo_fem & 0.008232 & 10 & 1 &  \\
+A_atomico & tree_path_dependent & floresta completa & idade & 0.092460 & 1 & 1 &  \\
+A_atomico & tree_path_dependent & floresta completa & circ_cintura & 0.074804 & 2 & 1 &  \\
+A_atomico & tree_path_dependent & floresta completa & has_autorrelato & 0.050175 & 3 & 2 & 1 \\
+A_atomico & tree_path_dependent & floresta completa & imc & 0.041835 & 4 & 1 &  \\
+A_atomico & tree_path_dependent & floresta completa & pas & 0.041274 & 5 & 1 &  \\
+A_atomico & tree_path_dependent & floresta completa & saude_autoaval & 0.033606 & 6 & 1 &  \\
+A_atomico & tree_path_dependent & floresta completa & colesterol_alto & 0.018330 & 7 & 1 & 1 \\
+A_atomico & tree_path_dependent & floresta completa & escolaridade & 0.014084 & 8 & 1 &  \\
+A_atomico & tree_path_dependent & floresta completa & pad & 0.013394 & 9 & 1 &  \\
+A_atomico & tree_path_dependent & floresta completa & regiao & 0.010428 & 10 & 4 & 1 \\
+B_composto & interventional & floresta reduzida (diagnostico) & idade & 0.089006 & 1 & 1 &  \\
+B_composto & interventional & floresta reduzida (diagnostico) & circ_cintura & 0.057111 & 2 & 1 &  \\
+B_composto & interventional & floresta reduzida (diagnostico) & multimorbidade & 0.044836 & 3 & 1 &  \\
+B_composto & interventional & floresta reduzida (diagnostico) & imc & 0.032188 & 4 & 1 &  \\
+B_composto & interventional & floresta reduzida (diagnostico) & saude_autoaval & 0.030935 & 5 & 1 &  \\
+B_composto & interventional & floresta reduzida (diagnostico) & regiao & 0.013673 & 6 & 4 & 1 \\
+B_composto & interventional & floresta reduzida (diagnostico) & raca_cor & 0.011074 & 7 & 4 & 1 \\
+B_composto & interventional & floresta reduzida (diagnostico) & escolaridade & 0.009520 & 8 & 1 &  \\
+B_composto & interventional & floresta reduzida (diagnostico) & sexo_fem & 0.008097 & 9 & 1 &  \\
+B_composto & interventional & floresta reduzida (diagnostico) & plano_sim & 0.003243 & 10 & 1 &  \\
+B_composto & tree_path_dependent & floresta completa & idade & 0.105836 & 1 & 1 &  \\
+B_composto & tree_path_dependent & floresta completa & circ_cintura & 0.078199 & 2 & 1 &  \\
+B_composto & tree_path_dependent & floresta completa & multimorbidade & 0.069853 & 3 & 1 &  \\
+B_composto & tree_path_dependent & floresta completa & imc & 0.047081 & 4 & 1 &  \\
+B_composto & tree_path_dependent & floresta completa & saude_autoaval & 0.041069 & 5 & 1 &  \\
+B_composto & tree_path_dependent & floresta completa & escolaridade & 0.016934 & 6 & 1 &  \\
+B_composto & tree_path_dependent & floresta completa & regiao & 0.014642 & 7 & 4 & 1 \\
+B_composto & tree_path_dependent & floresta completa & raca_cor & 0.011153 & 8 & 4 & 1 \\
+B_composto & tree_path_dependent & floresta completa & sexo_fem & 0.010208 & 9 & 1 &  \\
+B_composto & tree_path_dependent & floresta completa & plano_sim & 0.003414 & 10 & 1 &  \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize O regime principal é tree\_path\_dependent sobre as 500 árvores ajustadas, e é ele que sustenta o SHAP global publicado. O de contraste é interventional sobre a floresta reduzida, que exclui as árvores atribuídas com erro pelo explicador desta versão. A floresta reduzida é objeto de diagnóstico e nunca modelo publicado (D-053). Atribuições na escala de fração de votos da classe positiva, que é a escala em que o limiar calibrado opera. A soma das contribuições reconstrói o escore do indivíduo, nunca o risco dele, e o valor de base fica perto de 0,5 por efeito do class\_weight, não perto da prevalência (D-022, D-040, D-053). A codificação usa drop="first", então a categoria de referência de cada nominal tem atribuição zero por construção, não por irrelevância. A coluna categoria\_referencia\_omitida registra qual ficou de fora. O .tex traz os 10 primeiros de cada célula em cada regime; o .csv traz todos.
+\end{flushleft}

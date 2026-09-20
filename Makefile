@@ -7,7 +7,7 @@
 
 PYTHON ?= python
 
-.PHONY: tudo test test-rapido resultados figuras notebook limpar ajuda
+.PHONY: tudo test test-rapido resultados figuras shap notebook limpar ajuda
 
 ## tudo — suíte de testes e reprodução completa, na ordem em que importam
 tudo: test resultados notebook
@@ -33,6 +33,13 @@ resultados:
 ##   equivale a: python -m src.experimento --figuras
 figuras:
 	$(PYTHON) -m src.experimento --figuras
+
+## shap — atribuições SHAP da floresta publicada, fora do caminho crítico.
+## O regime de contraste é caro e nenhum número publicado depende dele, por isso
+## ele não entra em `resultados`.
+##   equivale a: python -m src.explicabilidade
+shap:
+	$(PYTHON) -m src.explicabilidade
 
 ## notebook — reexecuta o documento de resultados in-place, preservando os outputs.
 ## É o mesmo grid de `figuras`, apresentado na ordem da arguição. Commitado com
