@@ -50,9 +50,11 @@ import sys
 import time
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import shap
+from matplotlib.colors import LinearSegmentedColormap
 
 from . import artefatos as art
 from . import colinearidade as col
@@ -917,6 +919,454 @@ def exportar_tudo(tabelas: dict[str, pd.DataFrame]) -> dict[str, dict]:
                   "as 500 árvores. O portão do regime de contraste é o piso por árvore, "
                   "medido na mesma execução (D-053)."),
         ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Figuras
+# ---------------------------------------------------------------------------
+
+# Cor do valor observado no enxame: baixo no teal, alto no coral, na mesma paleta que
+# o resto do projeto usa. O mapa vale só para variáveis com ordem; as nominais saem em
+# cinza, porque colorir código de categoria sugeriria uma ordem que elas não têm.
+CMAP_VALOR = LinearSegmentedColormap.from_list(
+    "shap_valor", [cfg.TEAL, "#F1F5F9", cfg.CORAL]
+)
+CINZA_NOMINAL = "#94A3B8"
+
+# Empilhamento do enxame. Os pontos se espalham na vertical pela densidade local em
+# vez de por sorteio: sorteio faria a mesma execução desenhar figuras diferentes.
+LARGURA_ENXAME = 0.40
+BINS_ENXAME = 90
+PONTO_ENXAME = 7
+ALFA_ENXAME = 0.55
+
+# Casos que viram figura. O falso positivo e o verdadeiro negativo ficam só na tabela:
+# os dois que a triagem discute são o encaminhado e o que escapou.
+CASOS_EM_FIGURA = ["VP", "FN"]
+ROTULO_CASO = {
+    "VP": "verdadeiro positivo",
+    "FP": "falso positivo",
+    "FN": "falso negativo",
+    "VN": "verdadeiro negativo",
+}
+
+# O que toda explicação local precisa dizer na própria figura, e não na legenda
+# (D-053). A primeira frase desarma a leitura de meio a meio; a segunda desarma a
+# leitura de efeito protetor, que é o inverso da leitura clínica.
+NOTA_LOCAL = (
+    "O valor de base é a média das saídas da floresta sob reponderamento de classes, "
+    "e fica perto de 0,5 por causa dele, não na prevalência de 7%.\n"
+    "A referência das contribuições é o indivíduo médio sob esse reponderamento, e "
+    "não a população: contribuição negativa significa abaixo dessa referência, nunca "
+    "efeito protetor.\n"
+    "A soma das contribuições reconstrói o escore do indivíduo, nunca o risco dele "
+    "(D-022, D-040, D-053)."
+)
+
+
+def _eixo_figura(ax, titulo: str, xlabel: str, ylabel: str = "") -> None:
+    """Título, rótulos e grade na identidade visual do projeto."""
+    ax.set_title(titulo, fontweight="bold", color=cfg.INK, fontsize=11)
+    ax.set_xlabel(xlabel, color=cfg.INK, fontsize=9)
+    if ylabel:
+        ax.set_ylabel(ylabel, color=cfg.INK, fontsize=9)
+    ax.grid(color=cfg.GRID, linewidth=0.8, axis="x")
+    ax.set_axisbelow(True)
+    for lado in ("top", "right"):
+        ax.spines[lado].set_visible(False)
+
+
+def _destino(path_figuras, nome: str) -> Path:
+    """Caminho do arquivo, com o diretório criado. `reports/figuras/` não é versionado."""
+    path_figuras = cfg.PATH_FIGURAS if path_figuras is None else Path(path_figuras)
+    path_figuras.mkdir(parents=True, exist_ok=True)
+    return path_figuras / nome
+
+
+def _formatar_valor(valor: float) -> str:
+    """Valor observado como quem lê a variável o escreve: 87,3 e não 87,300000."""
+    valor = float(valor)
+    texto = f"{valor:.0f}" if valor.is_integer() else f"{valor:.1f}"
+    return texto.replace(".", ",")
+
+
+def atribuicao_por_atributo(valores: np.ndarray, mapa: pd.DataFrame) -> pd.DataFrame:
+    """Contribuição com sinal de cada indivíduo, somada por variável conceitual.
+
+    É a matriz que o enxame plota. A soma é com sinal, como na explicação local: em
+    módulo, as colunas de uma nominal deixariam de se cancelar quando se cancelam.
+
+    Returns:
+        DataFrame de uma linha por indivíduo e uma coluna por variável conceitual, na
+        ordem em que os atributos aparecem na matriz de design.
+    """
+    atributos = list(dict.fromkeys(mapa["atributo"]))
+    colunas = {}
+    for atributo in atributos:
+        posicoes = np.flatnonzero((mapa["atributo"] == atributo).to_numpy())
+        colunas[atributo] = valores[:, posicoes].sum(axis=1)
+    return pd.DataFrame(colunas)
+
+
+def _nominais(mapa: pd.DataFrame) -> set[str]:
+    """Variáveis que passaram pelo one-hot, que são as que têm categoria omitida."""
+    com_omitida = mapa[mapa["categoria_referencia_omitida"].astype(str) != ""]
+    return set(com_omitida["atributo"])
+
+
+def _empilhar(valores: np.ndarray, largura: float = LARGURA_ENXAME,
+              bins: int = BINS_ENXAME) -> np.ndarray:
+    """Deslocamento vertical de cada ponto, proporcional à densidade local.
+
+    Ponto que cai numa faixa cheia se afasta do eixo, ponto isolado fica em cima dele.
+    O resultado é determinístico, o que jitter sorteado não garante.
+    """
+    desloc = np.zeros(len(valores))
+    if len(valores) == 0 or np.ptp(valores) == 0:
+        return desloc
+
+    cortes = np.linspace(valores.min(), valores.max(), bins + 1)[1:-1]
+    faixas = np.clip(np.digitize(valores, cortes), 0, bins - 1)
+    maior = max(int(np.bincount(faixas).max()), 1)
+    for faixa in np.unique(faixas):
+        dentro = np.flatnonzero(faixas == faixa)
+        desloc[dentro] = np.arange(len(dentro)) - (len(dentro) - 1) / 2
+    return desloc * (2 * largura / maior)
+
+
+def figura_beeswarm(medida: dict, path_figuras: Path | None = None) -> Path:
+    """Atribuição global da célula, um ponto por indivíduo e uma linha por variável.
+
+    O enxame mostra o que o ranking esconde: a direção das contribuições, a assimetria
+    da cauda e a dispersão dentro de cada variável. A cor traz o valor observado, então
+    dá para ler se contribuição alta vem de valor alto ou de valor baixo. As nominais
+    saem em cinza porque o código da categoria não tem ordem.
+
+    Salva a figura e devolve o caminho.
+    """
+    celula = medida["celula"]
+    chave = (REGIME_PRINCIPAL, OBJETO_COMPLETA)
+    mapa = medida["mapa"]
+    por_atributo = atribuicao_por_atributo(medida["atribuicoes"][chave], mapa)
+    ordem = list(medida["rankings"][chave]["atributo"])
+    nominais = _nominais(mapa)
+    clinicos = medida["clinicos"].loc[medida["design_te"].index]
+
+    fig, ax = plt.subplots(figsize=(8.2, 1.9 + 0.42 * len(ordem)))
+    imagem = None
+
+    for linha, atributo in enumerate(ordem):
+        y = len(ordem) - 1 - linha
+        contribuicoes = por_atributo[atributo].to_numpy()
+        desloc = _empilhar(contribuicoes)
+
+        if atributo in nominais:
+            ax.scatter(contribuicoes, y + desloc, s=PONTO_ENXAME, c=CINZA_NOMINAL,
+                       alpha=ALFA_ENXAME, linewidths=0)
+            continue
+
+        # Percentil no lugar do valor cru: uma cauda longa de circunferência abdominal
+        # jogaria todo o resto da escala para a mesma cor.
+        observado = clinicos[atributo].rank(pct=True).to_numpy()
+        imagem = ax.scatter(contribuicoes, y + desloc, s=PONTO_ENXAME, c=observado,
+                            cmap=CMAP_VALOR, vmin=0, vmax=1, alpha=ALFA_ENXAME,
+                            linewidths=0)
+
+    ax.axvline(0, color=cfg.INK, lw=1, ls=":")
+    ax.set_yticks(range(len(ordem)), list(reversed(ordem)), fontsize=9, color=cfg.INK)
+    _eixo_figura(
+        ax,
+        f"Atribuição SHAP por variável, {MODELO} · {celula}\n"
+        f"regime {REGIME_PRINCIPAL} sobre a {OBJETO_COMPLETA}, teste completo, "
+        f"n={len(por_atributo)}",
+        "contribuição para o escore, em fração de votos",
+    )
+
+    if imagem is not None:
+        barra = fig.colorbar(imagem, ax=ax, pad=0.02, fraction=0.035, shrink=0.42)
+        barra.set_ticks([0, 1], labels=["valor baixo", "valor alto"], fontsize=8)
+        barra.outline.set_visible(False)
+
+    fig.text(0.01, -0.02,
+             "Nominais em cinza: o código da categoria não tem ordem para colorir. A "
+             "categoria de referência de cada nominal tem atribuição zero por "
+             "construção, efeito do drop=\"first\", e entra na soma da variável.\n"
+             "Escala de fração de votos: a soma das contribuições reconstrói o escore "
+             "do indivíduo, nunca o risco dele (D-022, D-040, D-053).",
+             fontsize=8, color=cfg.INK, va="top")
+
+    destino = _destino(path_figuras, f"shap_beeswarm_{celula}.png")
+    fig.tight_layout()
+    fig.savefig(destino, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return destino
+
+
+def ler_tabela(nome: str, path: Path | None = None) -> pd.DataFrame:
+    """Lê um dos artefatos versionados de `reports/tabelas/`.
+
+    O contraste entre regimes é a parte cara da execução e não muda de valor entre
+    reexecuções do documento, então a figura o lê em vez de recalcular.
+
+    Raises:
+        FileNotFoundError: se o artefato não estiver emitido.
+    """
+    destino = (cfg.PATH_TABELAS / f"{nome}.csv") if path is None else Path(path)
+    if not destino.exists():
+        raise FileNotFoundError(
+            f"Artefato ausente: {destino}. Rode python -m src.explicabilidade antes."
+        )
+    return pd.read_csv(destino, converters={"categoria_referencia_omitida": str})
+
+
+def _prefixo_comum(esquerda: list[str], direita: list[str]) -> int:
+    """Quantas posições do topo os dois rankings compartilham, na mesma ordem."""
+    quantas = 0
+    for um, outro in zip(esquerda, direita):
+        if um != outro:
+            break
+        quantas += 1
+    return quantas
+
+
+def figura_contraste_de_regimes(celula: str, tabela: pd.DataFrame | None = None,
+                                path_figuras: Path | None = None) -> Path:
+    """Posições no ranking sob os dois regimes de perturbação, lado a lado.
+
+    É a figura da mitigação: a divergência entre os dois rankings é a medida da
+    exposição deste trabalho ao problema que a referência aponta (D-053). Quem não
+    muda de posição sai em teal e quem muda sai em coral, com o tamanho do
+    deslocamento anotado.
+
+    Args:
+        tabela: `shap_global_atributo` já lida. Omitida, sai do artefato versionado,
+            que é o que evita recalcular o regime caro a cada reexecução.
+
+    Salva a figura e devolve o caminho.
+    """
+    tabela = ler_tabela(NOME_GLOBAL_ATRIBUTO) if tabela is None else tabela
+    recorte = tabela[tabela["celula"] == celula]
+    if recorte.empty:
+        raise KeyError(f"Célula {celula!r} ausente de {NOME_GLOBAL_ATRIBUTO}.")
+
+    lados = {}
+    for regime, _objeto in REGIMES:
+        lado = recorte[recorte["regime"] == regime]
+        if lado.empty:
+            raise KeyError(f"Regime {regime!r} ausente de {NOME_GLOBAL_ATRIBUTO}.")
+        lados[regime] = lado.set_index("atributo")["posicao"].astype(int).sort_values()
+
+    esquerda, direita = lados[REGIME_PRINCIPAL], lados[REGIME_CONTRASTE]
+    topo_estavel = _prefixo_comum(list(esquerda.index), list(direita.index))
+    n = len(esquerda)
+
+    fig, ax = plt.subplots(figsize=(8.6, 1.9 + 0.40 * n))
+    for atributo, posicao in esquerda.items():
+        partida, chegada = int(posicao), int(direita[atributo])
+        moveu = chegada != partida
+        cor = cfg.CORAL if moveu else cfg.TEAL
+        ax.plot([0, 1], [n - partida, n - chegada], color=cor,
+                lw=2.0 if moveu else 1.2, alpha=0.9 if moveu else 0.55,
+                marker="o", markersize=5)
+        ax.text(-0.03, n - partida, f"{partida}. {atributo}", ha="right", va="center",
+                fontsize=9, color=cfg.INK, fontweight="bold" if moveu else "normal")
+        deslocou = f"  ({chegada - partida:+d})" if moveu else ""
+        ax.text(1.03, n - chegada, f"{chegada}. {atributo}{deslocou}", ha="left",
+                va="center", fontsize=9, color=cor if moveu else cfg.INK,
+                fontweight="bold" if moveu else "normal")
+
+    ax.set_xlim(-0.62, 1.62)
+    ax.set_ylim(-0.4, n + 0.6)
+    ax.set_xticks([0, 1], [f"{REGIME_PRINCIPAL}\n{OBJETO_COMPLETA}",
+                           f"{REGIME_CONTRASTE}\n{OBJETO_REDUZIDA}"],
+                  fontsize=9, color=cfg.INK)
+    ax.set_yticks([])
+    ax.grid(visible=False)
+    for lado in ("top", "right", "left", "bottom"):
+        ax.spines[lado].set_visible(False)
+    ax.set_title(
+        f"Ranking de atribuição sob os dois regimes, {MODELO} · {celula}\n"
+        f"as {topo_estavel} primeiras posições não se movem, e a movimentação fica na "
+        f"cauda",
+        fontweight="bold", color=cfg.INK, fontsize=11)
+
+    fig.text(0.01, -0.02,
+             "O regime de contraste assume independência entre as variáveis, que é a "
+             "formulação apontada como frágil, e roda sobre a floresta reduzida, "
+             "objeto de diagnóstico e nunca modelo publicado.\n"
+             "A divergência entre os dois rankings é a medida da exposição deste "
+             "trabalho ao problema (D-053).",
+             fontsize=8, color=cfg.INK, va="top")
+
+    destino = _destino(path_figuras, f"shap_contraste_{celula}.png")
+    fig.tight_layout()
+    fig.savefig(destino, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return destino
+
+
+def _painel_waterfall(ax, caso: pd.DataFrame) -> tuple[float, float]:
+    """Uma explicação local: o acumulado do valor de base até o escore do indivíduo.
+
+    Returns:
+        Os extremos que o painel ocupa no eixo do escore. Quem desenha o par usa os
+        dois para dar a mesma escala aos dois casos, já que eixo compartilhado fica
+        com o limite do último painel desenhado.
+    """
+    linha = caso.iloc[0]
+    valor_base = float(linha["valor_base"])
+    limiar = float(linha["limiar"])
+    escore = float(linha["escore"])
+
+    ordenado = caso.reindex(
+        caso["contribuicao"].abs().sort_values(ascending=False, kind="stable").index
+    )
+    inicio, esquerdas, tamanhos, cores, rotulos = valor_base, [], [], [], []
+    for _, contribuicao in ordenado.iterrows():
+        valor = float(contribuicao["contribuicao"])
+        esquerdas.append(inicio)
+        tamanhos.append(valor)
+        cores.append(cfg.CORAL if valor >= 0 else cfg.TEAL)
+        rotulos.append(f"{contribuicao['atributo']} = "
+                       f"{_formatar_valor(contribuicao['valor_observado'])}")
+        inicio += valor
+
+    y = np.arange(len(tamanhos))[::-1]
+    ax.barh(y, tamanhos, left=esquerdas, height=0.62, color=cores, alpha=0.9)
+    for altura, (comeco, tamanho) in enumerate(zip(esquerdas, tamanhos)):
+        fim = comeco + tamanho
+        ax.text(fim + (0.003 if tamanho >= 0 else -0.003), y[altura],
+                f"{tamanho:+.3f}".replace(".", ","),
+                ha="left" if tamanho >= 0 else "right", va="center", fontsize=8,
+                color=cfg.INK)
+
+    ax.axvline(valor_base, color=cfg.INK, lw=1.2, ls=":")
+    ax.axvline(limiar, color=cfg.CORAL, lw=1.8, ls="--")
+    ax.scatter([escore], [-1.0], color=cfg.INK, s=45, marker="D", zorder=5)
+    ax.text(escore, -1.5, f"escore {escore:.3f}".replace(".", ","), ha="center",
+            va="top", fontsize=8, fontweight="bold", color=cfg.INK)
+
+    # As duas marcas de referência ficam no alto da área de dados, e não dentro dela:
+    # na altura da primeira barra elas cairiam por cima do valor da contribuição.
+    no_alto = ("data", "axes fraction")
+    ax.annotate(f"valor de base {valor_base:.3f}".replace(".", ","),
+                (valor_base, 0.99), xycoords=no_alto, ha="right", va="top",
+                fontsize=8, color=cfg.INK)
+    ax.annotate(f"limiar {limiar:.3f}".replace(".", ","), (limiar, 0.99),
+                xycoords=no_alto, ha="left", va="top", fontsize=8,
+                fontweight="bold", color=cfg.CORAL)
+
+    ax.set_ylim(-2.2, len(tamanhos) + 0.1)
+    ax.set_yticks(y, rotulos, fontsize=9, color=cfg.INK)
+    decisao = "encaminhado" if escore >= limiar else "não encaminhado"
+    distancia = f"{abs(escore - limiar):.3f}".replace(".", ",")
+    _eixo_figura(
+        ax,
+        f"{linha['caso']}, {ROTULO_CASO[linha['caso']]}\n"
+        f"indivíduo {int(linha['indice'])}, {decisao}, a {distancia} do limiar",
+        "escore, em fração de votos",
+    )
+
+    fins = [e + t for e, t in zip(esquerdas, tamanhos)]
+    return min(fins + [escore, limiar]), max(fins + [valor_base])
+
+
+def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
+                         path_figuras: Path | None = None) -> Path:
+    """O verdadeiro positivo e o falso negativo da célula, lado a lado.
+
+    Os dois têm o mesmo desfecho observado e decisões opostas, e explicá-los juntos é
+    o que mostra por qual variável a decisão passou. A marca do limiar diz onde a
+    decisão acontece, e a nota diz contra qual referência as contribuições são lidas,
+    que é o que D-053 manda pôr na figura em vez de na legenda.
+
+    O falso positivo e o verdadeiro negativo ficam só na tabela: os quatro casos saem
+    em `shap_casos_locais`, e a figura traz os dois que a triagem discute.
+
+    Salva a figura e devolve o caminho.
+    """
+    casos = list(CASOS_EM_FIGURA) if casos is None else list(casos)
+    tabela = tabela_casos_locais([medida])
+    celula = medida["celula"]
+
+    n_variaveis = tabela["atributo"].nunique()
+    fig, eixos = plt.subplots(
+        1, len(casos), sharex=True,
+        figsize=(6.2 * len(casos), 2.8 + 0.42 * n_variaveis),
+    )
+    extremos = []
+    for ax, caso in zip(np.atleast_1d(eixos), casos):
+        recorte = tabela[tabela["caso"] == caso]
+        if recorte.empty:
+            raise KeyError(f"Caso {caso!r} ausente dos casos locais de {celula}.")
+        extremos.append(_painel_waterfall(ax, recorte))
+
+    # Folga à esquerda para o valor de cada contribuição negativa caber fora da barra
+    # sem encostar no rótulo da variável.
+    menor = min(e[0] for e in extremos)
+    maior = max(e[1] for e in extremos)
+    np.atleast_1d(eixos)[0].set_xlim(menor - 0.30 * (maior - menor), maior)
+
+    fig.suptitle(f"Explicação local, {MODELO} · {celula}\n"
+                 f"regime {REGIME_PRINCIPAL} sobre a {OBJETO_COMPLETA}",
+                 fontweight="bold", color=cfg.INK, fontsize=12)
+    fig.text(0.01, -0.01, NOTA_LOCAL, fontsize=8, color=cfg.INK, va="top")
+
+    destino = _destino(path_figuras, f"shap_waterfall_{celula}.png")
+    fig.tight_layout()
+    fig.savefig(destino, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return destino
+
+
+def material_das_figuras(celula: str, particao: xp.Particao) -> dict:
+    """Ajusta a célula e calcula o regime principal, que é o que as figuras consomem.
+
+    O documento recalcula este regime em vez de ler tabela porque o enxame precisa das
+    atribuições linha a linha e o waterfall precisa do valor de base de cada
+    indivíduo, e nenhum dos dois cabe num artefato tabular. O regime de contraste fica
+    de fora: é a parte cara, não vira figura por indivíduo, e quem o exibe lê o
+    artefato versionado.
+
+    O limiar é conferido contra o publicado pelo mesmo caminho de `medir_celula`, de
+    modo que a figura descreve o modelo da tabela consolidada e não um parecido com
+    ele.
+
+    Returns:
+        Dicionário no formato que as funções de tabela já consomem, com o regime
+        principal no lugar dos dois.
+
+    Raises:
+        ValueError: se o limiar divergir do publicado, se a aditividade não fechar ou
+            se o escore pela matriz de design não bater com o do pipeline.
+    """
+    base = preparar(celula, particao)
+    conferencia = conferir_limiar(base["limiar"], celula)
+
+    design = np.asarray(base["design_te"])
+    proba = base["floresta"].predict_proba(design)[:, 1]
+    valores, valor_base = explicar(base["floresta"], design, REGIME_PRINCIPAL)
+
+    erro = erro_de_aditividade(valores, valor_base, proba)
+    if erro > TOL_PRINCIPAL:
+        raise ValueError(
+            f"{celula}: aditividade do regime {REGIME_PRINCIPAL} não fecha em "
+            f"{TOL_PRINCIPAL:g}. Erro máximo {erro:.3e}."
+        )
+    if not np.allclose(proba, base["proba"], atol=1e-12):
+        raise ValueError(
+            f"{celula}: o escore pela matriz de design não bate com o do pipeline."
+        )
+
+    chave = (REGIME_PRINCIPAL, OBJETO_COMPLETA)
+    return {
+        **base,
+        "conferencia_limiar": conferencia,
+        "atribuicoes": {chave: valores},
+        "bases": {chave: valor_base},
+        "rankings": {chave: ranking_por_atributo(valores, base["mapa"])},
+        "erro_principal": erro,
     }
 
 
