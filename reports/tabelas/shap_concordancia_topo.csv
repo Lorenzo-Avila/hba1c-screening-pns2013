@@ -1,0 +1,5 @@
+celula,comparacao,regime_a,objeto_a,regime_b,objeto_b,topo_coincidente,n_atributos,atributos_no_topo
+A_atomico,principal completa x contraste reduzida,tree_path_dependent,floresta completa,interventional,floresta reduzida (diagnostico),7,13,"idade, circ_cintura, has_autorrelato, imc, pas, saude_autoaval, colesterol_alto"
+A_atomico,principal reduzida x contraste reduzida,tree_path_dependent,floresta reduzida (diagnostico),interventional,floresta reduzida (diagnostico),3,13,"idade, circ_cintura, has_autorrelato"
+B_composto,principal completa x contraste reduzida,tree_path_dependent,floresta completa,interventional,floresta reduzida (diagnostico),5,10,"idade, circ_cintura, multimorbidade, imc, saude_autoaval"
+B_composto,principal reduzida x contraste reduzida,tree_path_dependent,floresta reduzida (diagnostico),interventional,floresta reduzida (diagnostico),5,10,"idade, circ_cintura, multimorbidade, imc, saude_autoaval"

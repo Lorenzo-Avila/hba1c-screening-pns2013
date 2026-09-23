@@ -293,6 +293,21 @@ def decomposicao_do_escore(pipeline, X_train: pd.DataFrame,
     }
 
 
+def tabela_decomposicao(decomposicao: dict) -> pd.DataFrame:
+    """A decomposição do escore em uma linha, pronta para virar artefato.
+
+    Os dois R² eram impressos pelo notebook e não existiam em arquivo nenhum, e são o
+    argumento do descarte de `C_completo`: 1,000 da identidade contra 0,884 do VIF.
+    """
+    return pd.DataFrame([{
+        "feature_set": decomposicao["feature_set"],
+        "r2_identidade": decomposicao["r2_identidade"],
+        "r2_vif": decomposicao["r2_vif"],
+        "vif": decomposicao["vif"],
+        "parcelas": ", ".join(decomposicao["parcelas"]),
+    }])
+
+
 # ---------------------------------------------------------------------------
 # Tabela comparativa A/B/C: resultado do TCC, não diagnóstico interno
 # ---------------------------------------------------------------------------
@@ -416,7 +431,10 @@ def diagnostico_completo(X_train: pd.DataFrame, y_train=None,
     decomposicao = decomposicao_do_escore(
         ft.construir_preprocessador("C_completo").fit(X_train, y_train), X_train
     )
+    tabela_escore = tabela_decomposicao(decomposicao)
 
+    # Todo `.tex` sai com o `.csv` ao lado. O painel só lê CSV (D-055), e um número
+    # que só existe em LaTeX obriga quem lê a reparsear o documento.
     return {
         "pearson": pearson,
         "pares_pearson": tabela_pares,
@@ -429,7 +447,14 @@ def diagnostico_completo(X_train: pd.DataFrame, y_train=None,
         "tex_resumo": exportar_latex(resumo, "vif_resumo.tex"),
         "tex_pearson": exportar_latex(tabela_pares, "pearson_coeficientes.tex"),
         "tex_ablacao": exportar_latex(ablacao, "vif_ablacao_rcest.tex"),
+        "tex_decomposicao": exportar_latex(tabela_escore, "decomposicao_escore.tex",
+                                           float_format="%.3f"),
         "csv_vif": art.salvar_csv(vif, cfg.PATH_TABELAS / "vif_comparativo.csv"),
+        "csv_resumo": art.salvar_csv(resumo, cfg.PATH_TABELAS / "vif_resumo.csv"),
         "csv_pearson": art.salvar_csv(
             tabela_pares, cfg.PATH_TABELAS / "pearson_coeficientes.csv"),
+        "csv_ablacao": art.salvar_csv(
+            ablacao, cfg.PATH_TABELAS / "vif_ablacao_rcest.csv"),
+        "csv_decomposicao": art.salvar_csv(
+            tabela_escore, cfg.PATH_TABELAS / "decomposicao_escore.csv"),
     }

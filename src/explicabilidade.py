@@ -77,6 +77,20 @@ OBJETO_REDUZIDA = "floresta reduzida (diagnostico)"
 # implícito o que foi explicado.
 REGIMES = [(REGIME_PRINCIPAL, OBJETO_COMPLETA), (REGIME_CONTRASTE, OBJETO_REDUZIDA)]
 
+# O regime principal sobre a floresta reduzida. Não entra nas tabelas globais, porque
+# não é nem o que se publica nem o contraste, mas é o degrau do meio da regra de D-053:
+# separa o que a remoção das árvores move do que a troca de regime move.
+PRINCIPAL_REDUZIDA = (REGIME_PRINCIPAL, OBJETO_REDUZIDA)
+
+# As duas comparações do topo coincidente. A primeira é a que a figura de contraste e o
+# texto publicado descrevem. A segunda fixa o objeto e isola o efeito do regime.
+COMPARACOES_TOPO = [
+    ("principal completa x contraste reduzida",
+     (REGIME_PRINCIPAL, OBJETO_COMPLETA), (REGIME_CONTRASTE, OBJETO_REDUZIDA)),
+    ("principal reduzida x contraste reduzida",
+     PRINCIPAL_REDUZIDA, (REGIME_CONTRASTE, OBJETO_REDUZIDA)),
+]
+
 # Linhas do treino que estimam a expectativa marginal do regime de contraste. Cem é a
 # ordem de grandeza usual, e aumentar reduz variância de estimação sem mudar o que o
 # regime assume. Saem do treino, nunca do teste, por R1 e R2.
@@ -126,6 +140,7 @@ NOME_GLOBAL_COLUNA = "shap_global_coluna"
 NOME_PARES = "shap_pares_colineares"
 NOME_CASOS = "shap_casos_locais"
 NOME_ARVORES = "shap_arvores_excluidas"
+NOME_CONCORDANCIA = "shap_concordancia_topo"
 
 # As três estruturas de dependência que sobrevivem nas duas células publicadas, nomeadas
 # em D-053 antes de qualquer atribuição existir. Nenhum limiar decide se agrupa: cada
@@ -643,6 +658,7 @@ def medir_celula(celula: str, particao: xp.Particao) -> dict:
         "rankings": {
             (REGIME_PRINCIPAL, OBJETO_COMPLETA): ranking_principal,
             (REGIME_CONTRASTE, OBJETO_REDUZIDA): ranking_contraste,
+            PRINCIPAL_REDUZIDA: ranking_reduzida,
         },
         "erro_principal": erro_principal,
         "erro_contraste": erro_contraste,
@@ -661,11 +677,18 @@ def medir_celula(celula: str, particao: xp.Particao) -> dict:
 # Tabelas
 # ---------------------------------------------------------------------------
 
-def tabela_global_atributo(medidas: list[dict]) -> pd.DataFrame:
-    """Uma linha por célula, regime e variável conceitual."""
+def tabela_global_atributo(medidas: list[dict],
+                           chaves: list[tuple[str, str]] | None = None) -> pd.DataFrame:
+    """Uma linha por célula, regime e variável conceitual.
+
+    Args:
+        chaves: pares (regime, objeto) a incluir. Omitido, usa `REGIMES`, que é o que
+            o artefato publica. `concordancia_topo` pede também `PRINCIPAL_REDUZIDA`.
+    """
+    chaves = list(REGIMES) if chaves is None else list(chaves)
     partes = []
     for medida in medidas:
-        for chave in REGIMES:
+        for chave in chaves:
             regime, objeto = chave
             ranking = medida["rankings"][chave].copy()
             ranking.insert(0, "objeto_explicado", objeto)
@@ -675,6 +698,60 @@ def tabela_global_atributo(medidas: list[dict]) -> pd.DataFrame:
     colunas = ["celula", "regime", "objeto_explicado", "atributo", "shap_medio_abs",
                "posicao", "n_colunas", "categoria_referencia_omitida"]
     return pd.concat(partes, ignore_index=True)[colunas]
+
+
+def concordancia_topo(tabela: pd.DataFrame,
+                      comparacoes: list | None = None) -> pd.DataFrame:
+    """Quantas posições do topo coincidem entre dois rankings, por célula.
+
+    Para cada célula e comparação, devolve o maior `k` tal que as posições 1 a `k` têm
+    a mesma variável nos dois rankings. É o número que o texto usa como resposta à
+    multicolinearidade: sete em `A_atomico` e cinco em `B_composto` (D-053, D-055).
+
+    Args:
+        tabela: formato de `tabela_global_atributo`, com `celula`, `regime`,
+            `objeto_explicado`, `atributo` e `posicao`. Pode ser o CSV versionado.
+        comparacoes: triplas (nome, lado_a, lado_b), cada lado um par (regime,
+            objeto). Omitido, usa `COMPARACOES_TOPO`.
+
+    Returns:
+        DataFrame com uma linha por célula e comparação: `celula`, `comparacao`, os
+        dois lados, `topo_coincidente`, `n_atributos` e `atributos_no_topo`.
+
+    Raises:
+        KeyError: se um lado de alguma comparação não estiver na tabela. O CSV
+            publicado não traz o regime principal sobre a floresta reduzida, e uma
+            comparação sem um dos lados daria `k = 0` calado.
+    """
+    comparacoes = list(COMPARACOES_TOPO) if comparacoes is None else list(comparacoes)
+
+    def ordem(recorte: pd.DataFrame, lado: tuple[str, str]) -> list[str]:
+        regime, objeto = lado
+        linhas = recorte[(recorte["regime"] == regime)
+                         & (recorte["objeto_explicado"] == objeto)]
+        if linhas.empty:
+            raise KeyError(f"{recorte['celula'].iloc[0]}: ranking {regime} sobre "
+                           f"{objeto} ausente da tabela.")
+        return list(linhas.sort_values("posicao", kind="stable")["atributo"])
+
+    linhas = []
+    for celula in pd.unique(tabela["celula"]):
+        recorte = tabela[tabela["celula"] == celula]
+        for nome, lado_a, lado_b in comparacoes:
+            esquerda, direita = ordem(recorte, lado_a), ordem(recorte, lado_b)
+            k = _prefixo_comum(esquerda, direita)
+            linhas.append({
+                "celula": celula,
+                "comparacao": nome,
+                "regime_a": lado_a[0],
+                "objeto_a": lado_a[1],
+                "regime_b": lado_b[0],
+                "objeto_b": lado_b[1],
+                "topo_coincidente": k,
+                "n_atributos": len(esquerda),
+                "atributos_no_topo": ", ".join(esquerda[:k]),
+            })
+    return pd.DataFrame(linhas)
 
 
 def tabela_global_coluna(medidas: list[dict]) -> pd.DataFrame:
@@ -882,7 +959,7 @@ def exportar(tabela: pd.DataFrame, nome: str, nota: str,
 
 
 def exportar_tudo(tabelas: dict[str, pd.DataFrame]) -> dict[str, dict]:
-    """Emite os cinco pares de arquivos em `reports/tabelas/`."""
+    """Emite os seis pares de arquivos em `reports/tabelas/`."""
     nota_topo = (f"{NOTA_REGIMES} {NOTA_ESCALA} {NOTA_REFERENCIA} O .tex traz os "
                  f"{TOPO_TEX} primeiros de cada célula em cada regime; o .csv traz "
                  f"todos.")
@@ -919,7 +996,23 @@ def exportar_tudo(tabelas: dict[str, pd.DataFrame]) -> dict[str, dict]:
                   "as 500 árvores. O portão do regime de contraste é o piso por árvore, "
                   "medido na mesma execução (D-053)."),
         ),
+        NOME_CONCORDANCIA: exportar_concordancia(tabelas[NOME_CONCORDANCIA]),
     }
+
+
+def exportar_concordancia(tabela: pd.DataFrame) -> dict[str, Path]:
+    """Grava `shap_concordancia_topo`, separado para poder sair sem o resto.
+
+    O artefato se deriva dos rankings, e emiti-lo sozinho evita regravar as outras
+    cinco tabelas quando só ele falta.
+    """
+    return exportar(
+        tabela, NOME_CONCORDANCIA,
+        nota=("Maior k tal que as posições 1 a k têm a mesma variável nos dois "
+              "rankings. A primeira comparação é a do texto e da figura de contraste; "
+              "a segunda fixa a floresta reduzida e isola o efeito do regime. "
+              f"{NOTA_REGIMES}"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1377,7 +1470,7 @@ def material_das_figuras(celula: str, particao: xp.Particao) -> dict:
 def executar(celulas: list[str] | None = None,
              particao: xp.Particao | None = None,
              salvar: bool = True) -> dict:
-    """Mede as células, monta as cinco tabelas e emite os artefatos.
+    """Mede as células, monta as seis tabelas e emite os artefatos.
 
     Args:
         celulas: chaves de `features.FEATURE_SETS`. Omitido, usa as duas do grid
@@ -1408,6 +1501,9 @@ def executar(celulas: list[str] | None = None,
         NOME_PARES: tabela_pares_colineares(medidas),
         NOME_CASOS: tabela_casos_locais(medidas),
         NOME_ARVORES: tabela_arvores_excluidas(medidas),
+        NOME_CONCORDANCIA: concordancia_topo(
+            tabela_global_atributo(medidas, chaves=REGIMES + [PRINCIPAL_REDUZIDA])
+        ),
     }
     artefatos = exportar_tudo(tabelas) if salvar else {}
 

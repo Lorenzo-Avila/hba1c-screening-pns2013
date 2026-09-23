@@ -560,3 +560,52 @@ def test_mcnemar_usa_o_limiar_de_cada_modelo():
     # Com limiar 0,8 o segundo positivo passa despercebido; com 0,3 ele é detectado.
     assert teste["positivos_so_b_detecta"] == 1
     assert teste["positivos_so_a_detecta"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Curvas: a função que desenha é a que grava
+# ---------------------------------------------------------------------------
+
+
+def test_calibracao_decis_e_a_tabela_do_diagnostico(split, resultados):
+    """Os decis gravados são os mesmos do ECE publicado, na mesma ordem.
+
+    O `calibration_curve` do scikit-learn corta as faixas de outro jeito e difere na
+    terceira casa. Se a curva saísse dele, o gráfico e o ECE descreveriam faixas
+    diferentes do mesmo teste.
+    """
+    _, _, _, y_test = split
+    for r in resultados:
+        decis = ev.calibracao_decis(y_test, r["proba_teste"])
+        tabela = r["calibracao"]["tabela"]
+        assert list(decis.columns) == ["decil", "n", "prob_media", "freq_observada"]
+        assert decis["decil"].tolist() == tabela["bin"].tolist()
+        assert decis["n"].tolist() == tabela["n"].tolist()
+        np.testing.assert_array_equal(decis["prob_media"], tabela["proba_media"])
+        np.testing.assert_array_equal(decis["freq_observada"],
+                                      tabela["freq_observada"])
+
+
+def test_figuras_chamam_as_funcoes_de_curva(split, resultados, tmp_path, monkeypatch):
+    """Cada figura desenha os pontos da função de curva, e não uma conta própria.
+
+    É o que impede PNG e CSV de divergirem: se alguém voltar a chamar o scikit-learn
+    direto dentro da figura, a figura para de passar por aqui e o teste acusa.
+    """
+    _, _, _, y_test = split
+    proba = resultados[0]["proba_teste"]
+    chamadas = []
+    for nome in ("curva_roc", "curva_pr", "calibracao_decis"):
+        original = getattr(ev, nome)
+
+        def espiao(*args, _original=original, _nome=nome, **kwargs):
+            chamadas.append(_nome)
+            return _original(*args, **kwargs)
+
+        monkeypatch.setattr(ev, nome, espiao)
+
+    ev.figura_roc(y_test, proba, "espiao", path_figuras=tmp_path)
+    ev.figura_precision_recall(y_test, proba, 0.5, "espiao", path_figuras=tmp_path)
+    ev.figura_calibracao(y_test, proba, "espiao", path_figuras=tmp_path)
+
+    assert chamadas == ["curva_roc", "curva_pr", "calibracao_decis"]

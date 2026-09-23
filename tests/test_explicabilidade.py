@@ -1,12 +1,12 @@
 """Contratos da explicabilidade via SHAP sobre a Random Forest publicada.
 
-Nove guardas, e elas se dividem em três naturezas. As de **identidade numérica**
+Onze guardas, e elas se dividem em três naturezas. As de **identidade numérica**
 conferem que a atribuição descreve o modelo: aditividade nos dois regimes e agregação
 por variável conceitual. As de **vazamento e determinismo** conferem o protocolo: o
 background sai do treino, e a seleção dos casos locais reproduz sozinha. As de
 **artefato** conferem que o que está em `reports/tabelas/` é o que o código produz hoje:
-composição completa no padrão de D-044, consistência entre duas tabelas que se olham, e
-reprodução do regime principal na terceira casa.
+composição completa no padrão de D-044, consistência entre duas tabelas que se olham,
+reprodução do regime principal na terceira casa, e o topo coincidente entre regimes.
 
 **Custo, que decidiu o desenho.** Identificar as árvores que o explicador atribui com
 erro custa minutos, porque explica as 500 uma a uma sobre o teste inteiro. Guarda cara é
@@ -457,3 +457,64 @@ def test_reproducao_do_regime_principal(ajustadas, artefatos):
         "O regime principal recalculado não reproduz o artefato na "
         f"{CASAS}ª casa:\n{divergencias.to_string(index=False)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Topo coincidente
+# ---------------------------------------------------------------------------
+
+def test_concordancia_topo_conta_o_prefixo_comum():
+    """`k` é o maior prefixo idêntico, e uma troca no meio corta a contagem ali."""
+    linhas = []
+    ordens = {
+        (ex.REGIME_PRINCIPAL, ex.OBJETO_COMPLETA): ["a", "b", "c", "d"],
+        ex.PRINCIPAL_REDUZIDA: ["a", "c", "b", "d"],
+        (ex.REGIME_CONTRASTE, ex.OBJETO_REDUZIDA): ["a", "b", "d", "c"],
+    }
+    for (regime, objeto), ordem in ordens.items():
+        for posicao, atributo in enumerate(ordem, start=1):
+            linhas.append({"celula": "X", "regime": regime, "objeto_explicado": objeto,
+                           "atributo": atributo, "posicao": posicao})
+
+    tabela = ex.concordancia_topo(pd.DataFrame(linhas)).set_index("comparacao")
+    completa, reduzida = (nome for nome, _, _ in ex.COMPARACOES_TOPO)
+    assert tabela.loc[completa, "topo_coincidente"] == 2
+    assert tabela.loc[completa, "atributos_no_topo"] == "a, b"
+    assert tabela.loc[reduzida, "topo_coincidente"] == 1
+    assert (tabela["n_atributos"] == 4).all()
+
+    # O CSV publicado não traz o principal sobre a reduzida. Sem este lado a comparação
+    # daria zero calado, e a função tem de recusar.
+    so_publicado = pd.DataFrame(linhas)
+    so_publicado = so_publicado[so_publicado["objeto_explicado"].ne(ex.OBJETO_REDUZIDA)
+                                | so_publicado["regime"].eq(ex.REGIME_CONTRASTE)]
+    with pytest.raises(KeyError, match="ausente"):
+        ex.concordancia_topo(so_publicado)
+
+
+def test_concordancia_topo_versionada_confere_com_o_ranking_publicado(artefatos):
+    """Sete posições em `A_atomico` e cinco em `B_composto`, e o CSV confere com o ranking.
+
+    A primeira comparação se recalcula sobre `shap_global_atributo.csv`, porque os dois
+    lados dela estão publicados. A segunda depende do principal sobre a reduzida, que
+    só existe dentro de `make shap`, e aqui ela entra só pela composição.
+    """
+    caminho = cfg.PATH_TABELAS / f"{ex.NOME_CONCORDANCIA}.csv"
+    if not caminho.exists():
+        pytest.skip(f"Artefato ausente em {caminho}. Rode make shap antes.")
+    versionada = pd.read_csv(caminho)
+
+    esperadas = {(celula, nome) for celula in ex.CELULAS
+                 for nome, _, _ in ex.COMPARACOES_TOPO}
+    obtidas = set(zip(versionada["celula"], versionada["comparacao"]))
+    assert obtidas == esperadas, sorted(obtidas ^ esperadas)
+
+    publicada = ex.COMPARACOES_TOPO[0]
+    recalculada = ex.concordancia_topo(artefatos[ex.NOME_GLOBAL_ATRIBUTO],
+                                       comparacoes=[publicada])
+    na_versionada = versionada[versionada["comparacao"] == publicada[0]]
+    assert (recalculada.set_index("celula")["topo_coincidente"].to_dict()
+            == na_versionada.set_index("celula")["topo_coincidente"].to_dict())
+    assert recalculada.set_index("celula")["topo_coincidente"].to_dict() == {
+        "A_atomico": 7, "B_composto": 5,
+    }

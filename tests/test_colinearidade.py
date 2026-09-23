@@ -354,3 +354,19 @@ def test_resumo_e_exportacao_latex(split, tmp_path):
     assert destino.exists()
     assert "tabular" in conteudo
     assert "A_atomico" in conteudo
+
+
+def test_decomposicao_versionada_reproduz_os_dois_r2():
+    """R² 1,000 da identidade contra 0,884 do VIF, o argumento do descarte de C.
+
+    Os dois números eram impressos pelo notebook e não tinham arquivo. Fixados aqui
+    porque são resultado medido: se mudarem, investiga-se (D-016).
+    """
+    caminho = cfg.PATH_TABELAS / "decomposicao_escore.csv"
+    if not caminho.exists():
+        pytest.skip(f"Artefato ausente em {caminho}. Rode make notebook antes.")
+    linha = pd.read_csv(caminho).iloc[0]
+    assert linha["feature_set"] == "C_completo"
+    assert round(linha["r2_identidade"], 3) == 1.000
+    assert round(linha["r2_vif"], 3) == 0.884
+    assert linha["parcelas"] == "has_combinada, colesterol_sim, obesidade_reconstruida"

@@ -27,7 +27,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import binomtest
 from sklearn.base import clone
-from sklearn.calibration import calibration_curve
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
@@ -271,6 +270,23 @@ def tabela_calibracao(y_te, proba_te, n_bins: int = 10,
     )
 
 
+def calibracao_decis(y_te, proba_te, n_bins: int = 10) -> pd.DataFrame:
+    """Curva de calibração por decis, a mesma que `diagnostico_calibracao` resume.
+
+    Sai de `tabela_calibracao`, e não de `sklearn.calibration.calibration_curve`. As
+    duas cortam por quantis e diferem na terceira casa, porque o scikit-learn atribui
+    as faixas de outro jeito. Esta é a que dá o ECE publicado e o décimo decil de
+    D-040, e é a que a figura desenha.
+
+    Returns:
+        DataFrame com `decil`, `n`, `prob_media` e `freq_observada`.
+    """
+    tabela = tabela_calibracao(y_te, proba_te, n_bins=n_bins)
+    return tabela.rename(columns={"bin": "decil", "proba_media": "prob_media"})[
+        ["decil", "n", "prob_media", "freq_observada"]
+    ]
+
+
 def diagnostico_calibracao(y_te, proba_te, n_bins: int = 10) -> dict:
     """Quantifica o desvio entre probabilidade estimada e frequência observada.
 
@@ -316,6 +332,43 @@ def diagnostico_calibracao(y_te, proba_te, n_bins: int = 10) -> dict:
         "intercepto": float(cox.intercept_[0]),
         "tabela": tabela,
     }
+
+
+# ---------------------------------------------------------------------------
+# Curvas: os pontos que as figuras desenham e que os artefatos gravam
+# ---------------------------------------------------------------------------
+
+
+def curva_roc(y_te, proba_te) -> pd.DataFrame:
+    """Pontos da curva ROC, na ordem de `roc_curve`.
+
+    O primeiro limiar é infinito: é o ponto (0, 0), em que ninguém é encaminhado.
+    A área por trapézio sobre estes pontos é a `auc_roc` da tabela consolidada.
+
+    Returns:
+        DataFrame com `fpr`, `tpr` e `limiar`.
+    """
+    fpr, tpr, limiares = roc_curve(y_te, proba_te)
+    return pd.DataFrame({"fpr": fpr, "tpr": tpr, "limiar": limiares})
+
+
+def curva_pr(y_te, proba_te) -> pd.DataFrame:
+    """Pontos da curva precision-recall, na ordem de `precision_recall_curve`.
+
+    O último ponto, recall 0 e precisão 1, não tem limiar associado e sai com limiar
+    vazio. A PR-AUC publicada é `average_precision`, a soma em degrau
+    `Σ (recall_n − recall_{n−1}) · precisao_n` sobre estes pontos. Trapézio aqui dá
+    outro número.
+
+    Returns:
+        DataFrame com `precisao`, `recall` e `limiar`.
+    """
+    precisao, recall, limiares = precision_recall_curve(y_te, proba_te)
+    return pd.DataFrame({
+        "precisao": precisao,
+        "recall": recall,
+        "limiar": np.append(limiares, np.nan),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -370,11 +423,11 @@ def figura_roc(y_te, proba_te, rotulo: str,
     path_figuras.mkdir(parents=True, exist_ok=True)
     destino = path_figuras / f"roc_{_slug(rotulo)}.png"
 
-    fpr, tpr, _ = roc_curve(y_te, proba_te)
+    curva = curva_roc(y_te, proba_te)
     auc = roc_auc_score(y_te, proba_te)
 
     fig, ax = plt.subplots(figsize=(5.4, 4.6))
-    ax.plot(fpr, tpr, color=cfg.TEAL, lw=2.2, label=f"AUC-ROC = {auc:.3f}")
+    ax.plot(curva["fpr"], curva["tpr"], color=cfg.TEAL, lw=2.2, label=f"AUC-ROC = {auc:.3f}")
     ax.plot([0, 1], [0, 1], color=cfg.INK, lw=1, ls=":", label="aleatório")
     _preparar_eixo(ax, f"Curva ROC — {rotulo}",
                    "1 − especificidade (falsos positivos)",
@@ -394,7 +447,8 @@ def figura_precision_recall(y_te, proba_te, limiar: float, rotulo: str,
     path_figuras.mkdir(parents=True, exist_ok=True)
     destino = path_figuras / f"pr_{_slug(rotulo)}.png"
 
-    prec, rec, _ = precision_recall_curve(y_te, proba_te)
+    curva = curva_pr(y_te, proba_te)
+    prec, rec = curva["precisao"], curva["recall"]
     pr_auc = average_precision_score(y_te, proba_te)
     y_pred = (np.asarray(proba_te) >= limiar).astype(int)
     rec_op = recall_score(y_te, y_pred, zero_division=0)
@@ -423,18 +477,17 @@ def figura_precision_recall(y_te, proba_te, limiar: float, rotulo: str,
 
 def figura_calibracao(y_te, proba_te, rotulo: str, n_bins: int = 10,
                       path_figuras: Path | None = None) -> Path:
-    """Curva de calibração, insumo do backlog de calibração probabilística."""
+    """Curva de calibração por decis, a mesma de `calibracao_decis`."""
     path_figuras = cfg.PATH_FIGURAS if path_figuras is None else Path(path_figuras)
     path_figuras.mkdir(parents=True, exist_ok=True)
     destino = path_figuras / f"calibracao_{_slug(rotulo)}.png"
 
-    observado, predito = calibration_curve(y_te, proba_te, n_bins=n_bins,
-                                           strategy="quantile")
+    decis = calibracao_decis(y_te, proba_te, n_bins=n_bins)
     brier = brier_score_loss(y_te, proba_te)
 
     fig, ax = plt.subplots(figsize=(5.4, 4.6))
     ax.plot([0, 1], [0, 1], color=cfg.INK, lw=1, ls=":", label="calibração perfeita")
-    ax.plot(predito, observado, color=cfg.TEAL, lw=2.2, marker="o",
+    ax.plot(decis["prob_media"], decis["freq_observada"], color=cfg.TEAL, lw=2.2, marker="o",
             markersize=5, label=f"Brier = {brier:.4f}")
     _preparar_eixo(ax, f"Curva de calibração — {rotulo}",
                    "Probabilidade estimada", "Frequência observada")

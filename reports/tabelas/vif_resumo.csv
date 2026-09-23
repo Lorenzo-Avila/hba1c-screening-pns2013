@@ -1,0 +1,4 @@
+feature_set,colunas,vif_maximo,vif_mediano,acima_do_limiar
+A_atomico,20,3.512344233,1.403028241,0
+B_composto,16,3.922226676,1.395973133,0
+C_completo,23,14.033643965,1.623773872,2

@@ -23,8 +23,9 @@ confiança. Quem governa isso é a marca `Estimador.invariante_ao_conjunto`.
 
 Uso:
 
-    python -m src.experimento              # emite os dois artefatos e confere
+    python -m src.experimento              # emite os artefatos e confere
     python -m src.experimento --figuras    # idem, com as figuras do teste
+    python -m src.experimento --saida DIR  # grava em DIR, confere contra reports/tabelas/
 """
 
 from __future__ import annotations
@@ -76,6 +77,14 @@ NOME_RESUMO = "resumo_amostra"
 NOME_AUSENTES = "ausentes_por_variavel"
 NOME_CALIBRACAO = "calibracao_comparada"
 NOME_MCNEMAR = "mcnemar_pareado"
+NOME_CUSTO_MARGINAL = "custo_marginal_pareado"
+NOME_CURVA_ROC = "curva_roc"
+NOME_CURVA_PR = "curva_pr"
+NOME_DECIS = "calibracao_decis"
+
+# O par do custo marginal: a floresta contra a logística, nos conjuntos em que as duas
+# rodam. O sinal dos deltas é sempre floresta menos logística.
+PAR_CUSTO = (NOME_FLORESTA, "LogReg")
 
 # Par que o McNemar compara: os dois modelos no conjunto em que a floresta venceu.
 PAR_MCNEMAR = ((NOME_FLORESTA, "B_composto"), ("LogReg", "B_composto"))
@@ -120,7 +129,8 @@ def rodar_grid(modelos: list[str] | None = None,
                conjuntos: list[str] | None = None,
                particao: Particao | None = None,
                recall_alvo: float = cfg.RECALL_ALVO,
-               salvar_figuras: bool = False) -> list[dict]:
+               salvar_figuras: bool = False,
+               path_figuras: Path | None = None) -> list[dict]:
     """Executa o grid modelo × conjunto e devolve os resultados brutos.
 
     Args:
@@ -130,6 +140,7 @@ def rodar_grid(modelos: list[str] | None = None,
             implica reler o CSV bruto.
         recall_alvo: ponto de operação dos estimadores calibráveis. Os invariantes
             ignoram, porque operam com limiar fixo.
+        path_figuras: onde gravar as figuras. Omitido, `reports/figuras/`.
 
     Returns:
         Lista de dicionários de `evaluate.avaliar`, na ordem das linhas da tabela.
@@ -163,6 +174,7 @@ def rodar_grid(modelos: list[str] | None = None,
                 recall_alvo=recall_alvo,
                 limiar=estimador.limiar_fixo,   # presente só nos invariantes
                 salvar_figuras=salvar_figuras,
+                path_figuras=path_figuras,
             ))
     return resultados
 
@@ -171,7 +183,8 @@ def compor_grid(modelos: list[str] | None = None,
                 conjuntos: list[str] | None = None,
                 particao: Particao | None = None,
                 recall_alvo: float = cfg.RECALL_ALVO,
-                salvar_figuras: bool = False) -> list[dict]:
+                salvar_figuras: bool = False,
+                path_figuras: Path | None = None) -> list[dict]:
     """O grid publicado, onde nem todo modelo roda em todo conjunto.
 
     `rodar_grid` aplica os mesmos conjuntos a todos os modelos que dependem de um, e a
@@ -188,13 +201,15 @@ def compor_grid(modelos: list[str] | None = None,
 
     demais = [nome for nome in modelos if nome != NOME_FLORESTA]
     resultados = rodar_grid(demais, conjuntos, particao=particao,
-                            recall_alvo=recall_alvo, salvar_figuras=salvar_figuras)
+                            recall_alvo=recall_alvo, salvar_figuras=salvar_figuras,
+                            path_figuras=path_figuras)
 
     if NOME_FLORESTA in modelos:
         da_floresta = [c for c in conjuntos if c in CONJUNTOS_FLORESTA]
         resultados += rodar_grid([NOME_FLORESTA], da_floresta, particao=particao,
                                  recall_alvo=recall_alvo,
-                                 salvar_figuras=salvar_figuras)
+                                 salvar_figuras=salvar_figuras,
+                                 path_figuras=path_figuras)
 
     posicao = {nome: i for i, nome in enumerate(ORDEM_MODELOS)}
     resultados.sort(key=lambda r: posicao.get(r["modelo"], len(posicao)))
@@ -384,6 +399,111 @@ def equiparado_por_modelo(resultados: list[dict],
     return tabela
 
 
+def _leitura_do_par(delta_encaminhados: int, delta_detectados: int) -> str:
+    """Classifica o par pelo sinal dos dois deltas, floresta menos logística.
+
+    Quem detecta ao menos o mesmo encaminhando no máximo o mesmo domina. Quando os
+    dois deltas andam juntos, para cima ou para baixo, é troca: mais casos custam mais
+    encaminhamento, e o preço é o custo marginal.
+    """
+    if delta_encaminhados == 0 and delta_detectados == 0:
+        return "empate"
+    if delta_detectados >= 0 and delta_encaminhados <= 0:
+        return "floresta domina"
+    if delta_detectados <= 0 and delta_encaminhados >= 0:
+        return "logistica domina"
+    return "troca"
+
+
+def custo_marginal_pareado(resultados: list[dict],
+                           equiparado: pd.DataFrame,
+                           par: tuple[str, str] = PAR_CUSTO) -> pd.DataFrame:
+    """Quanto encaminhamento a floresta gasta a mais por caso a mais, contra a logística.
+
+    Uma linha por conjunto e regime. O ponto padrão sai do grid, o regime equiparado
+    sai de `equiparado_por_modelo`, e nenhum modelo é reavaliado aqui: são os mesmos
+    números que a carga operacional e o equiparado já publicam, subtraídos. É o que dá
+    artefato à frase de 48 encaminhamentos por um caso (D-046, D-055).
+
+    `custo_marginal` só existe quando a floresta detecta mais **e** encaminha mais.
+    Sem caso a mais não há preço por caso a mais, e com caso a mais encaminhando menos
+    a floresta domina: a razão sairia negativa e leria como desconto, que não é.
+
+    Returns:
+        DataFrame com `conjunto`, `regime`, encaminhados e detectados de cada modelo,
+        `delta_encaminhados`, `delta_detectados`, `custo_marginal` e `leitura`.
+    """
+    floresta, logistica = par
+    padrao = {(r["modelo"], r["conjunto"]): (r["vp"] + r["fp"], r["vp"])
+              for r in resultados if r.get("limiar_calibrado", True)}
+    equiparados = {(l["modelo"], l["conjunto"]): (int(l["encaminhados"]),
+                                                   int(l["casos_detectados"]))
+                   for _, l in equiparado.iterrows()}
+
+    linhas = []
+    for regime, fonte in (("padrao", padrao), ("equiparado", equiparados)):
+        for conjunto in CONJUNTOS_FLORESTA:
+            if (floresta, conjunto) not in fonte or (logistica, conjunto) not in fonte:
+                continue
+            enc_f, det_f = fonte[(floresta, conjunto)]
+            enc_l, det_l = fonte[(logistica, conjunto)]
+            delta_enc, delta_det = int(enc_f - enc_l), int(det_f - det_l)
+            linhas.append({
+                "conjunto": conjunto,
+                "regime": regime,
+                "encaminhados_floresta": int(enc_f),
+                "detectados_floresta": int(det_f),
+                "encaminhados_logistica": int(enc_l),
+                "detectados_logistica": int(det_l),
+                "delta_encaminhados": delta_enc,
+                "delta_detectados": delta_det,
+                "custo_marginal": (delta_enc / delta_det
+                                   if delta_det > 0 and delta_enc > 0
+                                   else float("nan")),
+                "leitura": _leitura_do_par(delta_enc, delta_det),
+            })
+
+    tabela = pd.DataFrame(linhas)
+    tabela.attrs["nota"] = (
+        f"Deltas de {floresta} menos {logistica}, no mesmo conjunto e no mesmo regime. "
+        f"O ponto padrão é o do grid publicado; o equiparado é o de "
+        f"{NOME_EQUIPARADO}. Custo marginal é encaminhados a mais por caso a mais, "
+        f"vazio quando a floresta não detecta mais ou quando detecta mais "
+        f"encaminhando menos."
+    )
+    return tabela
+
+
+def curvas(resultados: list[dict], particao: Particao) -> dict[str, pd.DataFrame]:
+    """Pontos das curvas ROC, PR e de calibração por decis de cada célula calibrável.
+
+    Os comparadores de corte único ficam fora: com saída em dois valores, a curva é uma
+    quebra e não descreve desempenho (D-023). As funções são as mesmas que desenham as
+    figuras, então PNG e CSV não divergem.
+
+    Returns:
+        Dicionário com `curva_roc`, `curva_pr` e `calibracao_decis`, cada um com
+        `modelo` e `conjunto` à frente das colunas da curva.
+    """
+    construtores = {
+        NOME_CURVA_ROC: ev.curva_roc,
+        NOME_CURVA_PR: ev.curva_pr,
+        NOME_DECIS: ev.calibracao_decis,
+    }
+    saida = {}
+    for nome, construir in construtores.items():
+        partes = []
+        for r in resultados:
+            if not r.get("limiar_calibrado", True):
+                continue
+            curva = construir(particao.y_te, r["proba_teste"])
+            curva.insert(0, "conjunto", r["conjunto"])
+            curva.insert(0, "modelo", r["modelo"])
+            partes.append(curva)
+        saida[nome] = pd.concat(partes, ignore_index=True)
+    return saida
+
+
 def veredito_do_criterio(carga: pd.DataFrame,
                          nome_regra: str = "Regra ADA") -> pd.DataFrame:
     """Aplica o critério de sucesso a cada regime da carga operacional.
@@ -514,7 +634,7 @@ def leitura_do_criterio(carga: pd.DataFrame,
 
 
 def exportar(tabela: pd.DataFrame, nome: str, nota: str | None = None,
-             **kwargs) -> dict[str, Path]:
+             destino: Path | None = None, **kwargs) -> dict[str, Path]:
     """Grava a tabela como `.tex` e `.csv` em `reports/tabelas/`.
 
     O `.csv` não é cópia redundante do `.tex`: é sobre ele que a conferência de
@@ -522,19 +642,34 @@ def exportar(tabela: pd.DataFrame, nome: str, nota: str | None = None,
     diretório versionado acusa mudança a cada execução (D-048).
 
     Args:
+        destino: diretório de gravação. Omitido, `reports/tabelas/`.
         **kwargs: repassados a `to_latex`, só para o `.tex`. O `.csv` não os vê,
             porque formatação de apresentação não pode chegar ao arquivo sobre o
             qual a conferência de reprodução trabalha.
     """
-    destino_csv = art.salvar_csv(tabela, cfg.PATH_TABELAS / f"{nome}.csv")
+    destino = cfg.PATH_TABELAS if destino is None else Path(destino)
+    destino_csv = art.salvar_csv(tabela, destino / f"{nome}.csv")
     if nota is None:
         nota = tabela.attrs.get("nota")
-    destino_tex = ev.exportar_latex(tabela, f"{nome}.tex", nota=nota, **kwargs)
+    destino_tex = ev.exportar_latex(tabela, f"{nome}.tex", path_reports=destino,
+                                    nota=nota, **kwargs)
     return {"tex": destino_tex, "csv": destino_csv}
 
 
+def exportar_curva(tabela: pd.DataFrame, nome: str,
+                   destino: Path | None = None) -> dict[str, Path]:
+    """Grava uma curva só como `.csv`.
+
+    São milhares de pontos, que servem ao gráfico e não cabem em documento. O `.tex`
+    de uma curva seria o maior arquivo do diretório e ninguém o leria.
+    """
+    destino = cfg.PATH_TABELAS if destino is None else Path(destino)
+    return {"csv": art.salvar_csv(tabela, destino / f"{nome}.csv")}
+
+
 def exportar_descritivas(particao: Particao,
-                         analitico: pd.DataFrame | None = None) -> dict[str, dict]:
+                         analitico: pd.DataFrame | None = None,
+                         destino: Path | None = None) -> dict[str, dict]:
     """Emite o quadro da amostra e as contagens de ausentes.
 
     Os dois números saíam de `data` direto para o texto, sem passar por arquivo
@@ -551,13 +686,15 @@ def exportar_descritivas(particao: Particao,
     Args:
         analitico: base limpa. Omitida, relê o CSV bruto. Passe a sua se já tiver uma
             em mãos, para não pagar a leitura duas vezes.
+        destino: diretório de gravação. Omitido, `reports/tabelas/`.
     """
     analitico = dt.carregar_analitico() if analitico is None else analitico
     return {
-        NOME_RESUMO: exportar(dt.resumo_amostra(analitico), NOME_RESUMO, nota=""),
+        NOME_RESUMO: exportar(dt.resumo_amostra(analitico), NOME_RESUMO, nota="",
+                              destino=destino),
         NOME_AUSENTES: exportar(
             dt.ausentes_por_variavel(analitico, treino=particao.X_tr),
-            NOME_AUSENTES, nota="",
+            NOME_AUSENTES, nota="", destino=destino,
         ),
     }
 
@@ -721,10 +858,15 @@ def executar(modelos: list[str] | None = None,
              salvar_figuras: bool = False,
              conferir: bool = True,
              particao: Particao | None = None,
-             descritivas: bool = True) -> dict:
+             descritivas: bool = True,
+             saida: Path | None = None) -> dict:
     """Roda o grid, emite os artefatos e confere a reprodução.
 
     Args:
+        saida: diretório onde gravar tabelas e figuras. Omitido, `reports/tabelas/` e
+            `reports/figuras/`. A conferência lê as âncoras versionadas de
+            `reports/tabelas/` em qualquer caso: é assim que o painel reproduz ao vivo
+            sem regravar o diretório que ele mesmo lê (D-054, D-055).
         particao: split pronto. Omitido, `preparar_particao` constrói um. O parâmetro
             existe para quem já tem a partição em mãos: o notebook de resultados
             diagnostica colinearidade sobre `X_tr` antes de chamar aqui, e reler o CSV
@@ -738,8 +880,10 @@ def executar(modelos: list[str] | None = None,
         `artefatos`, `divergencias` e `particao`.
     """
     particao = preparar_particao() if particao is None else particao
+    destino = None if saida is None else Path(saida)
+    figuras = None if destino is None else destino / "figuras"
     resultados = compor_grid(modelos, conjuntos, particao=particao,
-                             salvar_figuras=salvar_figuras)
+                             salvar_figuras=salvar_figuras, path_figuras=figuras)
 
     consolidado = ev.comparar(resultados)
     carga = carga_operacional(resultados, particao)
@@ -751,27 +895,35 @@ def executar(modelos: list[str] | None = None,
     calibracao = ev.tabela_calibracao_comparada(resultados)
 
     artefatos = {
-        NOME_CONSOLIDADO: exportar(consolidado, NOME_CONSOLIDADO),
-        NOME_CARGA: exportar(carga, NOME_CARGA),
+        NOME_CONSOLIDADO: exportar(consolidado, NOME_CONSOLIDADO, destino=destino),
+        NOME_CARGA: exportar(carga, NOME_CARGA, destino=destino),
         # `na_rep`: a linha da regra não tem alvo, e um "NaN" impresso numa tabela
         # que vai para o LaTeX lê como falha de geração, não como célula vazia.
-        NOME_EQUIPARADO: exportar(equiparado, NOME_EQUIPARADO,
+        NOME_EQUIPARADO: exportar(equiparado, NOME_EQUIPARADO, destino=destino,
                                   na_rep=SEM_CONJUNTO),
-        NOME_CALIBRACAO: exportar(calibracao, NOME_CALIBRACAO,
+        NOME_CALIBRACAO: exportar(calibracao, NOME_CALIBRACAO, destino=destino,
                                   nota=ev.nota_corte_unico(consolidado)),
     }
     if descritivas:
-        artefatos.update(exportar_descritivas(particao))
+        artefatos.update(exportar_descritivas(particao, destino=destino))
 
     mcnemar = mcnemar_do_par(resultados, particao)
     if mcnemar is not None:
         artefatos[NOME_MCNEMAR] = exportar(
-            ev.tabela_mcnemar(mcnemar), NOME_MCNEMAR,
+            ev.tabela_mcnemar(mcnemar), NOME_MCNEMAR, destino=destino,
             nota=(f"Teste de McNemar pareado entre {mcnemar['modelo_a']} e "
                   f"{mcnemar['modelo_b']}, nas predições do teste, cada modelo no seu "
                   f"limiar calibrado. O p-valor vem do teste binomial exato sobre os "
                   f"{mcnemar['discordantes']} casos discordantes."),
         )
+
+    custo = custo_marginal_pareado(resultados, equiparado)
+    if not custo.empty:
+        artefatos[NOME_CUSTO_MARGINAL] = exportar(custo, NOME_CUSTO_MARGINAL,
+                                                  destino=destino, na_rep="")
+    if any(r.get("limiar_calibrado", True) for r in resultados):
+        for nome, curva in curvas(resultados, particao).items():
+            artefatos[nome] = exportar_curva(curva, nome, destino=destino)
 
     divergencias = pd.DataFrame()
     composicao = pd.DataFrame()
@@ -828,11 +980,20 @@ def main(argv: list[str] | None = None) -> int:
                         help="não compara com as âncoras nem confere a composição")
     parser.add_argument("--congelar-ancora", action="store_true",
                         help=f"grava {REFERENCIA_FLORESTA} a partir desta execução")
+    parser.add_argument("--saida", type=Path, default=None, metavar="DIR",
+                        help="grava tabelas e figuras em DIR; a conferência continua "
+                             "lendo as âncoras de reports/tabelas/")
     args = parser.parse_args(argv)
+
+    if args.saida is not None and args.congelar_ancora:
+        # A âncora vive em `reports/tabelas/`, e congelá-la a partir de uma execução
+        # gravada em outro lugar misturaria as duas origens.
+        parser.error("--congelar-ancora não combina com --saida.")
 
     saida = executar(modelos=args.modelos, conjuntos=args.conjuntos,
                      salvar_figuras=args.figuras,
-                     conferir=not args.sem_conferencia)
+                     conferir=not args.sem_conferencia,
+                     saida=args.saida)
 
     print(ev.comparar_formatado(saida["resultados"]).to_string(index=False))
     print()
@@ -848,8 +1009,9 @@ def main(argv: list[str] | None = None) -> int:
         print(saida["mcnemar"]["tabela"].to_string())
         print(ev.leitura_do_mcnemar(saida["mcnemar"]))
         print()
+    print(f"Artefatos em {args.saida or cfg.PATH_TABELAS}:")
     for nome, caminhos in saida["artefatos"].items():
-        print(f"{nome}: {caminhos['tex'].name}, {caminhos['csv'].name}")
+        print(f"{nome}: {', '.join(p.name for p in caminhos.values())}")
 
     if args.sem_conferencia:
         return 0

@@ -1,0 +1,14 @@
+\begin{tabular}{llrrrrrrrl}
+\toprule
+conjunto & regime & encaminhados_floresta & detectados_floresta & encaminhados_logistica & detectados_logistica & delta_encaminhados & delta_detectados & custo_marginal & leitura \\
+\midrule
+A_atomico & padrao & 671 & 93 & 675 & 89 & -4 & 4 &  & floresta domina \\
+B_composto & padrao & 685 & 96 & 661 & 91 & 24 & 5 & 4.800 & troca \\
+A_atomico & equiparado & 985 & 108 & 986 & 107 & -1 & 1 &  & floresta domina \\
+B_composto & equiparado & 1048 & 110 & 1000 & 109 & 48 & 1 & 48.000 & troca \\
+\bottomrule
+\end{tabular}
+
+\begin{flushleft}
+\footnotesize Deltas de Random Forest menos LogReg, no mesmo conjunto e no mesmo regime. O ponto padrão é o do grid publicado; o equiparado é o de equiparado_por_modelo. Custo marginal é encaminhados a mais por caso a mais, vazio quando a floresta não detecta mais ou quando detecta mais encaminhando menos.
+\end{flushleft}

@@ -14,6 +14,13 @@ leitura do código:
 
 from __future__ import annotations
 
+import hashlib
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import numpy as np
 import pandas as pd
 import pytest
 from sklearn.dummy import DummyClassifier
@@ -595,3 +602,226 @@ def test_descritivas_ganham_artefato(particao, tabelas_preservadas):
     ausentes = pd.read_csv(cfg.PATH_TABELAS / f"{xp.NOME_AUSENTES}.csv")
     assert "no_treino" in ausentes.columns
     assert ausentes.loc[0, "variavel"] == "colesterol_alto"
+
+
+# ---------------------------------------------------------------------------
+# Custo marginal pareado
+# ---------------------------------------------------------------------------
+
+def _versionado(nome: str) -> pd.DataFrame:
+    caminho = cfg.PATH_TABELAS / f"{nome}.csv"
+    if not caminho.exists():
+        pytest.skip(f"Artefato ausente em {caminho}. Rode make resultados antes.")
+    return pd.read_csv(caminho)
+
+
+def test_leitura_do_custo_marginal_segue_o_sinal_dos_deltas():
+    """A leitura sai dos dois sinais, e o custo só existe quando há caso a mais."""
+    assert xp._leitura_do_par(24, 5) == "troca"
+    assert xp._leitura_do_par(-3, -1) == "troca"
+    assert xp._leitura_do_par(-4, 4) == "floresta domina"
+    assert xp._leitura_do_par(0, 2) == "floresta domina"
+    assert xp._leitura_do_par(4, -1) == "logistica domina"
+    assert xp._leitura_do_par(3, 0) == "logistica domina"
+    assert xp._leitura_do_par(0, 0) == "empate"
+
+    resultados = [
+        {"modelo": xp.NOME_FLORESTA, "conjunto": "A_atomico", "vp": 10, "fp": 90},
+        {"modelo": "LogReg", "conjunto": "A_atomico", "vp": 12, "fp": 80},
+        {"modelo": xp.NOME_FLORESTA, "conjunto": "B_composto", "vp": 14, "fp": 80},
+        {"modelo": "LogReg", "conjunto": "B_composto", "vp": 12, "fp": 90},
+    ]
+    equiparado = pd.DataFrame(columns=["modelo", "conjunto", "encaminhados",
+                                       "casos_detectados"])
+    tabela = xp.custo_marginal_pareado(resultados, equiparado).set_index("conjunto")
+
+    perde = tabela.loc["A_atomico"]
+    assert (perde["delta_encaminhados"], perde["delta_detectados"]) == (8, -2)
+    assert perde["leitura"] == "logistica domina"
+    assert pd.isna(perde["custo_marginal"])
+
+    # Caso a mais encaminhando menos é dominância: a razão daria -4 e leria como
+    # desconto por caso.
+    domina = tabela.loc["B_composto"]
+    assert (domina["delta_encaminhados"], domina["delta_detectados"]) == (-8, 2)
+    assert domina["leitura"] == "floresta domina"
+    assert pd.isna(domina["custo_marginal"])
+
+
+def test_custo_marginal_versionado_traz_os_quatro_pares():
+    """Os quatro pares que o texto usa, entre eles os 48 encaminhamentos por um caso.
+
+    Fixado de propósito: se um destes números se mover, investiga-se (D-016, D-046).
+    """
+    tabela = _versionado(xp.NOME_CUSTO_MARGINAL).set_index(["conjunto", "regime"])
+    esperado = {
+        ("B_composto", "padrao"): (24, 5, 4.8, "troca"),
+        ("B_composto", "equiparado"): (48, 1, 48.0, "troca"),
+        ("A_atomico", "padrao"): (-4, 4, None, "floresta domina"),
+        ("A_atomico", "equiparado"): (-1, 1, None, "floresta domina"),
+    }
+    assert set(tabela.index) == set(esperado)
+    for chave, (delta_enc, delta_det, custo, leitura) in esperado.items():
+        linha = tabela.loc[chave]
+        assert linha["delta_encaminhados"] == delta_enc, chave
+        assert linha["delta_detectados"] == delta_det, chave
+        assert linha["leitura"] == leitura, chave
+        if custo is None:
+            assert pd.isna(linha["custo_marginal"]), chave
+        else:
+            assert round(linha["custo_marginal"], 3) == custo, chave
+
+
+def test_custo_marginal_versionado_bate_com_os_artefatos_de_origem():
+    """Nenhum número novo: o padrão é o do consolidado, o equiparado é o de D-047."""
+    custo = _versionado(xp.NOME_CUSTO_MARGINAL)
+    consolidado = _versionado(xp.NOME_CONSOLIDADO).set_index(["modelo", "conjunto"])
+    equiparado = _versionado(xp.NOME_EQUIPARADO).set_index(["modelo", "conjunto"])
+
+    for _, linha in custo.iterrows():
+        for modelo, sufixo in ((xp.NOME_FLORESTA, "floresta"), ("LogReg", "logistica")):
+            chave = (modelo, linha["conjunto"])
+            if linha["regime"] == "padrao":
+                origem = consolidado.loc[chave]
+                encaminhados, detectados = origem["vp"] + origem["fp"], origem["vp"]
+            else:
+                origem = equiparado.loc[chave]
+                encaminhados = origem["encaminhados"]
+                detectados = origem["casos_detectados"]
+            regime = linha["regime"]
+            assert linha[f"encaminhados_{sufixo}"] == encaminhados, (chave, regime)
+            assert linha[f"detectados_{sufixo}"] == detectados, (chave, regime)
+
+
+# ---------------------------------------------------------------------------
+# Curvas
+# ---------------------------------------------------------------------------
+
+def _area_roc(curva: pd.DataFrame) -> float:
+    """Trapézio sobre os pontos, na ordem em que `roc_curve` os devolve."""
+    return float(np.trapezoid(curva["tpr"], curva["fpr"]))
+
+
+def _area_pr(curva: pd.DataFrame) -> float:
+    """Soma em degrau `Σ (recall_n − recall_{n−1}) · precisao_n`, recall crescente.
+
+    É a definição de `average_precision`. Trapézio sobre os mesmos pontos dá outro
+    número, e a guarda falharia sem haver defeito.
+    """
+    recall = curva["recall"].to_numpy()[::-1]
+    precisao = curva["precisao"].to_numpy()[::-1]
+    return float(np.sum(np.diff(recall) * precisao[1:]))
+
+
+def test_curvas_cobrem_as_cinco_celulas_calibraveis():
+    """As cinco células calibráveis, e nenhum comparador de corte único (D-023)."""
+    calibraveis = {c for c in xp.composicao_esperada() if c[1] != xp.SEM_CONJUNTO}
+    assert len(calibraveis) == 5
+    colunas = {
+        xp.NOME_CURVA_ROC: ["modelo", "conjunto", "fpr", "tpr", "limiar"],
+        xp.NOME_CURVA_PR: ["modelo", "conjunto", "precisao", "recall", "limiar"],
+        xp.NOME_DECIS: ["modelo", "conjunto", "decil", "n", "prob_media",
+                        "freq_observada"],
+    }
+    for nome, esperadas in colunas.items():
+        tabela = _versionado(nome)
+        assert list(tabela.columns) == esperadas, nome
+        celulas = set(zip(tabela["modelo"], tabela["conjunto"]))
+        assert celulas == calibraveis, f"{nome}: {sorted(celulas ^ calibraveis)}"
+
+
+def test_area_da_curva_roc_versionada_reproduz_a_auc_publicada():
+    curva = _versionado(xp.NOME_CURVA_ROC)
+    consolidado = _versionado(xp.NOME_CONSOLIDADO).set_index(["modelo", "conjunto"])
+    for chave, pontos in curva.groupby(["modelo", "conjunto"]):
+        publicada = round(consolidado.loc[chave, "auc_roc"], 3)
+        assert round(_area_roc(pontos), 3) == publicada, chave
+
+
+def test_soma_em_degrau_da_curva_pr_versionada_reproduz_a_pr_auc_publicada():
+    curva = _versionado(xp.NOME_CURVA_PR)
+    consolidado = _versionado(xp.NOME_CONSOLIDADO).set_index(["modelo", "conjunto"])
+    for chave, pontos in curva.groupby(["modelo", "conjunto"]):
+        publicada = round(consolidado.loc[chave, "pr_auc"], 3)
+        assert round(_area_pr(pontos), 3) == publicada, chave
+
+
+def test_curvas_do_grid_reproduzem_as_areas_recalculadas(particao, grid_dois_conjuntos):
+    """Sobre os escores em memória, as duas áreas fecham em 1e-6 com o scikit-learn."""
+    tabelas = xp.curvas(grid_dois_conjuntos, particao)
+    for r in [r for r in grid_dois_conjuntos if r["limiar_calibrado"]]:
+        chave = (r["modelo"], r["conjunto"])
+        for nome, area, metrica in ((xp.NOME_CURVA_ROC, _area_roc, "auc_roc"),
+                                    (xp.NOME_CURVA_PR, _area_pr, "pr_auc")):
+            tabela = tabelas[nome]
+            pontos = tabela[(tabela["modelo"] == chave[0])
+                            & (tabela["conjunto"] == chave[1])]
+            assert area(pontos) == pytest.approx(r[metrica], abs=1e-6), (chave, metrica)
+
+
+def test_calibracao_decis_reproduz_o_decimo_decil_de_d040():
+    """No décimo decil a floresta prediz 0,713 e observa 0,253 em A, 0,743 e 0,229 em B."""
+    decis = _versionado(xp.NOME_DECIS)
+    floresta = decis[(decis["modelo"] == xp.NOME_FLORESTA) & (decis["decil"] == 10)]
+    floresta = floresta.set_index("conjunto")
+    esperado = {"A_atomico": (0.713, 0.253), "B_composto": (0.743, 0.229)}
+    for conjunto, (predito, observado) in esperado.items():
+        assert round(floresta.loc[conjunto, "prob_media"], 3) == predito, conjunto
+        assert round(floresta.loc[conjunto, "freq_observada"], 3) == observado, conjunto
+
+
+def test_todo_tex_versionado_tem_csv_irmao():
+    """O painel só lê CSV, então número que existe só em LaTeX não chega à tela (D-055).
+
+    As âncoras ficam de fora: são congeladas, e a conferência as lê como LaTeX de
+    propósito, porque é o formato em que foram publicadas.
+    """
+    if not cfg.PATH_TABELAS.exists():
+        pytest.skip(f"Diretório de tabelas ausente em {cfg.PATH_TABELAS}.")
+    sem_irmao = sorted(
+        tex.name for tex in cfg.PATH_TABELAS.glob("*.tex")
+        if tex.name not in xp.REFERENCIAS and not tex.with_suffix(".csv").exists()
+    )
+    assert not sem_irmao, f".tex sem .csv: {sem_irmao}"
+
+
+# ---------------------------------------------------------------------------
+# Diretório de saída
+# ---------------------------------------------------------------------------
+
+def _hashes(diretorio: Path) -> dict[str, str]:
+    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(diretorio.iterdir()) if p.is_file()}
+
+
+@pytest.mark.lento
+def test_saida_grava_fora_de_reports_tabelas():
+    """Com `--saida`, a reprodução grava no diretório pedido e não toca no versionado.
+
+    É a execução que o painel dispara ao vivo. Sem esta guarda, uma regressão faria a
+    demonstração regravar `reports/tabelas/` no meio da banca, e o diff só apareceria
+    depois (D-054, D-055).
+    """
+    if not cfg.PATH_RAW.exists():
+        pytest.skip(f"CSV bruto ausente em {cfg.PATH_RAW} (não versionado).")
+    antes = _hashes(cfg.PATH_TABELAS)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        processo = subprocess.run(
+            [sys.executable, "-m", "src.experimento", "--saida", tmp],
+            capture_output=True, text=True, encoding="utf-8", timeout=1800,
+            cwd=str(cfg.RAIZ),
+        )
+        log = processo.stdout[-3000:] + processo.stderr[-3000:]
+        assert processo.returncode == 0, log
+        assert "Composição conferida" in processo.stdout, log
+        assert "Reprodução conferida" in processo.stdout, log
+
+        emitidos = {p.name for p in Path(tmp).iterdir() if p.is_file()}
+        for nome in (xp.NOME_CONSOLIDADO, xp.NOME_CUSTO_MARGINAL, xp.NOME_CURVA_ROC):
+            assert f"{nome}.csv" in emitidos, f"{nome}.csv ausente de {tmp}"
+
+    depois = _hashes(cfg.PATH_TABELAS)
+    alterados = sorted(n for n in antes.keys() | depois.keys()
+                       if antes.get(n) != depois.get(n))
+    assert not alterados, f"reports/tabelas/ mudou durante a execução: {alterados}"
