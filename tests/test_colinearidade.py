@@ -347,13 +347,38 @@ def test_resumo_e_exportacao_latex(split, tmp_path):
     resumo = col.resumo_por_conjunto(tabela)
 
     assert list(resumo["feature_set"]) == sorted(ft.FEATURE_SETS)
-    assert {"colunas", "vif_maximo", "vif_mediano", "acima_do_limiar"} <= set(resumo)
+    assert {"colunas", "vif_maximo", "vif_mediano", "acima_do_limiar",
+            "limiar_vif"} <= set(resumo)
+    assert (resumo["limiar_vif"] == cfg.VIF_LIMIAR).all()
 
     destino = col.exportar_latex(resumo, "vif_resumo.tex", path_reports=tmp_path)
     conteudo = destino.read_text(encoding="utf-8")
     assert destino.exists()
     assert "tabular" in conteudo
     assert "A_atomico" in conteudo
+
+
+def test_limiar_versionado_decide_acima_do_limiar():
+    """`acima_do_limiar` do comparativo é `vif > limiar_vif` do resumo, linha a linha.
+
+    O painel mostra o limiar ao lado da contagem. Se os dois CSV discordarem, a tela
+    exibe um corte que não foi o usado.
+    """
+    caminho_vif = cfg.PATH_TABELAS / "vif_comparativo.csv"
+    caminho_resumo = cfg.PATH_TABELAS / "vif_resumo.csv"
+    for caminho in (caminho_vif, caminho_resumo):
+        if not caminho.exists():
+            pytest.skip(f"Artefato ausente em {caminho}. Rode make notebook antes.")
+    resumo = pd.read_csv(caminho_resumo)
+    vif = pd.read_csv(caminho_vif).merge(
+        resumo[["feature_set", "limiar_vif"]], on="feature_set", how="left",
+        validate="many_to_one")
+
+    assert (resumo["limiar_vif"] == cfg.VIF_LIMIAR).all()
+    assert vif["limiar_vif"].notna().all()
+    assert (vif["acima_do_limiar"] == (vif["vif"] > vif["limiar_vif"])).all()
+    contagem = vif.groupby("feature_set")["acima_do_limiar"].sum()
+    assert (resumo.set_index("feature_set")["acima_do_limiar"] == contagem).all()
 
 
 def test_decomposicao_versionada_reproduz_os_dois_r2():

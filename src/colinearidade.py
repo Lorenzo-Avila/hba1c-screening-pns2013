@@ -331,8 +331,12 @@ def tabela_comparativa(X_train: pd.DataFrame, y_train=None,
 
 
 def resumo_por_conjunto(tabela: pd.DataFrame) -> pd.DataFrame:
-    """Condensa a tabela de VIF em uma linha por conjunto de atributos."""
-    return (
+    """Condensa a tabela de VIF em uma linha por conjunto de atributos.
+
+    `limiar_vif` repete em cada linha o corte que decide `acima_do_limiar`, para que
+    o CSV diga contra o que a contagem foi feita (D-055).
+    """
+    resumo = (
         tabela.groupby("feature_set")
         .agg(
             colunas=("variavel", "count"),
@@ -342,6 +346,8 @@ def resumo_por_conjunto(tabela: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index()
     )
+    resumo["limiar_vif"] = cfg.VIF_LIMIAR
+    return resumo
 
 
 def ablacao_vif(X_train: pd.DataFrame, y_train=None,

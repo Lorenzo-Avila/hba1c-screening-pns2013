@@ -693,23 +693,25 @@ def mcnemar_pareado(y_te, resultado_a: dict, resultado_b: dict) -> dict:
             `limiar`.
 
     Returns:
-        Dicionário com `tabela` (a 2x2 de acertos), `p_valor`, as contagens de
-        discordância e, entre os positivos reais, quantos cada modelo detecta que o
-        outro perde.
+        Dicionário com `tabela` (a 2x2 de acertos), `p_valor`, as quatro células da
+        2x2 como contagens soltas, o total de positivos do teste e, entre esses
+        positivos, quantos cada modelo detecta que o outro perde.
     """
     y_te = np.asarray(y_te)
     pred_a = (np.asarray(resultado_a["proba_teste"]) >= resultado_a["limiar"]).astype(int)
     pred_b = (np.asarray(resultado_b["proba_teste"]) >= resultado_b["limiar"]).astype(int)
 
     acerta_a, acerta_b = pred_a == y_te, pred_b == y_te
+    ambos_acertam = int(np.sum(acerta_a & acerta_b))
+    ambos_erram = int(np.sum(~acerta_a & ~acerta_b))
     so_a = int(np.sum(acerta_a & ~acerta_b))
     so_b = int(np.sum(~acerta_a & acerta_b))
 
     rotulo_a = _rotulo_resultado(resultado_a)
     rotulo_b = _rotulo_resultado(resultado_b)
     tabela = pd.DataFrame(
-        [[int(np.sum(acerta_a & acerta_b)), so_a],
-         [so_b, int(np.sum(~acerta_a & ~acerta_b))]],
+        [[ambos_acertam, so_a],
+         [so_b, ambos_erram]],
         index=[f"{rotulo_a} acerta", f"{rotulo_a} erra"],
         columns=[f"{rotulo_b} acerta", f"{rotulo_b} erra"],
     )
@@ -724,7 +726,10 @@ def mcnemar_pareado(y_te, resultado_a: dict, resultado_b: dict) -> dict:
         "modelo_b": rotulo_b,
         "tabela": tabela,
         "n": int(len(y_te)),
+        "positivos_teste": int(np.sum(positivo)),
         "concordam": int(np.sum(acerta_a == acerta_b)),
+        "ambos_acertam": ambos_acertam,
+        "ambos_erram": ambos_erram,
         "discordantes": discordantes,
         "so_a_acerta": so_a,
         "so_b_acerta": so_b,
@@ -745,7 +750,11 @@ def _rotulo_resultado(resultado: dict) -> str:
 
 
 def tabela_mcnemar(teste: dict) -> pd.DataFrame:
-    """A saída do McNemar em uma linha, pronta para virar artefato."""
+    """A saída do McNemar em uma linha, pronta para virar artefato.
+
+    Leva as quatro células da 2x2 e o total de positivos como colunas próprias, para
+    que quem lê o CSV não precise somar nada (D-055).
+    """
     return pd.DataFrame([{
         "modelo_a": teste["modelo_a"],
         "modelo_b": teste["modelo_b"],
@@ -756,6 +765,10 @@ def tabela_mcnemar(teste: dict) -> pd.DataFrame:
         "positivos_so_a_detecta": teste["positivos_so_a_detecta"],
         "positivos_so_b_detecta": teste["positivos_so_b_detecta"],
         "p_valor": teste["p_valor"],
+        "ambos_acertam": teste["ambos_acertam"],
+        "ambos_erram": teste["ambos_erram"],
+        "discordancias": teste["discordantes"],
+        "positivos_teste": teste["positivos_teste"],
     }])
 
 

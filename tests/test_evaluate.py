@@ -562,6 +562,46 @@ def test_mcnemar_usa_o_limiar_de_cada_modelo():
     assert teste["positivos_so_a_detecta"] == 0
 
 
+def _conferir_identidades_mcnemar(linha) -> None:
+    """As quatro células da 2x2 fecham as contagens agregadas da mesma linha."""
+    assert linha["concordam"] == linha["ambos_acertam"] + linha["ambos_erram"]
+    assert linha["discordancias"] == linha["so_a_acerta"] + linha["so_b_acerta"]
+    assert linha["concordam"] + linha["discordancias"] == linha["n"]
+
+
+def test_linha_do_mcnemar_fecha_as_identidades_da_2x2():
+    """A linha do artefato traz as células que a 2x2 mostra, e elas somam certo.
+
+    Dado sorteado em vez de montado à mão, para que nenhuma célula fique zerada por
+    construção e esconda uma troca de coluna.
+    """
+    rng = np.random.default_rng(cfg.RANDOM_STATE)
+    y = rng.integers(0, 2, size=200)
+    a = {"modelo": "A", "conjunto": "", "limiar": 0.5, "proba_teste": rng.random(200)}
+    b = {"modelo": "B", "conjunto": "", "limiar": 0.4, "proba_teste": rng.random(200)}
+
+    teste = ev.mcnemar_pareado(y, a, b)
+    linha = ev.tabela_mcnemar(teste).iloc[0]
+
+    _conferir_identidades_mcnemar(linha)
+    assert linha["positivos_teste"] == int(y.sum())
+    assert linha["ambos_acertam"] == teste["tabela"].iloc[0, 0]
+    assert linha["ambos_erram"] == teste["tabela"].iloc[1, 1]
+    assert min(linha[["ambos_acertam", "ambos_erram",
+                      "so_a_acerta", "so_b_acerta"]]) > 0
+
+
+def test_mcnemar_versionado_fecha_as_identidades_da_2x2():
+    """O artefato que o painel lê cumpre as mesmas identidades que a função."""
+    caminho = cfg.PATH_TABELAS / "mcnemar_pareado.csv"
+    if not caminho.exists():
+        pytest.skip(f"Artefato ausente em {caminho}. Rode make resultados antes.")
+    linha = pd.read_csv(caminho).iloc[0]
+    _conferir_identidades_mcnemar(linha)
+    assert linha["positivos_so_a_detecta"] + linha["positivos_so_b_detecta"] \
+        <= linha["positivos_teste"]
+
+
 # ---------------------------------------------------------------------------
 # Curvas: a função que desenha é a que grava
 # ---------------------------------------------------------------------------
