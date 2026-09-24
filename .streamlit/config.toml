@@ -1,0 +1,10 @@
+# O painel roda sem rede: sem telemetria e sem tema carregado de fora.
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+
+# Só localhost: sem escutar na rede e sem consultar o IP externo na partida.
+[server]
+address = "localhost"

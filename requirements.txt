@@ -1,3 +1,4 @@
+altair==6.3.0
 anyio==4.15.1
 argon2-cffi==25.1.0
 argon2-cffi-bindings==26.1.0
@@ -103,6 +104,7 @@ six==1.17.0
 slicer==0.0.8
 soupsieve==2.9.2
 stack-data==0.6.3
+streamlit==1.64.0
 terminado==0.18.1
 threadpoolctl==3.7.0
 tinycss2==1.5.1

@@ -7,7 +7,7 @@
 
 PYTHON ?= python
 
-.PHONY: tudo test test-rapido resultados figuras shap notebook limpar ajuda
+.PHONY: tudo test test-rapido resultados figuras shap notebook painel limpar ajuda
 
 ## tudo — suíte de testes e reprodução completa, na ordem em que importam
 tudo: test resultados notebook
@@ -47,6 +47,12 @@ shap:
 ##   equivale a: jupyter nbconvert --execute --to notebook --inplace notebooks/03_resultados.ipynb
 notebook:
 	$(PYTHON) -m jupyter nbconvert --execute --to notebook --inplace notebooks/03_resultados.ipynb
+
+## painel: painel de resultados sobre os CSV de reports/tabelas/, em localhost.
+## Lê artefato versionado e não calcula nada (D-054).
+##   equivale a: streamlit run painel/app.py
+painel:
+	$(PYTHON) -m streamlit run painel/app.py
 
 ## limpar — remove os artefatos gerados, preservando os .tex versionados
 limpar:
