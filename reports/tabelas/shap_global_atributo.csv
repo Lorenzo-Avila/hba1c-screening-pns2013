@@ -1,47 +1,47 @@
-celula,regime,objeto_explicado,atributo,shap_medio_abs,posicao,n_colunas,categoria_referencia_omitida
-A_atomico,tree_path_dependent,floresta completa,idade,0.092460084,1,1,
-A_atomico,tree_path_dependent,floresta completa,circ_cintura,0.074803925,2,1,
-A_atomico,tree_path_dependent,floresta completa,has_autorrelato,0.050175009,3,2,1
-A_atomico,tree_path_dependent,floresta completa,imc,0.041834632,4,1,
-A_atomico,tree_path_dependent,floresta completa,pas,0.041274224,5,1,
-A_atomico,tree_path_dependent,floresta completa,saude_autoaval,0.033606138,6,1,
-A_atomico,tree_path_dependent,floresta completa,colesterol_alto,0.01832953,7,1,1
-A_atomico,tree_path_dependent,floresta completa,escolaridade,0.01408438,8,1,
-A_atomico,tree_path_dependent,floresta completa,pad,0.013393895,9,1,
-A_atomico,tree_path_dependent,floresta completa,regiao,0.010428035,10,4,1
-A_atomico,tree_path_dependent,floresta completa,sexo_fem,0.010152219,11,1,
-A_atomico,tree_path_dependent,floresta completa,raca_cor,0.007924635,12,4,1
-A_atomico,tree_path_dependent,floresta completa,plano_sim,0.002516563,13,1,
-A_atomico,interventional,floresta reduzida (diagnostico),idade,0.077799879,1,1,
-A_atomico,interventional,floresta reduzida (diagnostico),circ_cintura,0.056826002,2,1,
-A_atomico,interventional,floresta reduzida (diagnostico),has_autorrelato,0.032199337,3,2,1
-A_atomico,interventional,floresta reduzida (diagnostico),imc,0.029789294,4,1,
-A_atomico,interventional,floresta reduzida (diagnostico),pas,0.027934909,5,1,
-A_atomico,interventional,floresta reduzida (diagnostico),saude_autoaval,0.023805273,6,1,
-A_atomico,interventional,floresta reduzida (diagnostico),colesterol_alto,0.015878651,7,1,1
-A_atomico,interventional,floresta reduzida (diagnostico),regiao,0.00947602,8,4,1
-A_atomico,interventional,floresta reduzida (diagnostico),raca_cor,0.008325505,9,4,1
-A_atomico,interventional,floresta reduzida (diagnostico),sexo_fem,0.008231509,10,1,
-A_atomico,interventional,floresta reduzida (diagnostico),escolaridade,0.008043111,11,1,
-A_atomico,interventional,floresta reduzida (diagnostico),pad,0.00688503,12,1,
-A_atomico,interventional,floresta reduzida (diagnostico),plano_sim,0.002346422,13,1,
-B_composto,tree_path_dependent,floresta completa,idade,0.105836194,1,1,
-B_composto,tree_path_dependent,floresta completa,circ_cintura,0.078198929,2,1,
-B_composto,tree_path_dependent,floresta completa,multimorbidade,0.069853276,3,1,
-B_composto,tree_path_dependent,floresta completa,imc,0.047081362,4,1,
-B_composto,tree_path_dependent,floresta completa,saude_autoaval,0.041069428,5,1,
-B_composto,tree_path_dependent,floresta completa,escolaridade,0.016933613,6,1,
-B_composto,tree_path_dependent,floresta completa,regiao,0.014642434,7,4,1
-B_composto,tree_path_dependent,floresta completa,raca_cor,0.011153082,8,4,1
-B_composto,tree_path_dependent,floresta completa,sexo_fem,0.010208304,9,1,
-B_composto,tree_path_dependent,floresta completa,plano_sim,0.00341421,10,1,
-B_composto,interventional,floresta reduzida (diagnostico),idade,0.089005773,1,1,
-B_composto,interventional,floresta reduzida (diagnostico),circ_cintura,0.057110878,2,1,
-B_composto,interventional,floresta reduzida (diagnostico),multimorbidade,0.044836426,3,1,
-B_composto,interventional,floresta reduzida (diagnostico),imc,0.032187738,4,1,
-B_composto,interventional,floresta reduzida (diagnostico),saude_autoaval,0.030935455,5,1,
-B_composto,interventional,floresta reduzida (diagnostico),regiao,0.013672571,6,4,1
-B_composto,interventional,floresta reduzida (diagnostico),raca_cor,0.01107385,7,4,1
-B_composto,interventional,floresta reduzida (diagnostico),escolaridade,0.009519673,8,1,
-B_composto,interventional,floresta reduzida (diagnostico),sexo_fem,0.008096664,9,1,
-B_composto,interventional,floresta reduzida (diagnostico),plano_sim,0.00324253,10,1,
+celula,regime,objeto_explicado,atributo,shap_medio_abs,posicao,n_colunas,categoria_referencia_omitida,modelo
+A_atomico,tree_path_dependent,floresta completa,idade,0.092460084,1,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,circ_cintura,0.074803925,2,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,has_autorrelato,0.050175009,3,2,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,imc,0.041834632,4,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,pas,0.041274224,5,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,saude_autoaval,0.033606138,6,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,colesterol_alto,0.01832953,7,1,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,escolaridade,0.01408438,8,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,pad,0.013393895,9,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,regiao,0.010428035,10,4,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,sexo_fem,0.010152219,11,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,raca_cor,0.007924635,12,4,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,plano_sim,0.002516563,13,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),idade,0.077799879,1,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),circ_cintura,0.056826002,2,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),has_autorrelato,0.032199337,3,2,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),imc,0.029789294,4,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),pas,0.027934909,5,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),saude_autoaval,0.023805273,6,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),colesterol_alto,0.015878651,7,1,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),regiao,0.00947602,8,4,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),raca_cor,0.008325505,9,4,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),sexo_fem,0.008231509,10,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),escolaridade,0.008043111,11,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),pad,0.00688503,12,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),plano_sim,0.002346422,13,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,idade,0.105836194,1,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,circ_cintura,0.078198929,2,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,multimorbidade,0.069853276,3,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,imc,0.047081362,4,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,saude_autoaval,0.041069428,5,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,escolaridade,0.016933613,6,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,regiao,0.014642434,7,4,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,raca_cor,0.011153082,8,4,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,sexo_fem,0.010208304,9,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,plano_sim,0.00341421,10,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),idade,0.089005773,1,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),circ_cintura,0.057110878,2,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),multimorbidade,0.044836426,3,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),imc,0.032187738,4,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),saude_autoaval,0.030935455,5,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),regiao,0.013672571,6,4,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),raca_cor,0.01107385,7,4,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),escolaridade,0.009519673,8,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),sexo_fem,0.008096664,9,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),plano_sim,0.00324253,10,1,,Random Forest

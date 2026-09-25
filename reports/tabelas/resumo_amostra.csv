@@ -6,3 +6,8 @@ Excluídas: bloco de medição integralmente ausente,-90,
 Amostra analítica,8451,
 "Positivos (HbA1c ≥ 6,5%)",593,0.070169211
 Prevalência ponderada por peso_lab (descritiva),,0.063574795
+Treino,6760,
+Teste,1691,
+Negativos,7858,
+Prevalência no treino,474,0.070118343
+Prevalência no teste,119,0.070372561

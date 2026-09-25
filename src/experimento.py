@@ -243,6 +243,39 @@ def celula(resultados: list[dict], modelo: str,
     )
 
 
+def encaminhamento(resultado: dict) -> tuple[int, float]:
+    """Encaminhados e taxa de encaminhamento de um resultado, sobre o teste inteiro.
+
+    Encaminhado é quem o ponto de operação manda a exame, `vp + fp`. A carga
+    operacional, o regime equiparado e a tabela consolidada leem daqui, para que as
+    três tabelas publiquem o mesmo número.
+    """
+    total = resultado["vp"] + resultado["vn"] + resultado["fp"] + resultado["fn"]
+    encaminhados = resultado["vp"] + resultado["fp"]
+    return encaminhados, encaminhados / total
+
+
+def consolidar(resultados: list[dict]) -> pd.DataFrame:
+    """A tabela consolidada: `evaluate.comparar` e as colunas que o painel lê prontas.
+
+    As colunas novas entram no fim, e as de `comparar` saem como sempre saíram:
+    `encaminhados` e `taxa_encaminhamento` de `encaminhamento`; `referencia_d030`,
+    verdadeira só na célula que `modelo_de_referencia` elege (D-030); `fpr`, a taxa
+    de falsos positivos no ponto de operação; e `recall_alvo`, o alvo com que o limiar
+    foi calibrado, vazio nos comparadores de limiar fixo, que não miram alvo nenhum.
+    """
+    tabela = ev.comparar(resultados)
+    referencia = modelo_de_referencia(resultados)
+    carga = [encaminhamento(r) for r in resultados]
+    tabela["encaminhados"] = [enc for enc, _ in carga]
+    tabela["taxa_encaminhamento"] = [taxa for _, taxa in carga]
+    tabela["referencia_d030"] = [r is referencia for r in resultados]
+    tabela["fpr"] = [r["fp"] / (r["fp"] + r["vn"]) for r in resultados]
+    tabela["recall_alvo"] = [r["recall_alvo"] if r.get("limiar_calibrado", True)
+                             else float("nan") for r in resultados]
+    return tabela
+
+
 def modelo_de_referencia(resultados: list[dict]) -> dict:
     """O resultado de menor NNS entre os estimadores calibráveis.
 
@@ -308,12 +341,11 @@ def carga_operacional(resultados: list[dict],
 
     linhas = []
     for r in (regra, equiparado, padrao):
-        total = r["vp"] + r["vn"] + r["fp"] + r["fn"]
-        encaminhados = r["vp"] + r["fp"]
+        encaminhados, taxa = encaminhamento(r)
         linhas.append({
             "regime": rotulos[id(r)],
             "encaminhados": encaminhados,
-            "taxa_encaminhamento": encaminhados / total,
+            "taxa_encaminhamento": taxa,
             "casos_detectados": r["vp"],
             "casos_perdidos": r["fn"],
             "recall": r["recall"],
@@ -353,8 +385,9 @@ def equiparado_por_modelo(resultados: list[dict],
     Returns:
         DataFrame com uma linha por célula calibrável mais a da regra, trazendo
         `recall_alvo`, `recall_obtido`, `recall_regra`, `encaminhados`,
-        `casos_detectados` e `nns`. A linha da regra vai primeiro, e tem `recall_alvo`
-        ausente: ela opera em limiar fixo e não mira alvo nenhum.
+        `casos_detectados`, `nns`, `cumpre_criterio` e `taxa_encaminhamento`. A linha
+        da regra vai primeiro, e tem `recall_alvo` e `cumpre_criterio` vazios: ela
+        opera em limiar fixo, não mira alvo nenhum e não se compara consigo mesma.
     """
     regra = next((r for r in resultados if r["modelo"] == nome_regra), None)
     if regra is None:
@@ -364,6 +397,11 @@ def equiparado_por_modelo(resultados: list[dict],
     disponiveis = md.estimadores()
 
     def linha(r: dict, recall_alvo: float) -> dict:
+        # O critério é o mesmo de `veredito_do_criterio`, célula a célula. Na linha da
+        # regra fica vazio.
+        cumpre = (pd.NA if r is regra else
+                  bm.cumpre_o_criterio(r["recall"] - regra["recall"],
+                                       r["nns"] - regra["nns"]))
         return {
             "estrategia": _rotulo(r),
             "modelo": r["modelo"],
@@ -378,6 +416,8 @@ def equiparado_por_modelo(resultados: list[dict],
             "encaminhados": r["vp"] + r["fp"],
             "casos_detectados": r["vp"],
             "nns": r["nns"],
+            "cumpre_criterio": cumpre,
+            "taxa_encaminhamento": encaminhamento(r)[1],
         }
 
     linhas = [linha(regra, float("nan"))]
@@ -395,6 +435,7 @@ def equiparado_por_modelo(resultados: list[dict],
         linhas.append(linha(equiparado, alvo))
 
     tabela = pd.DataFrame(linhas)
+    tabela["cumpre_criterio"] = tabela["cumpre_criterio"].astype("boolean")
     tabela.attrs["nota"] = bm.NOTA_EQUIPARACAO
     return tabela
 
@@ -543,7 +584,7 @@ def veredito_do_criterio(carga: pd.DataFrame,
             "nns": r["nns"],
             "nns_regra": referencia["nns"],
             "delta_nns": delta_nns,
-            "cumpre": bool(delta_recall > 0 and delta_nns < 0),
+            "cumpre": bm.cumpre_o_criterio(delta_recall, delta_nns),
         })
     return pd.DataFrame(linhas)
 
@@ -679,9 +720,10 @@ def exportar_descritivas(particao: Particao,
 
     O quadro da amostra traz as duas prevalências, a amostral e a ponderada por
     `peso_lab`. A ponderada é estimativa de parâmetro populacional e vive só na
-    descrição da amostra; nenhum estimador a enxerga (D-009, D-031). As contagens de
-    ausentes são as que o `KNNImputer` vai tratar, e a coluna do treino é a que vale,
-    porque é onde a imputação ajusta (D-011).
+    descrição da amostra; nenhum estimador a enxerga (D-009, D-031). O quadro traz
+    também o tamanho e a prevalência de cada lado da partição, a mesma que o grid usa.
+    As contagens de ausentes são as que o `KNNImputer` vai tratar, e a coluna do
+    treino é a que vale, porque é onde a imputação ajusta (D-011).
 
     Args:
         analitico: base limpa. Omitida, relê o CSV bruto. Passe a sua se já tiver uma
@@ -690,8 +732,10 @@ def exportar_descritivas(particao: Particao,
     """
     analitico = dt.carregar_analitico() if analitico is None else analitico
     return {
-        NOME_RESUMO: exportar(dt.resumo_amostra(analitico), NOME_RESUMO, nota="",
-                              destino=destino),
+        NOME_RESUMO: exportar(
+            dt.resumo_amostra(analitico, y_tr=particao.y_tr, y_te=particao.y_te),
+            NOME_RESUMO, nota="", destino=destino,
+        ),
         NOME_AUSENTES: exportar(
             dt.ausentes_por_variavel(analitico, treino=particao.X_tr),
             NOME_AUSENTES, nota="", destino=destino,
@@ -885,7 +929,7 @@ def executar(modelos: list[str] | None = None,
     resultados = compor_grid(modelos, conjuntos, particao=particao,
                              salvar_figuras=salvar_figuras, path_figuras=figuras)
 
-    consolidado = ev.comparar(resultados)
+    consolidado = consolidar(resultados)
     carga = carga_operacional(resultados, particao)
     equiparado = equiparado_por_modelo(resultados, particao)
 
@@ -895,7 +939,9 @@ def executar(modelos: list[str] | None = None,
     calibracao = ev.tabela_calibracao_comparada(resultados)
 
     artefatos = {
-        NOME_CONSOLIDADO: exportar(consolidado, NOME_CONSOLIDADO, destino=destino),
+        # `na_rep`: `recall_alvo` fica vazio nos comparadores de limiar fixo.
+        NOME_CONSOLIDADO: exportar(consolidado, NOME_CONSOLIDADO, destino=destino,
+                                   na_rep=SEM_CONJUNTO),
         NOME_CARGA: exportar(carga, NOME_CARGA, destino=destino),
         # `na_rep`: a linha da regra não tem alvo, e um "NaN" impresso numa tabela
         # que vai para o LaTeX lê como falha de geração, não como célula vazia.

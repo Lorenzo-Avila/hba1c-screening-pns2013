@@ -677,6 +677,15 @@ def medir_celula(celula: str, particao: xp.Particao) -> dict:
 # Tabelas
 # ---------------------------------------------------------------------------
 
+def _com_modelo(tabela: pd.DataFrame) -> pd.DataFrame:
+    """Acrescenta ao fim a coluna `modelo`, com o estimador que as atribuições explicam.
+
+    O módulo explica só a floresta publicada, e a coluna diz isso no próprio artefato:
+    quem lê o CSV fora do contexto não precisa adivinhar de qual modelo é o ranking.
+    """
+    return tabela.assign(modelo=MODELO)
+
+
 def tabela_global_atributo(medidas: list[dict],
                            chaves: list[tuple[str, str]] | None = None) -> pd.DataFrame:
     """Uma linha por célula, regime e variável conceitual.
@@ -697,7 +706,7 @@ def tabela_global_atributo(medidas: list[dict],
             partes.append(ranking)
     colunas = ["celula", "regime", "objeto_explicado", "atributo", "shap_medio_abs",
                "posicao", "n_colunas", "categoria_referencia_omitida"]
-    return pd.concat(partes, ignore_index=True)[colunas]
+    return _com_modelo(pd.concat(partes, ignore_index=True)[colunas])
 
 
 def concordancia_topo(tabela: pd.DataFrame,
@@ -750,6 +759,7 @@ def concordancia_topo(tabela: pd.DataFrame,
                 "topo_coincidente": k,
                 "n_atributos": len(esquerda),
                 "atributos_no_topo": ", ".join(esquerda[:k]),
+                "modelo": MODELO,
             })
     return pd.DataFrame(linhas)
 
@@ -767,7 +777,7 @@ def tabela_global_coluna(medidas: list[dict]) -> pd.DataFrame:
             partes.append(ranking)
     colunas = ["celula", "regime", "objeto_explicado", "coluna", "atributo",
                "shap_medio_abs", "posicao", "categoria_referencia_omitida"]
-    return pd.concat(partes, ignore_index=True)[colunas]
+    return _com_modelo(pd.concat(partes, ignore_index=True)[colunas])
 
 
 def tabela_pares_colineares(medidas: list[dict]) -> pd.DataFrame:
@@ -809,6 +819,7 @@ def tabela_pares_colineares(medidas: list[dict]) -> pd.DataFrame:
                                             else float("nan")),
                         "membro_dominante": maior,
                         "razao_maior_menor": razao,
+                        "modelo": MODELO,
                     })
     return pd.DataFrame(linhas)
 
@@ -850,8 +861,15 @@ def tabela_casos_locais(medidas: list[dict]) -> pd.DataFrame:
                     "valor_observado": float(
                         clinicos.loc[int(caso["indice"]), atributo]
                     ),
+                    "modelo": MODELO,
                 })
-    return pd.DataFrame(linhas)
+
+    # O mesmo índice nas duas células é o mesmo indivíduo: as duas usam a mesma
+    # partição. A marca evita que o painel apresente como dois casos quem é um só.
+    tabela = pd.DataFrame(linhas)
+    celulas_do_indice = tabela.groupby("indice")["celula"].transform("nunique")
+    tabela["indice_nas_duas_celulas"] = celulas_do_indice > 1
+    return tabela
 
 
 def _tres_significativos(valor: float) -> float:

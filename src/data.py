@@ -117,7 +117,9 @@ def carregar_analitico(path=None) -> pd.DataFrame:
     return limpar(carregar_bruto(path))
 
 
-def resumo_amostra(analitico: pd.DataFrame) -> pd.DataFrame:
+def resumo_amostra(analitico: pd.DataFrame,
+                   y_tr: pd.Series | None = None,
+                   y_te: pd.Series | None = None) -> pd.DataFrame:
     """Quadro descritivo: do CSV bruto ao conjunto analítico.
 
     Lê as contagens que `limpar` gravou em `attrs["exclusoes"]` em vez de
@@ -132,6 +134,10 @@ def resumo_amostra(analitico: pd.DataFrame) -> pd.DataFrame:
 
     Args:
         analitico: saída de `limpar` ou `carregar_analitico`.
+        y_tr, y_te: alvo de cada lado do split. Passados os dois, o quadro ganha no
+            fim o tamanho do treino e do teste, os negativos da amostra e a
+            prevalência de cada lado. Contar depois do split não fere R1: a contagem
+            descreve a partição e não entra em nenhum ajuste.
 
     Returns:
         DataFrame com `item`, `n` (Int64, nulo nas linhas de proporção) e
@@ -167,6 +173,15 @@ def resumo_amostra(analitico: pd.DataFrame) -> pd.DataFrame:
         ("Prevalência ponderada por peso_lab (descritiva)",
          None, prevalencia_ponderada),
     ]
+    if y_tr is not None and y_te is not None:
+        positivos_tr, positivos_te = int(y_tr.sum()), int(y_te.sum())
+        linhas += [
+            ("Treino", len(y_tr), None),
+            ("Teste", len(y_te), None),
+            ("Negativos", n_total - positivos, None),
+            ("Prevalência no treino", positivos_tr, positivos_tr / len(y_tr)),
+            ("Prevalência no teste", positivos_te, positivos_te / len(y_te)),
+        ]
     return pd.DataFrame(linhas, columns=["item", "n", "proporcao"]).astype(
         {"n": "Int64", "proporcao": "float64"}
     )

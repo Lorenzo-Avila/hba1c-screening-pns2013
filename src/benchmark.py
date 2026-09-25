@@ -365,6 +365,17 @@ def recall_da_regra_no_treino(X_tr, y_tr, regra=None) -> float:
     return float(recall_score(y_tr, predito, zero_division=0))
 
 
+def cumpre_o_criterio(delta_recall: float, delta_nns: float) -> bool:
+    """Critério de sucesso do projeto sobre os deltas contra a regra clínica.
+
+    Recall maior **e** NNS menor, as duas condições juntas. É a única definição do
+    critério em `src/`: `supera_a_regra_clinica`, `experimento.veredito_do_criterio` e
+    a coluna `cumpre_criterio` do regime equiparado chamam esta função, para que texto,
+    grid e artefato não divirjam (D-046).
+    """
+    return bool(delta_recall > 0 and delta_nns < 0)
+
+
 def supera_a_regra_clinica(resultados: list[dict],
                            nome_regra: str = "Regra ADA") -> pd.DataFrame:
     """Aplica o critério de sucesso do projeto: mais recall **com** NNS menor.
@@ -408,7 +419,7 @@ def supera_a_regra_clinica(resultados: list[dict],
             "nns": r["nns"],
             "nns_regra": regra["nns"],
             "delta_nns": delta_nns,
-            "supera": bool(delta_recall > 0 and delta_nns < 0),
+            "supera": cumpre_o_criterio(delta_recall, delta_nns),
         })
     tabela = pd.DataFrame(linhas)
     tabela.attrs["nota"] = NOTA_EQUIPARACAO

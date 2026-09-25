@@ -1,73 +1,73 @@
-celula,regime,objeto_explicado,coluna,atributo,shap_medio_abs,posicao,categoria_referencia_omitida
-A_atomico,tree_path_dependent,floresta completa,idade,idade,0.092460084,1,
-A_atomico,tree_path_dependent,floresta completa,circ_cintura,circ_cintura,0.074803925,2,
-A_atomico,tree_path_dependent,floresta completa,has_autorrelato_3.0,has_autorrelato,0.049593913,3,1
-A_atomico,tree_path_dependent,floresta completa,imc,imc,0.041834632,4,
-A_atomico,tree_path_dependent,floresta completa,pas,pas,0.041274224,5,
-A_atomico,tree_path_dependent,floresta completa,saude_autoaval,saude_autoaval,0.033606138,6,
-A_atomico,tree_path_dependent,floresta completa,colesterol_alto_2.0,colesterol_alto,0.01832953,7,1
-A_atomico,tree_path_dependent,floresta completa,escolaridade,escolaridade,0.01408438,8,
-A_atomico,tree_path_dependent,floresta completa,pad,pad,0.013393895,9,
-A_atomico,tree_path_dependent,floresta completa,sexo_fem,sexo_fem,0.010152219,10,
-A_atomico,tree_path_dependent,floresta completa,raca_cor_4.0,raca_cor,0.006679863,11,1
-A_atomico,tree_path_dependent,floresta completa,regiao_3.0,regiao,0.003498029,12,1
-A_atomico,tree_path_dependent,floresta completa,regiao_4.0,regiao,0.002644714,13,1
-A_atomico,tree_path_dependent,floresta completa,plano_sim,plano_sim,0.002516563,14,
-A_atomico,tree_path_dependent,floresta completa,regiao_2.0,regiao,0.002326104,15,1
-A_atomico,tree_path_dependent,floresta completa,regiao_5.0,regiao,0.001959188,16,1
-A_atomico,tree_path_dependent,floresta completa,raca_cor_2.0,raca_cor,0.001125456,17,1
-A_atomico,tree_path_dependent,floresta completa,has_autorrelato_2.0,has_autorrelato,0.000581097,18,1
-A_atomico,tree_path_dependent,floresta completa,raca_cor_3.0,raca_cor,0.000104573,19,1
-A_atomico,tree_path_dependent,floresta completa,raca_cor_5.0,raca_cor,1.4743e-05,20,1
-A_atomico,interventional,floresta reduzida (diagnostico),idade,idade,0.077799879,1,
-A_atomico,interventional,floresta reduzida (diagnostico),circ_cintura,circ_cintura,0.056826002,2,
-A_atomico,interventional,floresta reduzida (diagnostico),has_autorrelato_3.0,has_autorrelato,0.031569101,3,1
-A_atomico,interventional,floresta reduzida (diagnostico),imc,imc,0.029789294,4,
-A_atomico,interventional,floresta reduzida (diagnostico),pas,pas,0.027934909,5,
-A_atomico,interventional,floresta reduzida (diagnostico),saude_autoaval,saude_autoaval,0.023805273,6,
-A_atomico,interventional,floresta reduzida (diagnostico),colesterol_alto_2.0,colesterol_alto,0.015878651,7,1
-A_atomico,interventional,floresta reduzida (diagnostico),sexo_fem,sexo_fem,0.008231509,8,
-A_atomico,interventional,floresta reduzida (diagnostico),escolaridade,escolaridade,0.008043111,9,
-A_atomico,interventional,floresta reduzida (diagnostico),raca_cor_4.0,raca_cor,0.007091557,10,1
-A_atomico,interventional,floresta reduzida (diagnostico),pad,pad,0.00688503,11,
-A_atomico,interventional,floresta reduzida (diagnostico),regiao_3.0,regiao,0.002924392,12,1
-A_atomico,interventional,floresta reduzida (diagnostico),regiao_4.0,regiao,0.002558506,13,1
-A_atomico,interventional,floresta reduzida (diagnostico),plano_sim,plano_sim,0.002346422,14,
-A_atomico,interventional,floresta reduzida (diagnostico),regiao_5.0,regiao,0.002302416,15,1
-A_atomico,interventional,floresta reduzida (diagnostico),regiao_2.0,regiao,0.001690706,16,1
-A_atomico,interventional,floresta reduzida (diagnostico),raca_cor_2.0,raca_cor,0.001109434,17,1
-A_atomico,interventional,floresta reduzida (diagnostico),has_autorrelato_2.0,has_autorrelato,0.000630236,18,1
-A_atomico,interventional,floresta reduzida (diagnostico),raca_cor_3.0,raca_cor,0.000118625,19,1
-A_atomico,interventional,floresta reduzida (diagnostico),raca_cor_5.0,raca_cor,5.888e-06,20,1
-B_composto,tree_path_dependent,floresta completa,idade,idade,0.105836194,1,
-B_composto,tree_path_dependent,floresta completa,circ_cintura,circ_cintura,0.078198929,2,
-B_composto,tree_path_dependent,floresta completa,multimorbidade,multimorbidade,0.069853276,3,
-B_composto,tree_path_dependent,floresta completa,imc,imc,0.047081362,4,
-B_composto,tree_path_dependent,floresta completa,saude_autoaval,saude_autoaval,0.041069428,5,
-B_composto,tree_path_dependent,floresta completa,escolaridade,escolaridade,0.016933613,6,
-B_composto,tree_path_dependent,floresta completa,sexo_fem,sexo_fem,0.010208304,7,
-B_composto,tree_path_dependent,floresta completa,raca_cor_4.0,raca_cor,0.009656683,8,1
-B_composto,tree_path_dependent,floresta completa,regiao_3.0,regiao,0.006067907,9,1
-B_composto,tree_path_dependent,floresta completa,plano_sim,plano_sim,0.00341421,10,
-B_composto,tree_path_dependent,floresta completa,regiao_4.0,regiao,0.003316734,11,1
-B_composto,tree_path_dependent,floresta completa,regiao_2.0,regiao,0.003149425,12,1
-B_composto,tree_path_dependent,floresta completa,regiao_5.0,regiao,0.002108368,13,1
-B_composto,tree_path_dependent,floresta completa,raca_cor_2.0,raca_cor,0.001280459,14,1
-B_composto,tree_path_dependent,floresta completa,raca_cor_3.0,raca_cor,0.000165721,15,1
-B_composto,tree_path_dependent,floresta completa,raca_cor_5.0,raca_cor,5.0219e-05,16,1
-B_composto,interventional,floresta reduzida (diagnostico),idade,idade,0.089005773,1,
-B_composto,interventional,floresta reduzida (diagnostico),circ_cintura,circ_cintura,0.057110878,2,
-B_composto,interventional,floresta reduzida (diagnostico),multimorbidade,multimorbidade,0.044836426,3,
-B_composto,interventional,floresta reduzida (diagnostico),imc,imc,0.032187738,4,
-B_composto,interventional,floresta reduzida (diagnostico),saude_autoaval,saude_autoaval,0.030935455,5,
-B_composto,interventional,floresta reduzida (diagnostico),raca_cor_4.0,raca_cor,0.009876348,6,1
-B_composto,interventional,floresta reduzida (diagnostico),escolaridade,escolaridade,0.009519673,7,
-B_composto,interventional,floresta reduzida (diagnostico),sexo_fem,sexo_fem,0.008096664,8,
-B_composto,interventional,floresta reduzida (diagnostico),regiao_3.0,regiao,0.005495665,9,1
-B_composto,interventional,floresta reduzida (diagnostico),plano_sim,plano_sim,0.00324253,10,
-B_composto,interventional,floresta reduzida (diagnostico),regiao_4.0,regiao,0.002947696,11,1
-B_composto,interventional,floresta reduzida (diagnostico),regiao_5.0,regiao,0.002683698,12,1
-B_composto,interventional,floresta reduzida (diagnostico),regiao_2.0,regiao,0.002545511,13,1
-B_composto,interventional,floresta reduzida (diagnostico),raca_cor_2.0,raca_cor,0.000963995,14,1
-B_composto,interventional,floresta reduzida (diagnostico),raca_cor_3.0,raca_cor,0.000209862,15,1
-B_composto,interventional,floresta reduzida (diagnostico),raca_cor_5.0,raca_cor,2.3645e-05,16,1
+celula,regime,objeto_explicado,coluna,atributo,shap_medio_abs,posicao,categoria_referencia_omitida,modelo
+A_atomico,tree_path_dependent,floresta completa,idade,idade,0.092460084,1,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,circ_cintura,circ_cintura,0.074803925,2,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,has_autorrelato_3.0,has_autorrelato,0.049593913,3,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,imc,imc,0.041834632,4,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,pas,pas,0.041274224,5,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,saude_autoaval,saude_autoaval,0.033606138,6,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,colesterol_alto_2.0,colesterol_alto,0.01832953,7,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,escolaridade,escolaridade,0.01408438,8,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,pad,pad,0.013393895,9,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,sexo_fem,sexo_fem,0.010152219,10,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,raca_cor_4.0,raca_cor,0.006679863,11,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,regiao_3.0,regiao,0.003498029,12,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,regiao_4.0,regiao,0.002644714,13,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,plano_sim,plano_sim,0.002516563,14,,Random Forest
+A_atomico,tree_path_dependent,floresta completa,regiao_2.0,regiao,0.002326104,15,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,regiao_5.0,regiao,0.001959188,16,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,raca_cor_2.0,raca_cor,0.001125456,17,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,has_autorrelato_2.0,has_autorrelato,0.000581097,18,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,raca_cor_3.0,raca_cor,0.000104573,19,1,Random Forest
+A_atomico,tree_path_dependent,floresta completa,raca_cor_5.0,raca_cor,1.4743e-05,20,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),idade,idade,0.077799879,1,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),circ_cintura,circ_cintura,0.056826002,2,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),has_autorrelato_3.0,has_autorrelato,0.031569101,3,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),imc,imc,0.029789294,4,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),pas,pas,0.027934909,5,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),saude_autoaval,saude_autoaval,0.023805273,6,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),colesterol_alto_2.0,colesterol_alto,0.015878651,7,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),sexo_fem,sexo_fem,0.008231509,8,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),escolaridade,escolaridade,0.008043111,9,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),raca_cor_4.0,raca_cor,0.007091557,10,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),pad,pad,0.00688503,11,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),regiao_3.0,regiao,0.002924392,12,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),regiao_4.0,regiao,0.002558506,13,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),plano_sim,plano_sim,0.002346422,14,,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),regiao_5.0,regiao,0.002302416,15,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),regiao_2.0,regiao,0.001690706,16,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),raca_cor_2.0,raca_cor,0.001109434,17,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),has_autorrelato_2.0,has_autorrelato,0.000630236,18,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),raca_cor_3.0,raca_cor,0.000118625,19,1,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),raca_cor_5.0,raca_cor,5.888e-06,20,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,idade,idade,0.105836194,1,,Random Forest
+B_composto,tree_path_dependent,floresta completa,circ_cintura,circ_cintura,0.078198929,2,,Random Forest
+B_composto,tree_path_dependent,floresta completa,multimorbidade,multimorbidade,0.069853276,3,,Random Forest
+B_composto,tree_path_dependent,floresta completa,imc,imc,0.047081362,4,,Random Forest
+B_composto,tree_path_dependent,floresta completa,saude_autoaval,saude_autoaval,0.041069428,5,,Random Forest
+B_composto,tree_path_dependent,floresta completa,escolaridade,escolaridade,0.016933613,6,,Random Forest
+B_composto,tree_path_dependent,floresta completa,sexo_fem,sexo_fem,0.010208304,7,,Random Forest
+B_composto,tree_path_dependent,floresta completa,raca_cor_4.0,raca_cor,0.009656683,8,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,regiao_3.0,regiao,0.006067907,9,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,plano_sim,plano_sim,0.00341421,10,,Random Forest
+B_composto,tree_path_dependent,floresta completa,regiao_4.0,regiao,0.003316734,11,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,regiao_2.0,regiao,0.003149425,12,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,regiao_5.0,regiao,0.002108368,13,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,raca_cor_2.0,raca_cor,0.001280459,14,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,raca_cor_3.0,raca_cor,0.000165721,15,1,Random Forest
+B_composto,tree_path_dependent,floresta completa,raca_cor_5.0,raca_cor,5.0219e-05,16,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),idade,idade,0.089005773,1,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),circ_cintura,circ_cintura,0.057110878,2,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),multimorbidade,multimorbidade,0.044836426,3,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),imc,imc,0.032187738,4,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),saude_autoaval,saude_autoaval,0.030935455,5,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),raca_cor_4.0,raca_cor,0.009876348,6,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),escolaridade,escolaridade,0.009519673,7,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),sexo_fem,sexo_fem,0.008096664,8,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),regiao_3.0,regiao,0.005495665,9,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),plano_sim,plano_sim,0.00324253,10,,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),regiao_4.0,regiao,0.002947696,11,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),regiao_5.0,regiao,0.002683698,12,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),regiao_2.0,regiao,0.002545511,13,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),raca_cor_2.0,raca_cor,0.000963995,14,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),raca_cor_3.0,raca_cor,0.000209862,15,1,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),raca_cor_5.0,raca_cor,2.3645e-05,16,1,Random Forest

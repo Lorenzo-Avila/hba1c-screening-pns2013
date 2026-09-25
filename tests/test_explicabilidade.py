@@ -1,12 +1,13 @@
 """Contratos da explicabilidade via SHAP sobre a Random Forest publicada.
 
-Onze guardas, e elas se dividem em três naturezas. As de **identidade numérica**
+Treze guardas, e elas se dividem em três naturezas. As de **identidade numérica**
 conferem que a atribuição descreve o modelo: aditividade nos dois regimes e agregação
 por variável conceitual. As de **vazamento e determinismo** conferem o protocolo: o
 background sai do treino, e a seleção dos casos locais reproduz sozinha. As de
 **artefato** conferem que o que está em `reports/tabelas/` é o que o código produz hoje:
 composição completa no padrão de D-044, consistência entre duas tabelas que se olham,
-reprodução do regime principal na terceira casa, e o topo coincidente entre regimes.
+reprodução do regime principal na terceira casa, o topo coincidente entre regimes, e as
+colunas que o painel lê prontas.
 
 **Custo, que decidiu o desenho.** Identificar as árvores que o explicador atribui com
 erro custa minutos, porque explica as 500 uma a uma sobre o teste inteiro. Guarda cara é
@@ -518,3 +519,31 @@ def test_concordancia_topo_versionada_confere_com_o_ranking_publicado(artefatos)
     assert recalculada.set_index("celula")["topo_coincidente"].to_dict() == {
         "A_atomico": 7, "B_composto": 5,
     }
+
+
+# ---------------------------------------------------------------------------
+# Colunas que o painel lê prontas
+# ---------------------------------------------------------------------------
+
+def test_tabelas_shap_declaram_o_modelo(artefatos):
+    """As cinco tabelas de atribuição dizem de qual modelo são, em todas as linhas."""
+    caminho = cfg.PATH_TABELAS / f"{ex.NOME_CONCORDANCIA}.csv"
+    if not caminho.exists():
+        pytest.skip(f"Artefato ausente em {caminho}. Rode make shap antes.")
+    tabelas = {nome: artefatos[nome] for nome in
+               [ex.NOME_GLOBAL_ATRIBUTO, ex.NOME_GLOBAL_COLUNA, ex.NOME_PARES,
+                ex.NOME_CASOS]}
+    tabelas[ex.NOME_CONCORDANCIA] = pd.read_csv(caminho)
+
+    for nome, tabela in tabelas.items():
+        assert (tabela["modelo"] == ex.MODELO).all(), nome
+
+
+def test_indice_nas_duas_celulas_marca_o_mesmo_individuo(artefatos):
+    """A marca vale exatamente para os índices que aparecem nas duas células."""
+    casos = artefatos[ex.NOME_CASOS]
+    celulas_por_indice = casos.groupby("indice")["celula"].nunique()
+    repetidos = set(celulas_por_indice[celulas_por_indice > 1].index)
+
+    assert repetidos, "nenhum índice nas duas células"
+    assert (casos["indice_nas_duas_celulas"] == casos["indice"].isin(repetidos)).all()

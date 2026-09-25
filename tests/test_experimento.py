@@ -825,3 +825,114 @@ def test_saida_grava_fora_de_reports_tabelas():
     alterados = sorted(n for n in antes.keys() | depois.keys()
                        if antes.get(n) != depois.get(n))
     assert not alterados, f"reports/tabelas/ mudou durante a execução: {alterados}"
+
+
+# ---------------------------------------------------------------------------
+# Colunas que o painel lê prontas
+# ---------------------------------------------------------------------------
+
+def test_consolidado_marca_a_referencia_d030_do_grid(grid_dois_conjuntos):
+    """Uma célula marcada, e ela é a que `modelo_de_referencia` elege em memória."""
+    tabela = xp.consolidar(grid_dois_conjuntos)
+    referencia = xp.modelo_de_referencia(grid_dois_conjuntos)
+
+    marcadas = tabela[tabela["referencia_d030"]]
+    assert len(marcadas) == 1
+    assert (marcadas.iloc[0]["modelo"], marcadas.iloc[0]["conjunto"]) == (
+        referencia["modelo"], referencia["conjunto"])
+
+
+def test_consolidado_versionado_marca_uma_so_referencia_d030():
+    """No artefato, a marca coincide com o critério reaplicado às linhas publicadas.
+
+    O critério é reaplicado chamando `modelo_de_referencia` sobre as linhas do CSV, e
+    não reescrito aqui: duas definições do mesmo critério divergem em silêncio.
+    """
+    consolidado = _versionado(xp.NOME_CONSOLIDADO)
+    marcadas = consolidado[consolidado["referencia_d030"]]
+    assert len(marcadas) == 1
+
+    linhas = consolidado[["modelo", "conjunto", "limiar_calibrado", "nns"]]
+    eleita = xp.modelo_de_referencia(linhas.to_dict("records"))
+    assert (marcadas.iloc[0]["modelo"], marcadas.iloc[0]["conjunto"]) == (
+        eleita["modelo"], eleita["conjunto"])
+
+
+def test_encaminhados_e_fpr_fecham_com_a_confusao():
+    """`encaminhados = vp + fp` e `fpr = fp / (fp + vn)`, em todas as linhas.
+
+    A taxa de encaminhamento divide pelo teste inteiro nas duas tabelas que a publicam.
+    O regime equiparado não traz a confusão, então o tamanho do teste sai do
+    consolidado.
+    """
+    consolidado = _versionado(xp.NOME_CONSOLIDADO)
+    total = consolidado[["vp", "fp", "fn", "vn"]].sum(axis=1)
+
+    assert (consolidado["encaminhados"] == consolidado["vp"] + consolidado["fp"]).all()
+    assert consolidado["taxa_encaminhamento"].to_numpy() == pytest.approx(
+        (consolidado["encaminhados"] / total).to_numpy(), abs=1e-9)
+    assert consolidado["fpr"].to_numpy() == pytest.approx(
+        (consolidado["fp"] / (consolidado["fp"] + consolidado["vn"])).to_numpy(),
+        abs=1e-9)
+
+    n_teste = int(total.iloc[0])
+    assert (total == n_teste).all()
+    equiparado = _versionado(xp.NOME_EQUIPARADO)
+    assert equiparado["taxa_encaminhamento"].to_numpy() == pytest.approx(
+        (equiparado["encaminhados"] / n_teste).to_numpy(), abs=1e-9)
+
+
+def test_recall_alvo_do_consolidado_e_a_constante_de_configuracao():
+    """O alvo das calibráveis é `config.RECALL_ALVO`; os comparadores ficam vazios."""
+    consolidado = _versionado(xp.NOME_CONSOLIDADO)
+    calibraveis = consolidado["limiar_calibrado"]
+
+    assert (consolidado.loc[calibraveis, "recall_alvo"] == cfg.RECALL_ALVO).all()
+    assert consolidado.loc[~calibraveis, "recall_alvo"].isna().all()
+
+
+def test_cumpre_criterio_bate_com_a_leitura_do_criterio():
+    """A coluna diz o mesmo que `leitura_do_criterio`, célula a célula.
+
+    Cada linha vira uma carga operacional de dois regimes, a regra e a célula, e passa
+    pela mesma função que imprime o veredito. A célula de referência por D-030 não
+    cumpre, que é o que o `xfail` de `test_regime_equiparado_supera_a_regra_em_nns`
+    mantém visível (D-046).
+    """
+    equiparado = _versionado(xp.NOME_EQUIPARADO)
+    regra = equiparado.iloc[0]
+    assert pd.isna(regra["cumpre_criterio"])
+
+    for _, linha in equiparado.iloc[1:].iterrows():
+        carga = pd.DataFrame([
+            {"regime": "Regra ADA", "recall": regra["recall_obtido"],
+             "nns": regra["nns"]},
+            {"regime": linha["estrategia"], "recall": linha["recall_obtido"],
+             "nns": linha["nns"]},
+        ])
+        leitura = xp.leitura_do_criterio(carga).splitlines()[0]
+        cumpre_no_texto = f"{linha['estrategia']}: cumpre o critério" in leitura
+        assert str(linha["cumpre_criterio"]) == str(cumpre_no_texto), leitura
+
+    consolidado = _versionado(xp.NOME_CONSOLIDADO)
+    referencia = consolidado[consolidado["referencia_d030"]].iloc[0]
+    da_referencia = equiparado[(equiparado["modelo"] == referencia["modelo"])
+                               & (equiparado["conjunto"] == referencia["conjunto"])]
+    assert str(da_referencia.iloc[0]["cumpre_criterio"]) == "False"
+
+
+def test_resumo_amostra_versionado_bate_com_a_particao(particao):
+    """Treino, teste e as duas prevalências são os da partição que o grid usa."""
+    resumo = _versionado(xp.NOME_RESUMO).set_index("item")
+
+    assert resumo.loc["Treino", "n"] == len(particao.y_tr)
+    assert resumo.loc["Teste", "n"] == len(particao.y_te)
+    assert resumo.loc["Prevalência no treino", "n"] == particao.y_tr.sum()
+    assert resumo.loc["Prevalência no teste", "n"] == particao.y_te.sum()
+    assert resumo.loc["Prevalência no treino", "proporcao"] == pytest.approx(
+        particao.y_tr.mean(), abs=1e-9)
+    assert resumo.loc["Prevalência no teste", "proporcao"] == pytest.approx(
+        particao.y_te.mean(), abs=1e-9)
+    assert (resumo.loc["Negativos", "n"]
+            == resumo.loc["Amostra analítica", "n"]
+            - resumo.loc["Positivos (HbA1c ≥ 6,5%)", "n"])

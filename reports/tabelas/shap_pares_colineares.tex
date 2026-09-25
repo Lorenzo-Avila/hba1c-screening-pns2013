@@ -1,27 +1,27 @@
-\begin{tabular}{lllllrlrrrrlr}
+\begin{tabular}{lllllrlrrrrlrl}
 \toprule
-celula & regime & objeto_explicado & bloco & evidencia & n_membros & membro & shap_medio_abs & posicao & shap_bloco_somado & fracao_do_bloco & membro_dominante & razao_maior_menor \\
+celula & regime & objeto_explicado & bloco & evidencia & n_membros & membro & shap_medio_abs & posicao & shap_bloco_somado & fracao_do_bloco & membro_dominante & razao_maior_menor & modelo \\
 \midrule
-A_atomico & tree_path_dependent & floresta completa & imc x circ_cintura & Pearson 0,793 & 2 & imc & 0.041835 & 4 & 0.116639 & 0.358669 & circ_cintura & 1.788086 \\
-A_atomico & tree_path_dependent & floresta completa & imc x circ_cintura & Pearson 0,793 & 2 & circ_cintura & 0.074804 & 2 & 0.116639 & 0.641331 & circ_cintura & 1.788086 \\
-A_atomico & tree_path_dependent & floresta completa & pas x pad & Pearson 0,743 & 2 & pas & 0.041274 & 5 & 0.054668 & 0.754996 & pas & 3.081570 \\
-A_atomico & tree_path_dependent & floresta completa & pas x pad & Pearson 0,743 & 2 & pad & 0.013394 & 9 & 0.054668 & 0.245004 & pas & 3.081570 \\
-A_atomico & interventional & floresta reduzida (diagnostico) & imc x circ_cintura & Pearson 0,793 & 2 & imc & 0.029789 & 4 & 0.086615 & 0.343926 & circ_cintura & 1.907598 \\
-A_atomico & interventional & floresta reduzida (diagnostico) & imc x circ_cintura & Pearson 0,793 & 2 & circ_cintura & 0.056826 & 2 & 0.086615 & 0.656074 & circ_cintura & 1.907598 \\
-A_atomico & interventional & floresta reduzida (diagnostico) & pas x pad & Pearson 0,743 & 2 & pas & 0.027935 & 5 & 0.034820 & 0.802268 & pas & 4.057340 \\
-A_atomico & interventional & floresta reduzida (diagnostico) & pas x pad & Pearson 0,743 & 2 & pad & 0.006885 & 12 & 0.034820 & 0.197732 & pas & 4.057340 \\
-B_composto & tree_path_dependent & floresta completa & imc x circ_cintura & Pearson 0,793 & 2 & imc & 0.047081 & 4 & 0.125280 & 0.375808 & circ_cintura & 1.660932 \\
-B_composto & tree_path_dependent & floresta completa & imc x circ_cintura & Pearson 0,793 & 2 & circ_cintura & 0.078199 & 2 & 0.125280 & 0.624192 & circ_cintura & 1.660932 \\
-B_composto & tree_path_dependent & floresta completa & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & imc & 0.047081 & 4 & 0.205342 & 0.229283 & circ_cintura & 7.660325 \\
-B_composto & tree_path_dependent & floresta completa & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & circ_cintura & 0.078199 & 2 & 0.205342 & 0.380823 & circ_cintura & 7.660325 \\
-B_composto & tree_path_dependent & floresta completa & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & sexo_fem & 0.010208 & 9 & 0.205342 & 0.049714 & circ_cintura & 7.660325 \\
-B_composto & tree_path_dependent & floresta completa & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & multimorbidade & 0.069853 & 3 & 0.205342 & 0.340180 & circ_cintura & 7.660325 \\
-B_composto & interventional & floresta reduzida (diagnostico) & imc x circ_cintura & Pearson 0,793 & 2 & imc & 0.032188 & 4 & 0.089299 & 0.360451 & circ_cintura & 1.774305 \\
-B_composto & interventional & floresta reduzida (diagnostico) & imc x circ_cintura & Pearson 0,793 & 2 & circ_cintura & 0.057111 & 2 & 0.089299 & 0.639549 & circ_cintura & 1.774305 \\
-B_composto & interventional & floresta reduzida (diagnostico) & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & imc & 0.032188 & 4 & 0.142232 & 0.226305 & circ_cintura & 7.053631 \\
-B_composto & interventional & floresta reduzida (diagnostico) & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & circ_cintura & 0.057111 & 2 & 0.142232 & 0.401534 & circ_cintura & 7.053631 \\
-B_composto & interventional & floresta reduzida (diagnostico) & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & sexo_fem & 0.008097 & 9 & 0.142232 & 0.056926 & circ_cintura & 7.053631 \\
-B_composto & interventional & floresta reduzida (diagnostico) & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & multimorbidade & 0.044836 & 3 & 0.142232 & 0.315235 & circ_cintura & 7.053631 \\
+A_atomico & tree_path_dependent & floresta completa & imc x circ_cintura & Pearson 0,793 & 2 & imc & 0.041835 & 4 & 0.116639 & 0.358669 & circ_cintura & 1.788086 & Random Forest \\
+A_atomico & tree_path_dependent & floresta completa & imc x circ_cintura & Pearson 0,793 & 2 & circ_cintura & 0.074804 & 2 & 0.116639 & 0.641331 & circ_cintura & 1.788086 & Random Forest \\
+A_atomico & tree_path_dependent & floresta completa & pas x pad & Pearson 0,743 & 2 & pas & 0.041274 & 5 & 0.054668 & 0.754996 & pas & 3.081570 & Random Forest \\
+A_atomico & tree_path_dependent & floresta completa & pas x pad & Pearson 0,743 & 2 & pad & 0.013394 & 9 & 0.054668 & 0.245004 & pas & 3.081570 & Random Forest \\
+A_atomico & interventional & floresta reduzida (diagnostico) & imc x circ_cintura & Pearson 0,793 & 2 & imc & 0.029789 & 4 & 0.086615 & 0.343926 & circ_cintura & 1.907598 & Random Forest \\
+A_atomico & interventional & floresta reduzida (diagnostico) & imc x circ_cintura & Pearson 0,793 & 2 & circ_cintura & 0.056826 & 2 & 0.086615 & 0.656074 & circ_cintura & 1.907598 & Random Forest \\
+A_atomico & interventional & floresta reduzida (diagnostico) & pas x pad & Pearson 0,743 & 2 & pas & 0.027935 & 5 & 0.034820 & 0.802268 & pas & 4.057340 & Random Forest \\
+A_atomico & interventional & floresta reduzida (diagnostico) & pas x pad & Pearson 0,743 & 2 & pad & 0.006885 & 12 & 0.034820 & 0.197732 & pas & 4.057340 & Random Forest \\
+B_composto & tree_path_dependent & floresta completa & imc x circ_cintura & Pearson 0,793 & 2 & imc & 0.047081 & 4 & 0.125280 & 0.375808 & circ_cintura & 1.660932 & Random Forest \\
+B_composto & tree_path_dependent & floresta completa & imc x circ_cintura & Pearson 0,793 & 2 & circ_cintura & 0.078199 & 2 & 0.125280 & 0.624192 & circ_cintura & 1.660932 & Random Forest \\
+B_composto & tree_path_dependent & floresta completa & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & imc & 0.047081 & 4 & 0.205342 & 0.229283 & circ_cintura & 7.660325 & Random Forest \\
+B_composto & tree_path_dependent & floresta completa & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & circ_cintura & 0.078199 & 2 & 0.205342 & 0.380823 & circ_cintura & 7.660325 & Random Forest \\
+B_composto & tree_path_dependent & floresta completa & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & sexo_fem & 0.010208 & 9 & 0.205342 & 0.049714 & circ_cintura & 7.660325 & Random Forest \\
+B_composto & tree_path_dependent & floresta completa & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & multimorbidade & 0.069853 & 3 & 0.205342 & 0.340180 & circ_cintura & 7.660325 & Random Forest \\
+B_composto & interventional & floresta reduzida (diagnostico) & imc x circ_cintura & Pearson 0,793 & 2 & imc & 0.032188 & 4 & 0.089299 & 0.360451 & circ_cintura & 1.774305 & Random Forest \\
+B_composto & interventional & floresta reduzida (diagnostico) & imc x circ_cintura & Pearson 0,793 & 2 & circ_cintura & 0.057111 & 2 & 0.089299 & 0.639549 & circ_cintura & 1.774305 & Random Forest \\
+B_composto & interventional & floresta reduzida (diagnostico) & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & imc & 0.032188 & 4 & 0.142232 & 0.226305 & circ_cintura & 7.053631 & Random Forest \\
+B_composto & interventional & floresta reduzida (diagnostico) & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & circ_cintura & 0.057111 & 2 & 0.142232 & 0.401534 & circ_cintura & 7.053631 & Random Forest \\
+B_composto & interventional & floresta reduzida (diagnostico) & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & sexo_fem & 0.008097 & 9 & 0.142232 & 0.056926 & circ_cintura & 7.053631 & Random Forest \\
+B_composto & interventional & floresta reduzida (diagnostico) & imc, circ_cintura, sexo_fem x multimorbidade & canal de coarsening por ponto de corte clinico, D-012 & 4 & multimorbidade & 0.044836 & 3 & 0.142232 & 0.315235 & circ_cintura & 7.053631 & Random Forest \\
 \bottomrule
 \end{tabular}
 

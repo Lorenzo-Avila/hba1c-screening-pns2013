@@ -399,3 +399,12 @@ def test_regressao_logistica_equiparada_mantem_o_nns_medido_abaixo_da_regra(spli
     assert abs(logreg["recall"] - regra["recall"]) < 0.10
     # E aí a comparação de NNS é entre pontos comparáveis.
     assert logreg["nns"] < regra["nns"]
+
+
+def test_cumpre_o_criterio_exige_as_duas_condicoes():
+    """Recall maior e NNS menor juntos; uma condição sozinha não basta."""
+    assert bm.cumpre_o_criterio(0.01, -0.1)
+    assert not bm.cumpre_o_criterio(0.01, 0.1)
+    assert not bm.cumpre_o_criterio(-0.01, -0.1)
+    assert not bm.cumpre_o_criterio(0.0, -0.1)
+    assert not bm.cumpre_o_criterio(0.01, 0.0)

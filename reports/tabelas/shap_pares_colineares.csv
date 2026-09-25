@@ -1,21 +1,21 @@
-celula,regime,objeto_explicado,bloco,evidencia,n_membros,membro,shap_medio_abs,posicao,shap_bloco_somado,fracao_do_bloco,membro_dominante,razao_maior_menor
-A_atomico,tree_path_dependent,floresta completa,imc x circ_cintura,"Pearson 0,793",2,imc,0.041834632,4,0.116638557,0.358668979,circ_cintura,1.788086115
-A_atomico,tree_path_dependent,floresta completa,imc x circ_cintura,"Pearson 0,793",2,circ_cintura,0.074803925,2,0.116638557,0.641331021,circ_cintura,1.788086115
-A_atomico,tree_path_dependent,floresta completa,pas x pad,"Pearson 0,743",2,pas,0.041274224,5,0.054668119,0.754996229,pas,3.081569835
-A_atomico,tree_path_dependent,floresta completa,pas x pad,"Pearson 0,743",2,pad,0.013393895,9,0.054668119,0.245003771,pas,3.081569835
-A_atomico,interventional,floresta reduzida (diagnostico),imc x circ_cintura,"Pearson 0,793",2,imc,0.029789294,4,0.086615296,0.343926479,circ_cintura,1.907598169
-A_atomico,interventional,floresta reduzida (diagnostico),imc x circ_cintura,"Pearson 0,793",2,circ_cintura,0.056826002,2,0.086615296,0.656073521,circ_cintura,1.907598169
-A_atomico,interventional,floresta reduzida (diagnostico),pas x pad,"Pearson 0,743",2,pas,0.027934909,5,0.03481994,0.802267604,pas,4.057340225
-A_atomico,interventional,floresta reduzida (diagnostico),pas x pad,"Pearson 0,743",2,pad,0.00688503,12,0.03481994,0.197732396,pas,4.057340225
-B_composto,tree_path_dependent,floresta completa,imc x circ_cintura,"Pearson 0,793",2,imc,0.047081362,4,0.125280291,0.37580821,circ_cintura,1.660931756
-B_composto,tree_path_dependent,floresta completa,imc x circ_cintura,"Pearson 0,793",2,circ_cintura,0.078198929,2,0.125280291,0.62419179,circ_cintura,1.660931756
-B_composto,tree_path_dependent,floresta completa,"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,imc,0.047081362,4,0.205341871,0.229282813,circ_cintura,7.660325048
-B_composto,tree_path_dependent,floresta completa,"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,circ_cintura,0.078198929,2,0.205341871,0.380823105,circ_cintura,7.660325048
-B_composto,tree_path_dependent,floresta completa,"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,sexo_fem,0.010208304,9,0.205341871,0.0497137,circ_cintura,7.660325048
-B_composto,tree_path_dependent,floresta completa,"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,multimorbidade,0.069853276,3,0.205341871,0.340180381,circ_cintura,7.660325048
-B_composto,interventional,floresta reduzida (diagnostico),imc x circ_cintura,"Pearson 0,793",2,imc,0.032187738,4,0.089298616,0.36045058,circ_cintura,1.774305424
-B_composto,interventional,floresta reduzida (diagnostico),imc x circ_cintura,"Pearson 0,793",2,circ_cintura,0.057110878,2,0.089298616,0.63954942,circ_cintura,1.774305424
-B_composto,interventional,floresta reduzida (diagnostico),"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,imc,0.032187738,4,0.142231706,0.226304943,circ_cintura,7.053631167
-B_composto,interventional,floresta reduzida (diagnostico),"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,circ_cintura,0.057110878,2,0.142231706,0.401534088,circ_cintura,7.053631167
-B_composto,interventional,floresta reduzida (diagnostico),"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,sexo_fem,0.008096664,9,0.142231706,0.05692587,circ_cintura,7.053631167
-B_composto,interventional,floresta reduzida (diagnostico),"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,multimorbidade,0.044836426,3,0.142231706,0.3152351,circ_cintura,7.053631167
+celula,regime,objeto_explicado,bloco,evidencia,n_membros,membro,shap_medio_abs,posicao,shap_bloco_somado,fracao_do_bloco,membro_dominante,razao_maior_menor,modelo
+A_atomico,tree_path_dependent,floresta completa,imc x circ_cintura,"Pearson 0,793",2,imc,0.041834632,4,0.116638557,0.358668979,circ_cintura,1.788086115,Random Forest
+A_atomico,tree_path_dependent,floresta completa,imc x circ_cintura,"Pearson 0,793",2,circ_cintura,0.074803925,2,0.116638557,0.641331021,circ_cintura,1.788086115,Random Forest
+A_atomico,tree_path_dependent,floresta completa,pas x pad,"Pearson 0,743",2,pas,0.041274224,5,0.054668119,0.754996229,pas,3.081569835,Random Forest
+A_atomico,tree_path_dependent,floresta completa,pas x pad,"Pearson 0,743",2,pad,0.013393895,9,0.054668119,0.245003771,pas,3.081569835,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),imc x circ_cintura,"Pearson 0,793",2,imc,0.029789294,4,0.086615296,0.343926479,circ_cintura,1.907598169,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),imc x circ_cintura,"Pearson 0,793",2,circ_cintura,0.056826002,2,0.086615296,0.656073521,circ_cintura,1.907598169,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),pas x pad,"Pearson 0,743",2,pas,0.027934909,5,0.03481994,0.802267604,pas,4.057340225,Random Forest
+A_atomico,interventional,floresta reduzida (diagnostico),pas x pad,"Pearson 0,743",2,pad,0.00688503,12,0.03481994,0.197732396,pas,4.057340225,Random Forest
+B_composto,tree_path_dependent,floresta completa,imc x circ_cintura,"Pearson 0,793",2,imc,0.047081362,4,0.125280291,0.37580821,circ_cintura,1.660931756,Random Forest
+B_composto,tree_path_dependent,floresta completa,imc x circ_cintura,"Pearson 0,793",2,circ_cintura,0.078198929,2,0.125280291,0.62419179,circ_cintura,1.660931756,Random Forest
+B_composto,tree_path_dependent,floresta completa,"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,imc,0.047081362,4,0.205341871,0.229282813,circ_cintura,7.660325048,Random Forest
+B_composto,tree_path_dependent,floresta completa,"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,circ_cintura,0.078198929,2,0.205341871,0.380823105,circ_cintura,7.660325048,Random Forest
+B_composto,tree_path_dependent,floresta completa,"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,sexo_fem,0.010208304,9,0.205341871,0.0497137,circ_cintura,7.660325048,Random Forest
+B_composto,tree_path_dependent,floresta completa,"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,multimorbidade,0.069853276,3,0.205341871,0.340180381,circ_cintura,7.660325048,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),imc x circ_cintura,"Pearson 0,793",2,imc,0.032187738,4,0.089298616,0.36045058,circ_cintura,1.774305424,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),imc x circ_cintura,"Pearson 0,793",2,circ_cintura,0.057110878,2,0.089298616,0.63954942,circ_cintura,1.774305424,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,imc,0.032187738,4,0.142231706,0.226304943,circ_cintura,7.053631167,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,circ_cintura,0.057110878,2,0.142231706,0.401534088,circ_cintura,7.053631167,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,sexo_fem,0.008096664,9,0.142231706,0.05692587,circ_cintura,7.053631167,Random Forest
+B_composto,interventional,floresta reduzida (diagnostico),"imc, circ_cintura, sexo_fem x multimorbidade","canal de coarsening por ponto de corte clinico, D-012",4,multimorbidade,0.044836426,3,0.142231706,0.3152351,circ_cintura,7.053631167,Random Forest

@@ -177,3 +177,20 @@ def test_ausentes_por_variavel_com_treino(df):
     tabela = ausentes_por_variavel(df, treino)
     assert "no_treino" in tabela.columns
     assert (tabela["no_treino"] <= tabela["ausentes"]).all()
+
+
+def test_resumo_amostra_com_particao_acrescenta_as_linhas_no_fim(df):
+    """As linhas da partição entram depois das de sempre, que saem idênticas."""
+    sem = resumo_amostra(df)
+    y = df[cfg.ALVO]
+    y_tr, y_te = y.iloc[:6760], y.iloc[6760:]
+    com = resumo_amostra(df, y_tr=y_tr, y_te=y_te)
+
+    pd.testing.assert_frame_equal(com.iloc[:len(sem)], sem)
+    novas = com.iloc[len(sem):].set_index("item")
+    assert list(novas.index) == ["Treino", "Teste", "Negativos",
+                                 "Prevalência no treino", "Prevalência no teste"]
+    assert novas.loc["Treino", "n"] + novas.loc["Teste", "n"] == N_ESPERADO
+    assert novas.loc["Negativos", "n"] == N_ESPERADO - int(y.sum())
+    assert novas.loc["Prevalência no treino", "proporcao"] == pytest.approx(y_tr.mean())
+    assert novas.loc["Prevalência no teste", "proporcao"] == pytest.approx(y_te.mean())
