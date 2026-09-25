@@ -13,7 +13,8 @@ import streamlit as st
 RAIZ = Path(__file__).resolve().parent.parent / "reports" / "tabelas"
 
 # Colunas esperadas por artefato e casas decimais de cada coluna numérica,
-# copiadas do `.tex` irmão. "e3" indica notação científica com três casas.
+# copiadas do `.tex` irmão. "e3" indica notação científica com três casas e "%3"
+# a proporção de três casas escrita como porcentagem (0,405 vira 40,5%).
 ARTEFATOS = {
     "resumo_amostra": {
         "colunas": ["item", "n", "proporcao"],
@@ -61,7 +62,7 @@ ARTEFATOS = {
     "shap_global_atributo": {
         "colunas": ["celula", "regime", "objeto_explicado", "atributo",
                     "shap_medio_abs", "posicao", "n_colunas",
-                    "categoria_referencia_omitida"],
+                    "categoria_referencia_omitida", "modelo"],
         "casas": {"shap_medio_abs": 6, "posicao": 0, "n_colunas": 0},
     },
     "shap_global_coluna": {
@@ -96,10 +97,83 @@ ARTEFATOS = {
     "shap_casos_locais": {
         "colunas": ["celula", "regime", "objeto_explicado", "caso", "indice",
                     "escore", "limiar", "distancia_ao_limiar", "valor_base",
-                    "atributo", "contribuicao", "valor_observado"],
+                    "atributo", "contribuicao", "valor_observado", "modelo",
+                    "indice_nas_duas_celulas"],
         "casas": {"indice": 0, "escore": 6, "limiar": 6,
                   "distancia_ao_limiar": 6, "valor_base": 6, "contribuicao": 6,
                   "valor_observado": 6},
+    },
+    "comparativo_consolidado": {
+        "colunas": ["modelo", "conjunto", "limiar", "corte_unico", "recall",
+                    "recall_cv_dp", "especificidade", "especificidade_cv_dp", "f1",
+                    "f1_cv_dp", "auc_roc", "auc_roc_cv_dp", "pr_auc", "nns",
+                    "precisao", "vp", "fp", "fn", "vn", "encaminhados",
+                    "taxa_encaminhamento", "referencia_d030", "fpr", "recall_alvo"],
+        "casas": {"limiar": 3, "recall": 3, "recall_cv_dp": 3, "especificidade": 3,
+                  "especificidade_cv_dp": 3, "f1": 3, "f1_cv_dp": 3, "auc_roc": 3,
+                  "auc_roc_cv_dp": 3, "pr_auc": 3, "nns": 3, "precisao": 3,
+                  "vp": 0, "fp": 0, "fn": 0, "vn": 0, "encaminhados": 0,
+                  "taxa_encaminhamento": "%3", "fpr": 3, "recall_alvo": 3},
+    },
+    "carga_operacional": {
+        "colunas": ["regime", "encaminhados", "taxa_encaminhamento",
+                    "casos_detectados", "casos_perdidos", "recall", "nns"],
+        "casas": {"encaminhados": 0, "taxa_encaminhamento": "%3",
+                  "casos_detectados": 0, "casos_perdidos": 0, "recall": 3, "nns": 3},
+    },
+    "equiparado_por_modelo": {
+        "colunas": ["estrategia", "modelo", "conjunto", "recall_alvo",
+                    "recall_obtido", "recall_regra", "encaminhados",
+                    "casos_detectados", "nns", "cumpre_criterio",
+                    "taxa_encaminhamento"],
+        "casas": {"recall_alvo": 3, "recall_obtido": 3, "recall_regra": 3,
+                  "encaminhados": 0, "casos_detectados": 0, "nns": 3,
+                  "taxa_encaminhamento": "%3"},
+    },
+    "custo_marginal_pareado": {
+        "colunas": ["conjunto", "regime", "encaminhados_floresta",
+                    "detectados_floresta", "encaminhados_logistica",
+                    "detectados_logistica", "delta_encaminhados", "delta_detectados",
+                    "custo_marginal", "leitura"],
+        "casas": {"encaminhados_floresta": 0, "detectados_floresta": 0,
+                  "encaminhados_logistica": 0, "detectados_logistica": 0,
+                  "delta_encaminhados": 0, "delta_detectados": 0,
+                  "custo_marginal": 3},
+    },
+    # Curvas e decis não têm `.tex`: três casas, como os índices de calibração.
+    "curva_roc": {
+        "colunas": ["modelo", "conjunto", "fpr", "tpr", "limiar"],
+        "casas": {"fpr": 3, "tpr": 3, "limiar": 3},
+    },
+    "curva_pr": {
+        "colunas": ["modelo", "conjunto", "precisao", "recall", "limiar"],
+        "casas": {"precisao": 3, "recall": 3, "limiar": 3},
+    },
+    "calibracao_decis": {
+        "colunas": ["modelo", "conjunto", "decil", "n", "prob_media",
+                    "freq_observada"],
+        "casas": {"decil": 0, "n": 0, "prob_media": 3, "freq_observada": 3},
+    },
+    "calibracao_comparada": {
+        "colunas": ["modelo", "conjunto", "brier", "brier_trivial", "brier_skill",
+                    "prevalencia", "proba_media", "razao_inflacao", "ece", "slope",
+                    "intercepto"],
+        "casas": {"brier": 3, "brier_trivial": 3, "brier_skill": 3,
+                  "prevalencia": 3, "proba_media": 3, "razao_inflacao": 3,
+                  "ece": 3, "slope": 3, "intercepto": 3},
+    },
+    "shap_concordancia_topo": {
+        "colunas": ["celula", "comparacao", "regime_a", "objeto_a", "regime_b",
+                    "objeto_b", "topo_coincidente", "n_atributos",
+                    "atributos_no_topo", "modelo"],
+        "casas": {"topo_coincidente": 0, "n_atributos": 0},
+    },
+    "busca_rf": {
+        "colunas": ["conjunto", "posicao", "pr_auc_media", "pr_auc_desvio",
+                    "max_depth", "min_samples_leaf", "max_features",
+                    "class_weight", "n_estimators"],
+        "casas": {"posicao": 0, "pr_auc_media": 4, "pr_auc_desvio": 4,
+                  "max_depth": 0, "min_samples_leaf": 0, "n_estimators": 0},
     },
 }
 

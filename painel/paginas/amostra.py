@@ -2,40 +2,57 @@
 
 import streamlit as st
 
+import componentes
 import dados
 import graficos
+import selecao
 import textos
 
-st.header("Amostra")
-
+selecao.abrir_pagina("amostra", "tecnica")
+g = textos.GLOSSARIO
 resumo = dados.carregar("resumo_amostra")
-casas_resumo = dados.casas("resumo_amostra")
+casas = dados.casas("resumo_amostra")
 
-st.subheader("Exclusões e amostra analítica")
-st.dataframe(
-    graficos.tabela(resumo, casas_resumo,
-                    nomes={"item": "etapa", "n": "n", "proporcao": "proporção"}),
-    hide_index=True, height="content",
-)
 
-# As duas linhas que carregam proporção: a amostral, na linha dos positivos, e a
-# ponderada por peso_lab.
-com_proporcao = resumo.dropna(subset=["proporcao"])
-colunas = st.columns(len(com_proporcao))
-for coluna, (_, linha) in zip(colunas, com_proporcao.iterrows()):
-    coluna.metric(linha["item"], graficos.numero(linha["proporcao"],
-                                                 casas_resumo["proporcao"]))
-st.info(textos.PREVALENCIA_PONDERADA)
+def n(item: str) -> str:
+    return graficos.numero(selecao.resumo(item), casas["n"])
 
-st.subheader("Ausentes por variável ao fim da limpeza")
-ausentes = dados.carregar("ausentes_por_variavel")
-st.dataframe(
-    graficos.tabela(ausentes, dados.casas("ausentes_por_variavel"),
-                    nomes={"variavel": "variável", "proporcao": "proporção",
-                           "no_treino": "no treino"}),
-    hide_index=True, height="content",
-)
-st.caption(
-    "Os ausentes das variáveis classificatórias são imputados por KNNImputer "
-    "ajustado só no treino (R3)."
-)
+
+def p(item: str) -> str:
+    return graficos.numero(selecao.resumo(item, "proporcao"), casas["proporcao"])
+
+
+componentes.grade([
+    componentes.metrica("Linhas no CSV bruto", n("Linhas no CSV bruto"),
+                        ajuda=g["linhas_brutas"]),
+    componentes.metrica("Amostra analítica", n("Amostra analítica"),
+                        ajuda=g["amostra_analitica"]),
+    componentes.metrica("Treino", n("Treino"), ajuda=g["treino"]),
+    componentes.metrica("Teste", n("Teste"), ajuda=g["teste"]),
+])
+componentes.grade([
+    componentes.metrica("Prevalência amostral", p("Positivos (HbA1c ≥ 6,5%)"),
+                        ajuda=g["prevalencia"],
+                        nota=f"{n('Positivos (HbA1c ≥ 6,5%)')} positivos"),
+    componentes.metrica("Prevalência no treino", p("Prevalência no treino"),
+                        ajuda=g["prevalencia"]),
+    componentes.metrica("Prevalência no teste", p("Prevalência no teste"),
+                        ajuda=g["prevalencia"]),
+    componentes.metrica("Prevalência ponderada",
+                        p("Prevalência ponderada por peso_lab (descritiva)"),
+                        ajuda=g["prevalencia_ponderada"], tom="azul"),
+])
+componentes.quadro(textos.LEITURA_TITULO, textos.PREVALENCIA_PONDERADA)
+
+tabela, ausentes = st.columns(2)
+with tabela:
+    st.subheader(textos.FUNIL_TITULO)
+    componentes.tabela(graficos.tabela(resumo, casas,
+                                       nomes={"item": "etapa", "proporcao": "proporção"}))
+with ausentes:
+    st.subheader(textos.AUSENTES_TITULO)
+    componentes.tabela(graficos.tabela(
+        dados.carregar("ausentes_por_variavel"), dados.casas("ausentes_por_variavel"),
+        nomes={"variavel": "variável", "proporcao": "proporção", "no_treino": "no treino"},
+    ))
+    componentes.nota(textos.AUSENTES_NOTA)
