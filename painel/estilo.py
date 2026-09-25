@@ -47,6 +47,13 @@ TONS = {
     "azul": (AZUL_ESCURO, AZUL_FUNDO),
 }
 
+# Cor da barra de cada regime de encaminhamento, pela chave `regime_id`.
+CORES_REGIME = {
+    "regra": CINZA,
+    "equiparado": AZUL_CLARO,
+    "padrao": AZUL,
+}
+
 
 def css() -> str:
     """Folha de estilo injetada uma vez por execução do app."""
@@ -110,6 +117,11 @@ html, body, .stApp, .stMarkdown, p, li, label, h1, h2, h3, h4, td, th {{
   padding: .8rem 1rem; margin: .6rem 0 1rem 0; color: {TEXTO};
 }}
 .quadro .titulo {{ font-weight: 700; color: {AZUL_ESCURO}; margin-bottom: .25rem; }}
+.linha-log {{
+  font-family: ui-monospace, Consolas, monospace; font-size: .85rem;
+  padding: .45rem .8rem; margin: .3rem 0; border-left: 4px solid;
+  border-radius: 0 8px 8px 0; white-space: pre-wrap;
+}}
 .nota-fixa {{ font-size: .85rem; color: {TEXTO_SECUNDARIO}; margin: .2rem 0 .8rem 0; }}
 .painel-bloco {{
   background: {CARTAO}; border: 1px solid {BORDA}; border-radius: 12px;

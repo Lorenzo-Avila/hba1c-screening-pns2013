@@ -1,10 +1,10 @@
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrrrll}
 \toprule
-regime & encaminhados & taxa_encaminhamento & casos_detectados & casos_perdidos & recall & nns \\
+regime & encaminhados & taxa_encaminhamento & casos_detectados & casos_perdidos & recall & nns & regime_id & rotulo \\
 \midrule
-Regra ADA & 974 & 0.576 & 103 & 16 & 0.866 & 9.456 \\
-Random Forest · B_composto, recall equiparado (alvo 0.8945 no treino) & 1048 & 0.620 & 110 & 9 & 0.924 & 9.527 \\
-Random Forest · B_composto, ponto padrão (recall-alvo 0.80) & 685 & 0.405 & 96 & 23 & 0.807 & 7.135 \\
+Regra ADA & 974 & 0.576 & 103 & 16 & 0.866 & 9.456 & regra & Regra ADA \\
+Random Forest · B_composto, recall equiparado (alvo 0.8945 no treino) & 1048 & 0.620 & 110 & 9 & 0.924 & 9.527 & equiparado & Random Forest · B_composto, recall equiparado (alvo 0,8945 no treino) \\
+Random Forest · B_composto, ponto padrão (recall-alvo 0.80) & 685 & 0.405 & 96 & 23 & 0.807 & 7.135 & padrao & Random Forest · B_composto, ponto padrão (recall-alvo 0,80) \\
 \bottomrule
 \end{tabular}
 

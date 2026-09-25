@@ -1,4 +1,4 @@
-"""Ponto de entrada do painel: estilo, barra lateral, navegação e rodapé.
+"""Ponto de entrada do painel: estilo, barra lateral e navegação.
 
 Rode com `streamlit run painel/app.py`. O painel lê `reports/tabelas/` e não
 calcula nada. A navegação padrão fica escondida e a barra lateral monta os links
@@ -19,6 +19,7 @@ componentes.aplicar_estilo()
 SECOES = {
     "projeto": [
         st.Page("paginas/visao_geral.py", title="Visão geral", default=True),
+        st.Page("paginas/reproducao.py", title="Reprodução ao vivo"),
     ],
     "clinica": [
         st.Page("paginas/desempenho.py", title="Desempenho"),
@@ -59,5 +60,3 @@ with st.sidebar:
 selecao.renderizar()
 
 navegacao.run()
-st.divider()
-componentes.nota(textos.RODAPE)

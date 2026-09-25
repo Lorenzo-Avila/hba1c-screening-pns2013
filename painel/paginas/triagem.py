@@ -17,7 +17,7 @@ casas = dados.casas("carga_operacional")
 st.subheader(textos.REGIMES_TITULO)
 for coluna, (_, regime) in zip(st.columns(len(carga)), carga.iterrows()):
     with coluna:
-        componentes.bloco(regime["regime"], [
+        componentes.bloco(regime["rotulo"], [
             componentes.metrica(
                 "Encaminhados", graficos.numero(regime["encaminhados"], casas["encaminhados"]),
                 ajuda=g["encaminhados_n"],
@@ -59,6 +59,8 @@ componentes.tabela(exibida, colunas_html=("critério",))
 
 st.subheader(textos.CUSTO_MARGINAL_TITULO)
 custo = dados.carregar("custo_marginal_pareado")
+# O artefato traz a chave do regime; o nome que aparece na tela vem de `textos`.
+custo = custo.assign(regime=custo["regime"].map(textos.REGIMES_CUSTO))
 componentes.tabela(graficos.tabela(
     custo, dados.casas("custo_marginal_pareado"),
     colunas=["conjunto", "regime", "encaminhados_floresta", "detectados_floresta",

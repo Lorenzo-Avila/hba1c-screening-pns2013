@@ -31,6 +31,8 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import numbers
+import string
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -88,6 +90,38 @@ PAR_CUSTO = (NOME_FLORESTA, "LogReg")
 
 # Par que o McNemar compara: os dois modelos no conjunto em que a floresta venceu.
 PAR_MCNEMAR = ((NOME_FLORESTA, "B_composto"), ("LogReg", "B_composto"))
+
+# Moldes do nome de cada regime de carga, pela chave que vai em `regime_id`. As colunas
+# `regime` e `rotulo` saem do mesmo molde, a primeira com ponto e a segunda com vírgula
+# decimal, para que as duas nunca descrevam regimes diferentes.
+MOLDES_REGIME = {
+    "regra": "{regra}",
+    "equiparado": "{celula}, recall equiparado (alvo {alvo:.4f} no treino)",
+    "padrao": "{celula}, ponto padrão (recall-alvo {alvo:.2f})",
+}
+
+
+class _FormatoDecimal(string.Formatter):
+    """Formata os campos de um molde trocando o separador decimal dos números reais."""
+
+    def __init__(self, separador: str):
+        super().__init__()
+        self.separador = separador
+
+    def format_field(self, valor, especificacao):
+        texto = super().format_field(valor, especificacao)
+        if isinstance(valor, numbers.Real) and not isinstance(valor, numbers.Integral):
+            return texto.replace(".", self.separador)
+        return texto
+
+
+def nome_do_regime(regime_id: str, separador: str = ".", **campos) -> str:
+    """Preenche o molde de `MOLDES_REGIME` com o separador decimal pedido.
+
+    Com ponto, devolve o texto da coluna `regime`; com vírgula, o da coluna `rotulo`.
+    """
+    return _FormatoDecimal(separador).format(MOLDES_REGIME[regime_id], **campos)
+
 
 # Conjunto vazio na coluna, para as linhas invariantes. É o mesmo símbolo que
 # `benchmark.avaliar_comparadores` usa, senão as tabelas não se juntam.
@@ -313,8 +347,10 @@ def carga_operacional(resultados: list[dict],
 
     Returns:
         DataFrame de três linhas com `regime`, `encaminhados`, `taxa_encaminhamento`,
-        `casos_detectados`, `casos_perdidos`, `recall` e `nns`. A advertência sobre
-        volume absoluto fica em `attrs["nota"]`.
+        `casos_detectados`, `casos_perdidos`, `recall`, `nns`, e no fim `regime_id`
+        (`regra`, `equiparado`, `padrao`) e `rotulo`, o nome do regime com vírgula
+        decimal para o painel. A advertência sobre volume absoluto fica em
+        `attrs["nota"]`.
     """
     regra = next((r for r in resultados if r["modelo"] == nome_regra), None)
     if regra is None:
@@ -332,24 +368,25 @@ def carga_operacional(resultados: list[dict],
         salvar_figuras=False,
     )
 
-    rotulos = {
-        id(regra): nome_regra,
-        id(equiparado): (f"{_rotulo(padrao)}, recall equiparado "
-                         f"(alvo {alvo_da_regra:.4f} no treino)"),
-        id(padrao): f"{_rotulo(padrao)}, ponto padrão (recall-alvo {padrao['recall_alvo']:.2f})",
-    }
+    regimes = (
+        ("regra", regra, {"regra": nome_regra}),
+        ("equiparado", equiparado, {"celula": _rotulo(padrao), "alvo": alvo_da_regra}),
+        ("padrao", padrao, {"celula": _rotulo(padrao), "alvo": padrao["recall_alvo"]}),
+    )
 
     linhas = []
-    for r in (regra, equiparado, padrao):
+    for regime_id, r, campos in regimes:
         encaminhados, taxa = encaminhamento(r)
         linhas.append({
-            "regime": rotulos[id(r)],
+            "regime": nome_do_regime(regime_id, ".", **campos),
             "encaminhados": encaminhados,
             "taxa_encaminhamento": taxa,
             "casos_detectados": r["vp"],
             "casos_perdidos": r["fn"],
             "recall": r["recall"],
             "nns": r["nns"],
+            "regime_id": regime_id,
+            "rotulo": nome_do_regime(regime_id, ",", **campos),
         })
 
     tabela = pd.DataFrame(linhas)

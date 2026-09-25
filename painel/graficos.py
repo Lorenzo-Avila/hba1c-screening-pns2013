@@ -200,24 +200,26 @@ def desbalanceamento(itens: list) -> alt.Chart:
 
 
 def barras_encaminhados(df: pd.DataFrame, casas) -> alt.Chart:
-    """Percentual de encaminhados por regime, na ordem do artefato."""
-    dados = df[["regime", "taxa_encaminhamento"]].assign(
-        rotulo=[numero(v, casas) for v in df["taxa_encaminhamento"]],
+    """Percentual de encaminhados por regime, na ordem do artefato.
+
+    O eixo mostra `rotulo`, e a cor de cada barra sai de `regime_id`.
+    """
+    dados = df[["rotulo", "regime_id", "taxa_encaminhamento"]].assign(
+        valor=[numero(v, casas) for v in df["taxa_encaminhamento"]],
     )
     base = alt.Chart(dados).encode(
-        y=alt.Y("regime:N", sort=list(dados["regime"]), title=None,
+        y=alt.Y("rotulo:N", sort=list(dados["rotulo"]), title=None,
                 axis=alt.Axis(labelLimit=440, labelOverlap=False, labelFontSize=12)),
         x=alt.X("taxa_encaminhamento:Q", title="encaminhados a exame",
                 axis=alt.Axis(format="%")),
     )
     barras = base.mark_bar(height=26, cornerRadiusEnd=4).encode(
-        color=alt.Color("regime:N", legend=None,
-                        scale=alt.Scale(domain=list(dados["regime"]),
-                                        range=[estilo.CINZA, estilo.AZUL_CLARO,
-                                               estilo.AZUL]))
+        color=alt.Color("regime_id:N", legend=None,
+                        scale=alt.Scale(domain=list(estilo.CORES_REGIME),
+                                        range=list(estilo.CORES_REGIME.values())))
     )
     valores = base.mark_text(align="left", dx=6, fontSize=13, fontWeight="bold",
-                             color=estilo.TEXTO).encode(text="rotulo:N")
+                             color=estilo.TEXTO).encode(text="valor:N")
     return _configurar((barras + valores).properties(height=150))
 
 

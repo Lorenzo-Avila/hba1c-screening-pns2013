@@ -117,7 +117,8 @@ ARTEFATOS = {
     },
     "carga_operacional": {
         "colunas": ["regime", "encaminhados", "taxa_encaminhamento",
-                    "casos_detectados", "casos_perdidos", "recall", "nns"],
+                    "casos_detectados", "casos_perdidos", "recall", "nns",
+                    "regime_id", "rotulo"],
         "casas": {"encaminhados": 0, "taxa_encaminhamento": "%3",
                   "casos_detectados": 0, "casos_perdidos": 0, "recall": 3, "nns": 3},
     },

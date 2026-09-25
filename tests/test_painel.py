@@ -7,6 +7,7 @@ abaixo verifica uma dessas fronteiras por AST ou pela renderização com `AppTes
 
 import ast
 import functools
+import hashlib
 import html
 import json
 import re
@@ -38,6 +39,7 @@ PAGINAS = {
     "floresta_logistica": "tecnica",
     "calibracao": "tecnica",
     "explicabilidade_tecnica": "tecnica",
+    "reproducao": "projeto",
 }
 
 IMPORTS_PROIBIDOS = {"sklearn", "shap", "joblib", "pickle", "src", "subprocess"}
@@ -46,6 +48,9 @@ WIDGETS_PROIBIDOS = {
     "file_uploader", "camera_input", "form", "slider", "select_slider",
     "data_editor", "chat_input", "color_picker", "button",
 }
+# A reprodução ao vivo é a única página que dispara processo e tem botão.
+REPRODUCAO = PAINEL / "paginas" / "reproducao.py"
+LIBERADOS = {"subprocess": {REPRODUCAO}, "button": {REPRODUCAO}}
 LEITURAS = {"read_csv", "open", "read_text"}
 VOCABULARIO_PROIBIDO = ["risco", "probabilidade de", "preditiv", "protetor",
                         "acurácia", "acuracia", "accuracy",
@@ -86,7 +91,8 @@ def test_painel_nao_importa_modulo_proibido():
             else:
                 continue
             for modulo in modulos:
-                if modulo.split(".")[0] in IMPORTS_PROIBIDOS:
+                raiz = modulo.split(".")[0]
+                if raiz in IMPORTS_PROIBIDOS and arquivo not in LIBERADOS.get(raiz, ()):
                     violacoes.append(f"{_rel(arquivo)}:{no.lineno} importa {modulo}")
     assert not violacoes, "imports proibidos no painel:\n" + "\n".join(violacoes)
 
@@ -95,7 +101,8 @@ def test_painel_nao_usa_widget_de_entrada():
     violacoes = []
     for arquivo in ARQUIVOS:
         for no in ast.walk(_arvore(arquivo)):
-            if isinstance(no, ast.Attribute) and no.attr in WIDGETS_PROIBIDOS:
+            if (isinstance(no, ast.Attribute) and no.attr in WIDGETS_PROIBIDOS
+                    and arquivo not in LIBERADOS.get(no.attr, ())):
                 violacoes.append(f"{_rel(arquivo)}:{no.lineno} usa {no.attr}")
             elif isinstance(no, ast.ImportFrom):
                 for alias in no.names:
@@ -103,6 +110,51 @@ def test_painel_nao_usa_widget_de_entrada():
                         violacoes.append(
                             f"{_rel(arquivo)}:{no.lineno} importa {alias.name}")
     assert not violacoes, "widgets de entrada no painel:\n" + "\n".join(violacoes)
+
+
+def test_subprocess_e_button_so_na_reproducao():
+    """A liberação é por arquivo: a página de reprodução usa os dois, e só ela."""
+    usos = {"subprocess": set(), "button": set()}
+    for arquivo in ARQUIVOS:
+        for no in ast.walk(_arvore(arquivo)):
+            if isinstance(no, ast.Import) and any(
+                    a.name.split(".")[0] == "subprocess" for a in no.names):
+                usos["subprocess"].add(arquivo)
+            elif isinstance(no, ast.Attribute) and no.attr == "button":
+                usos["button"].add(arquivo)
+    assert usos == {"subprocess": {REPRODUCAO}, "button": {REPRODUCAO}}, usos
+
+
+def _chamadas_de_page(no: ast.AST) -> list:
+    """Caminhos passados a `st.Page` dentro do nó."""
+    return [chamada.args[0].value for chamada in ast.walk(no)
+            if isinstance(chamada, ast.Call)
+            and isinstance(chamada.func, ast.Attribute) and chamada.func.attr == "Page"]
+
+
+def _paginas_em_secoes() -> list:
+    """Caminhos passados a `st.Page` dentro do dicionário `SECOES` de `app.py`."""
+    secoes = next(no.value for no in ast.walk(_arvore(PAINEL / "app.py"))
+                  if isinstance(no, ast.Assign)
+                  and any(isinstance(a, ast.Name) and a.id == "SECOES"
+                          for a in no.targets))
+    return _chamadas_de_page(secoes)
+
+
+def test_todo_link_de_navegacao_aponta_para_arquivo_existente():
+    todas = _chamadas_de_page(_arvore(PAINEL / "app.py"))
+    assert todas and sorted(todas) == sorted(_paginas_em_secoes()), (
+        "st.Page fora de SECOES")
+    quebrados = [caminho for caminho in todas if not (PAINEL / caminho).is_file()]
+    assert not quebrados, f"st.Page aponta para arquivo inexistente: {quebrados}"
+
+
+def test_todo_arquivo_de_pagina_esta_em_secoes():
+    arquivos = {f"paginas/{p.name}" for p in (PAINEL / "paginas").glob("*.py")
+                if p.name != "__init__.py"}
+    ligados = set(_paginas_em_secoes())
+    assert not arquivos - ligados, f"página fora da navegação: {arquivos - ligados}"
+    assert {Path(c).stem for c in ligados} == set(PAGINAS), "PAGINAS desatualizado"
 
 
 def test_leitura_de_arquivo_so_em_dados():
@@ -253,7 +305,7 @@ def test_pagina_renderiza_sem_excecao(pagina):
     assert not app.exception, [e.value for e in app.exception]
     corpo = _html_renderizado(app)
     assert html.escape(textos.PAGINAS[pagina][0]) in corpo, "título da página ausente"
-    assert textos.RODAPE in corpo, "rodapé ausente"
+    assert "Sprints 1 a 3" not in corpo, "rodapé removido voltou à tela"
 
 
 @pytest.mark.parametrize("pagina", PAGINAS)
@@ -314,6 +366,16 @@ def test_desempenho_exibe_faixa_ada_e_cartao_f1():
     assert html.unescape(cartao_f1.group(1)) == textos.GLOSSARIO["f1"]
 
 
+def _caixa_de_casos(app: AppTest):
+    return next(c for c in app.selectbox if str(c.key).startswith("caso_exemplar"))
+
+
+def _selecionar_celula(app: AppTest, modelo: str, conjunto: str) -> None:
+    app.selectbox(key="selecao_modelo").select(modelo).run()
+    app.selectbox(key="selecao_conjunto").select(conjunto).run()
+    assert not app.exception, [e.value for e in app.exception]
+
+
 def test_casos_exemplares_exibe_faixa_ressalva_e_valor_observado():
     # Instância nova: o teste troca a seleção e não pode sujar o cache.
     app = _novo_app("casos_exemplares")
@@ -330,8 +392,94 @@ def test_casos_exemplares_exibe_faixa_ressalva_e_valor_observado():
     casos = dados.ler("shap_casos_locais")
     repetidos = list(casos[casos["indice_nas_duas_celulas"]]["indice"].unique())
     assert repetidos, "o artefato deixou de ter índice repetido entre células"
-    caixa = app.selectbox(key="caso_exemplar")
+    caixa = _caixa_de_casos(app)
     opcao = next(o for o in caixa.options if o.endswith(f"índice {repetidos[0]}"))
     caixa.select_index(caixa.options.index(opcao)).run()
     assert not app.exception
     assert "mesmo indivíduo" in _html_renderizado(app)
+
+
+def test_casos_exemplares_seguem_a_celula_da_barra_lateral():
+    """Cada célula da floresta mostra os seus quatro casos, e o selo diz qual é."""
+    casos = dados.ler("shap_casos_locais")
+    app = _novo_app("casos_exemplares")
+    for (modelo, conjunto), grupo in casos.groupby(["modelo", "celula"]):
+        _selecionar_celula(app, modelo, conjunto)
+        esperados = grupo[["caso", "indice"]].drop_duplicates()
+        opcoes = _caixa_de_casos(app).options
+        assert len(opcoes) == len(esperados) == 4, (modelo, conjunto, opcoes)
+        for caso, indice in esperados.itertuples(index=False):
+            assert f"{textos.CASOS[caso]} · índice {indice}" in opcoes
+        selo = textos.SELO_CELULA.format(celula=f"{modelo} · {conjunto}")
+        assert html.escape(selo) in _html_renderizado(app), "selo de célula errado"
+
+
+def test_casos_exemplares_avisam_quando_a_celula_nao_tem_shap():
+    """Célula calibrável sem SHAP, como a logística, mostra o aviso e nenhum caso."""
+    casos = dados.ler("shap_casos_locais")
+    consolidado = dados.ler("comparativo_consolidado")
+    com_shap = set(zip(casos["modelo"], casos["celula"]))
+    sem_shap = [(m, c) for m, c, unico in consolidado[
+                    ["modelo", "conjunto", "corte_unico"]].itertuples(index=False)
+                if not unico and (m, c) not in com_shap]
+    assert sem_shap, "toda célula calibrável passou a ter SHAP"
+    app = _novo_app("casos_exemplares")
+    _selecionar_celula(app, *sem_shap[0])
+    corpo = _html_renderizado(app)
+    assert html.escape(textos.SHAP_SO_FLORESTA) in corpo, "aviso de SHAP ausente"
+    assert not [c for c in app.selectbox if str(c.key).startswith("caso_exemplar")]
+    assert not app.get("vega_lite_chart"), "waterfall sem caso da célula"
+
+
+def test_triagem_exibe_rotulo_do_regime_e_regime_do_custo_em_texto():
+    corpo = _html_renderizado(_renderizar("triagem"))
+    carga = dados.ler("carga_operacional")
+    for _, linha in carga.iterrows():
+        assert html.escape(linha["rotulo"]) in corpo, linha["rotulo"]
+        if linha["rotulo"] != linha["regime"]:
+            assert html.escape(linha["regime"]) not in corpo, linha["regime"]
+    custo = dados.ler("custo_marginal_pareado")
+    assert set(custo["regime"]) == set(textos.REGIMES_CUSTO)
+    for chave, rotulo in textos.REGIMES_CUSTO.items():
+        assert f"<td>{html.escape(rotulo)}</td>" in corpo, rotulo
+        assert f"<td>{chave}</td>" not in corpo, chave
+
+
+def test_reproducao_antes_do_clique():
+    """Sem clicar: comando, tempo esperado, o que não é regenerado e o botão."""
+    app = _renderizar("reproducao")
+    corpo = _html_renderizado(app)
+    assert textos.COMANDO_REPRODUCAO in [c.value for c in app.code], "comando ausente"
+    assert html.escape(textos.REPRODUCAO_TEMPO) in corpo
+    assert html.escape(textos.REPRODUCAO_FORA) in corpo
+    assert app.button(key="reproduzir").label == textos.BOTAO_REPRODUZIR
+    for rotulo, _ in textos.REPRODUCAO_STATUS.values():
+        assert html.escape(rotulo) not in corpo, "status antes da execução"
+
+
+def _hashes(diretorio: Path) -> dict:
+    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(diretorio.iterdir()) if p.is_file()}
+
+
+@pytest.mark.lento
+def test_reproducao_pelo_botao_confere_e_nao_toca_nas_tabelas():
+    """Clique no botão: status 0, conferência na tela e `reports/tabelas/` intacto."""
+    if not (RAIZ / "data" / "raw" / "EXAMES_PNS_2013_BRUTA.csv").exists():
+        pytest.skip("CSV bruto ausente (não versionado).")
+    antes = _hashes(dados.RAIZ)
+    app = AppTest.from_file(str(PAINEL / "app.py"), default_timeout=420)
+    app.run()
+    app.switch_page("paginas/reproducao.py")
+    app.run()
+    app.button(key="reproduzir").click().run()
+    assert not app.exception, [e.value for e in app.exception]
+
+    corpo = _html_renderizado(app)
+    log = "\n".join(c.value for c in app.code)
+    ok, _ = textos.REPRODUCAO_STATUS[True]
+    assert html.escape(ok) in corpo, log[-3000:]
+    assert '<div class="linha-log"' in corpo, "linhas de conferência sem destaque"
+    assert "Composição conferida" in corpo and "Reprodução conferida" in corpo
+    assert "comparativo_consolidado" in corpo, "lista de artefatos ausente"
+    assert _hashes(dados.RAIZ) == antes, "reports/tabelas/ mudou durante a reprodução"

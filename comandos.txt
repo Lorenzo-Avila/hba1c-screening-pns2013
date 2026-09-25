@@ -1,0 +1,1 @@
+Rodar painel: python -m streamlit run painel/app.py

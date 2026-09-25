@@ -87,6 +87,13 @@ def quadro(titulo: str, texto: str) -> None:
           f"{escape(texto)}</div>")
 
 
+def linha_de_log(texto: str, tom: str) -> None:
+    """Linha de log em fonte monoespaçada, destacada com as cores do selo `tom`."""
+    fundo, cor = estilo.SELOS[tom]
+    _html(f'<div class="linha-log" style="background:{fundo};border-left-color:{cor};'
+          f'color:{cor}">{escape(texto)}</div>')
+
+
 def nota(texto: str) -> None:
     """Nota curta em cinza."""
     _html(f'<div class="nota-fixa">{escape(texto)}</div>')

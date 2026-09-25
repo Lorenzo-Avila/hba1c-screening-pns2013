@@ -14,11 +14,6 @@ técnica podem levar.
 TITULO_APP = "HbA1c ≥ 6,5%"
 SUBTITULO_APP = "Classificação de perfis · PNS 2013"
 
-RODAPE = (
-    "Painel de resultados das Sprints 1 a 3. "
-    "O protótipo de classificação com API é a fase 6."
-)
-
 SECOES = {
     "projeto": "Projeto",
     "clinica": "Visão clínica e de gestão",
@@ -96,6 +91,12 @@ PAGINAS = {
         "Dois regimes de perturbação, blocos colineares e árvores excluídas",
         "O contraste entre regimes mede a exposição da explicação à suposição de "
         "independência (D-053).",
+    ),
+    "reproducao": (
+        "Reprodução ao vivo",
+        "Do CSV bruto às tabelas, conferido contra as âncoras",
+        "O botão roda o experimento inteiro num processo separado, gravando num "
+        "diretório temporário. As tabelas publicadas não são tocadas.",
     ),
 }
 
@@ -221,6 +222,34 @@ NAO_FAZ = [
     "Não elege a célula principal",
 ]
 
+REPRODUCAO_COMANDO = "Comando"
+COMANDO_REPRODUCAO = "python -m src.experimento --saida <diretório temporário>"
+REPRODUCAO_TEMPO = (
+    "Leva cerca de 90 s. O log aparece linha a linha enquanto o processo roda."
+)
+REPRODUCAO_ARTEFATOS_TITULO = "Artefatos regenerados"
+REPRODUCAO_ARTEFATOS = (
+    "A lista sai do próprio diretório de saída, lida depois da execução."
+)
+REPRODUCAO_FORA = (
+    "As tabelas de colinearidade e de SHAP não são regeneradas por este comando. "
+    "Elas saem do notebook de resultados e da execução de SHAP."
+)
+BOTAO_REPRODUZIR = "Reproduzir a partir do CSV bruto"
+REPRODUCAO_RODANDO = "Em execução · {segundos} s"
+REPRODUCAO_DECORRIDO = "Tempo decorrido: {segundos} s"
+REPRODUCAO_STATUS = {
+    True: ("Reprodução conferida", "verde"),
+    False: ("Divergência", "vermelho"),
+}
+REPRODUCAO_TIMEOUT = (
+    "A reprodução passou de {minutos} min e o processo foi encerrado."
+)
+CONFERENCIA_TITULO = "Linhas de conferência do log"
+LOG_TITULO = "Log da execução"
+LOG_AO_VIVO = "Log em tempo real"
+TABELA_ARTEFATO = ("artefato", "arquivos")
+
 # ---------------------------------------------------------------------------
 # Visão clínica e de gestão
 # ---------------------------------------------------------------------------
@@ -257,6 +286,11 @@ EQUIPARADO_NOTA = (
 )
 CUMPRE = ("cumpre", "verde")
 NAO_CUMPRE = ("não cumpre", "vermelho")
+# Nome de cada regime de `custo_marginal_pareado`, pela chave da coluna `regime`.
+REGIMES_CUSTO = {
+    "padrao": "ponto padrão",
+    "equiparado": "recall equiparado",
+}
 CUSTO_MARGINAL_TITULO = "Custo marginal da floresta sobre a logística"
 CUSTO_MARGINAL_NOTA = (
     "enc. são encaminhados e det. são casos detectados. Quando a floresta encaminha "

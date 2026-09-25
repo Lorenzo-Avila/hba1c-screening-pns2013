@@ -15,6 +15,7 @@ leitura do código:
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -400,6 +401,31 @@ def test_carga_operacional_carrega_a_advertencia(particao, grid_dois_conjuntos):
     tabela = xp.carga_operacional(grid_dois_conjuntos, particao)
     assert tabela.attrs["nota"] == bm.NOTA_VOLUME_ABSOLUTO
     assert "recall equiparado" in tabela.attrs["leitura"]
+
+
+PONTO_DECIMAL = re.compile(r"(?<=\d)\.(?=\d)")
+
+
+def _confere_chave_e_rotulo(tabela: pd.DataFrame) -> None:
+    """Um `regime_id` por linha, os três presentes, e `rotulo` igual a `regime` com
+    vírgula decimal. As duas colunas novas ficam no fim, depois das antigas."""
+    assert list(tabela.columns[-2:]) == ["regime_id", "rotulo"]
+    assert tabela["regime_id"].notna().all()
+    assert sorted(tabela["regime_id"]) == sorted(xp.MOLDES_REGIME)
+    for _, linha in tabela.iterrows():
+        assert not PONTO_DECIMAL.search(linha["rotulo"]), linha["rotulo"]
+        assert linha["rotulo"] == PONTO_DECIMAL.sub(",", linha["regime"])
+
+
+def test_carga_operacional_tem_regime_id_e_rotulo(particao, grid_dois_conjuntos):
+    """O painel chaveia por `regime_id` e exibe `rotulo`, sem reescrever `regime`."""
+    tabela = xp.carga_operacional(grid_dois_conjuntos, particao)
+    _confere_chave_e_rotulo(tabela)
+    assert list(tabela["regime_id"]) == ["regra", "equiparado", "padrao"]
+
+
+def test_carga_versionada_tem_regime_id_e_rotulo():
+    _confere_chave_e_rotulo(_versionado(xp.NOME_CARGA))
 
 
 # ---------------------------------------------------------------------------
