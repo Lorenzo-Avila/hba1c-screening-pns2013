@@ -7,6 +7,11 @@ painel não interpreta número do log: o selo final sai do código de saída do
 processo, e as linhas de conferência são destacadas pelo começo do texto. O
 diretório temporário é apagado no fim, e `reports/tabelas/` não é tocado
 (D-054, D-055).
+
+Antes de disparar, confere se o interpretador do painel consegue importar o
+experimento. O painel não depende de sklearn e sobe com qualquer Python que tenha
+streamlit; sem a conferência, um Python fora da `.venv` só apareceria como
+traceback no meio do log.
 """
 
 import os
@@ -56,6 +61,35 @@ def _artefatos(diretorio: Path) -> pd.DataFrame:
         [(nome, " · ".join(extensoes)) for nome, extensoes in grupos.items()],
         columns=list(textos.TABELA_ARTEFATO),
     )
+
+
+def conferir_ambiente() -> str | None:
+    """Tenta importar o experimento com o interpretador do painel, em processo separado.
+
+    Devolve `None` se o import passa, ou a última linha do erro. O import acontece no
+    processo filho, e o painel continua sem importar `src/` nem sklearn.
+    """
+    try:
+        processo = subprocess.run(
+            [sys.executable, "-c", "import src.experimento"],
+            cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        return "o import passou de 120 s"
+    if processo.returncode == 0:
+        return None
+    linhas = processo.stderr.strip().splitlines()
+    return linhas[-1] if linhas else f"código de saída {processo.returncode}"
+
+
+def mostrar_falha_de_ambiente(erro: str) -> None:
+    """Aviso de ambiente com o interpretador em uso e o comando de correção."""
+    componentes.selos([(textos.AMBIENTE_TITULO, "vermelho")])
+    componentes.alerta(textos.AMBIENTE_FALHA.format(interpretador=sys.executable,
+                                                   erro=erro))
+    componentes.nota(textos.AMBIENTE_CORRECAO)
+    st.code(textos.COMANDO_PAINEL_VENV, language="bash")
 
 
 def reproduzir(area) -> dict:
@@ -141,7 +175,13 @@ componentes.quadro(textos.REPRODUCAO_ARTEFATOS_TITULO,
                    f"{textos.REPRODUCAO_ARTEFATOS} {textos.REPRODUCAO_FORA}")
 
 if st.button(textos.BOTAO_REPRODUZIR, type="primary", key="reproduzir"):
-    st.session_state[CHAVE_RESULTADO] = reproduzir(st.empty())
+    erro = conferir_ambiente()
+    if erro is None:
+        st.session_state[CHAVE_RESULTADO] = reproduzir(st.empty())
+    else:
+        # Resultado de clique anterior ficaria na tela como se fosse deste.
+        st.session_state.pop(CHAVE_RESULTADO, None)
+        mostrar_falha_de_ambiente(erro)
 
 if CHAVE_RESULTADO in st.session_state:
     mostrar(st.session_state[CHAVE_RESULTADO])

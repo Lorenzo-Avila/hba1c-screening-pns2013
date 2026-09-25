@@ -5,7 +5,17 @@
 # equivalente está anotado ao lado. Em máquina sem `make` (o caso do ambiente de
 # desenvolvimento atual, Windows), rode a linha direto.
 
+# Interpretador: o da `.venv` do projeto quando ela existe, porque é ela que tem as
+# versões de `requirements.txt`. Um `python` solto no PATH pode ter streamlit e não
+# ter sklearn: o painel sobe e a reprodução ao vivo falha no import. Sobrescreva com
+# `make PYTHON=...` se o ambiente estiver em outro lugar.
+ifneq ($(wildcard .venv/Scripts/python.exe),)
+PYTHON ?= .venv/Scripts/python
+else ifneq ($(wildcard .venv/bin/python),)
+PYTHON ?= .venv/bin/python
+else
 PYTHON ?= python
+endif
 
 .PHONY: tudo test test-rapido resultados figuras shap notebook painel limpar ajuda
 

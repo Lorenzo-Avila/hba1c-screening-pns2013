@@ -457,6 +457,32 @@ def test_reproducao_antes_do_clique():
         assert html.escape(rotulo) not in corpo, "status antes da execução"
 
 
+def test_reproducao_avisa_quando_o_interpretador_nao_importa_o_experimento(monkeypatch):
+    """Python sem sklearn: aviso com interpretador e correção, e nenhum experimento."""
+    erro = "ModuleNotFoundError: No module named 'sklearn'"
+
+    def import_falha(comando, **kwargs):
+        assert comando[1:] == ["-c", "import src.experimento"], comando
+        return subprocess.CompletedProcess(comando, 1, "", f"Traceback\n{erro}\n")
+
+    def popen_proibido(*args, **kwargs):
+        raise AssertionError("experimento disparado com ambiente quebrado")
+
+    monkeypatch.setattr(subprocess, "run", import_falha)
+    monkeypatch.setattr(subprocess, "Popen", popen_proibido)
+    app = _novo_app("reproducao")
+    app.button(key="reproduzir").click().run()
+    assert not app.exception, [e.value for e in app.exception]
+
+    corpo = html.unescape(_html_renderizado(app))
+    assert textos.AMBIENTE_TITULO in corpo
+    assert erro in corpo, "erro do import ausente"
+    assert textos.AMBIENTE_CORRECAO in corpo
+    assert textos.COMANDO_PAINEL_VENV in [c.value for c in app.code]
+    for rotulo, _ in textos.REPRODUCAO_STATUS.values():
+        assert rotulo not in corpo, "status de reprodução sem reprodução"
+
+
 def _hashes(diretorio: Path) -> dict:
     return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(diretorio.iterdir()) if p.is_file()}

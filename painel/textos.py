@@ -245,6 +245,19 @@ REPRODUCAO_STATUS = {
 REPRODUCAO_TIMEOUT = (
     "A reprodução passou de {minutos} min e o processo foi encerrado."
 )
+AMBIENTE_TITULO = "Ambiente sem as dependências do experimento"
+AMBIENTE_FALHA = (
+    "A reprodução não foi iniciada. O painel está rodando em {interpretador}, "
+    "e esse Python não consegue importar o experimento: {erro}"
+)
+AMBIENTE_CORRECAO = (
+    "Encerre o painel e suba de novo com o Python do ambiente virtual do projeto, "
+    "que tem as versões de requirements.txt."
+)
+COMANDO_PAINEL_VENV = (
+    ".venv\\Scripts\\python -m streamlit run painel/app.py   # Windows\n"
+    ".venv/bin/python -m streamlit run painel/app.py        # Linux/macOS"
+)
 CONFERENCIA_TITULO = "Linhas de conferência do log"
 LOG_TITULO = "Log da execução"
 LOG_AO_VIVO = "Log em tempo real"

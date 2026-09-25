@@ -1,1 +1,4 @@
-Rodar painel: python -m streamlit run painel/app.py
+Rodar painel (Windows): .venv\Scripts\python -m streamlit run painel/app.py
+Rodar painel (Linux/macOS): .venv/bin/python -m streamlit run painel/app.py
+Ou ative a .venv antes (.venv\Scripts\Activate.ps1) e rode: python -m streamlit run painel/app.py
+Um python fora da .venv sobe o painel, mas a reprodução ao vivo falha sem sklearn.
