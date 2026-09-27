@@ -59,7 +59,8 @@ notebook:
 	$(PYTHON) -m jupyter nbconvert --execute --to notebook --inplace notebooks/03_resultados.ipynb
 
 ## painel: painel de resultados sobre os CSV de reports/tabelas/, em localhost.
-## Lê artefato versionado e não calcula nada (D-054).
+## As telas leem artefato versionado. A reprodução ao vivo dispara o experimento
+## em outro processo e não regrava reports/tabelas/.
 ##   equivale a: streamlit run painel/app.py
 painel:
 	$(PYTHON) -m streamlit run painel/app.py

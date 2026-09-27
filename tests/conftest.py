@@ -10,8 +10,8 @@ em `reports/tabelas/`, que é diretório **versionado**.
    lê o rastro do anterior. Foi assim que a guarda do notebook falhou na primeira
    execução da suíte completa.
 
-2. **O marcador `lento`** identifica a reexecução do notebook, para o ciclo curto
-   poder pulá-la:
+2. **O marcador `lento`** identifica a execução longa (notebook, SHAP, busca,
+   saída alternativa ou reprodução do painel), para o ciclo curto poder pulá-la:
 
        pytest tests/ -v                 suíte inteira, com a reexecução
        pytest tests/ -m "not lento"     só as guardas baratas
@@ -43,7 +43,7 @@ from src import config as cfg  # noqa: E402  depois do backend, de propósito
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
-        "lento: reexecuta o notebook de resultados de ponta a ponta (minutos).",
+        "lento: execução longa (notebook, SHAP, busca, saída alternativa ou reprodução do painel).",
     )
 
 

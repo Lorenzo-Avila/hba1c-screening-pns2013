@@ -1,12 +1,11 @@
-# Notebook baseline — congelado
+# Notebook baseline, congelado
 
-Executado em setembro/2026.
+Registro da primeira matriz de atributos. Nela, variáveis compostas entravam
+junto dos componentes que as formam, e o VIF era calculado só sobre o bloco
+numérico.
 
-Resultado: LogReg com class_weight='balanced', Recall 0,697 · AUC-ROC 0,771 ·
-Precisão 0,151 no teste (n=1.691).
+Resultado daquela execução: regressão logística com `class_weight='balanced'`,
+recall 0,697, AUC-ROC 0,771, precisão 0,151 no teste (n=1.691).
 
-**Não editar.** Serve como registro da matriz de atributos que originou as
-decisões D-001 (redundância entre compostas e componentes) e D-002 (VIF
-calculado apenas sobre o bloco numérico) em `docs/RASTREABILIDADE.md`.
-
-Substituído pelos módulos em `src/` a partir da Sprint 1.
+Não editar. Os módulos em `src/` substituíram este notebook. O mapa do código
+atual está em [../arquitetura.md](../arquitetura.md).

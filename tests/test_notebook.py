@@ -194,7 +194,7 @@ def test_reexecucao_reproduz_a_tabela_consolidada(tabelas_preservadas):
 
 
 def test_notebook_nao_implementa_modelagem():
-    """Convenção do `CLAUDE.md`: notebooks orquestram, `src/` implementa.
+    """notebooks orquestram, `src/` implementa.
 
     Não é questão de estilo. Lógica de modelagem escrita na célula não tem teste, não
     dá para chamar pela CLI e some quando o notebook é reexecutado. Foi assim que os
