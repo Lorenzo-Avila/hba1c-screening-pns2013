@@ -2,7 +2,7 @@
 
 Dois pisos, avaliados pelo mesmo `evaluate.avaliar` e sobre as mesmas partições:
 
-- `RegraClinicaADA`: `idade >= 45 OU IMC >= 30`, que é o que a Atenção Primária faz
+- `RegraClinicaADA`: `idade >= 35 OU IMC >= 25`, que é o que a Atenção Primária faz
   hoje, sem machine learning. Comparador honesto, com as mesmas variáveis não
   invasivas e nenhuma estimação.
 - `DummyClassifier(strategy="most_frequent")`: piso absoluto. Com 7% de positivos,
@@ -35,7 +35,9 @@ from . import evaluate as ev
 LIMIAR_INDICADORA = 0.5
 
 # Cortes da regra de rastreamento da American Diabetes Association.
-CORTE_IDADE_ADA = 45
+# O IMC da regra não é o da obesidade das compostas (`config.CORTE_IMC_OBESIDADE`).
+CORTE_IDADE_ADA = 35
+CORTE_IMC_ADA = 25
 
 # Acima desta fração da população adulta, a estratégia deixa de selecionar quem
 # examinar e passa a empurrar a fila inteira para o laboratório. É o corte que a
@@ -63,7 +65,7 @@ NOTA_EQUIPARACAO = (
 
 
 class RegraClinicaADA(BaseEstimator, ClassifierMixin):
-    """Regra de rastreamento da ADA: `idade >= 45` **ou** `IMC >= 30`.
+    """Regra de rastreamento da ADA: `idade >= 35` **ou** `IMC >= 25`.
 
     Determinística e sem parâmetro estimado. `fit` não aprende nada: registra só
     `classes_` e o número de colunas, que a API do scikit-learn exige para o
@@ -72,18 +74,18 @@ class RegraClinicaADA(BaseEstimator, ClassifierMixin):
 
     **Escala clínica original.** Lê `idade` e `imc` por nome, em anos e kg/m²,
     direto das preditoras que `data.separar` devolve, antes de qualquer
-    padronização. Com IMC padronizado a comparação seria de z-score com 30, e a
+    padronização. Com IMC padronizado a comparação seria de z-score com 25, e a
     regra deixaria de ser a regra. Por isso este estimador **não** vai embrulhado no
     preprocessador: ele é o comparador de quem não tem pipeline nenhum.
 
     Args:
-        corte_idade: idade mínima, em anos. Padrão 45 (ADA).
-        corte_imc: IMC mínimo, em kg/m². Padrão 30, o corte de obesidade da SBD 2019
-            que `features.ConstrutorCompostas` já usa.
+        corte_idade: idade mínima, em anos. Padrão 35 (ADA).
+        corte_imc: IMC mínimo, em kg/m². Padrão 25 (ADA). Não é o corte de
+            obesidade das compostas.
     """
 
     def __init__(self, corte_idade: int = CORTE_IDADE_ADA,
-                 corte_imc: float = cfg.CORTE_IMC_OBESIDADE):
+                 corte_imc: float = CORTE_IMC_ADA):
         self.corte_idade = corte_idade
         self.corte_imc = corte_imc
 
@@ -107,7 +109,7 @@ class RegraClinicaADA(BaseEstimator, ClassifierMixin):
         return X
 
     def predict(self, X) -> np.ndarray:
-        """Indicadora da regra: 1 se `idade >= 45` ou `imc >= 30`, senão 0."""
+        """Indicadora da regra: 1 se `idade >= 35` ou `imc >= 25`, senão 0."""
         X = self._validar(X)
         idade = pd.to_numeric(X["idade"], errors="coerce")
         imc = pd.to_numeric(X["imc"], errors="coerce")

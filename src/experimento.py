@@ -500,8 +500,8 @@ def custo_marginal_pareado(resultados: list[dict],
 
     Uma linha por conjunto e regime. O ponto padrão sai do grid, o regime equiparado
     sai de `equiparado_por_modelo`, e nenhum modelo é reavaliado aqui: são os mesmos
-    números que a carga operacional e o equiparado já publicam, subtraídos. É o que dá
-    artefato à frase de 48 encaminhamentos por um caso (D-046, D-055).
+    números que a carga operacional e o equiparado já publicam, subtraídos. O par e a
+    leitura saem daqui, não de uma frase escrita à mão.
 
     `custo_marginal` só existe quando a floresta detecta mais **e** encaminha mais.
     Sem caso a mais não há preço por caso a mais, e com caso a mais encaminhando menos
@@ -672,9 +672,8 @@ def leitura_do_criterio(carga: pd.DataFrame,
 
     **O fecho nomeia a célula, não o algoritmo.** A carga operacional avalia os dois
     regimes do modelo de referência e mais ninguém, então dizer "o critério não é
-    cumprido" sem sujeito faz o leitor estender o veredito a todas as células, e o
-    artefato diz o contrário: das cinco calibráveis, quatro cumprem no regime
-    equiparado. Quem responde por todas é `equiparado_por_modelo` (D-046, D-047).
+    cumprido" sem sujeito faz o leitor estender o veredito a todas as células.
+    Quem cumpre, célula a célula, está em `equiparado_por_modelo`.
 
     **E nem todo regime decide o critério.** No ponto padrão o modelo opera em
     recall abaixo do da regra, e `_nota_de_recall_menor` cola a ressalva no
