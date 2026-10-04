@@ -79,7 +79,7 @@ def test_montar_sem_conjunto_falha_para_quem_depende_dele():
 
 
 def test_piso_nao_recebe_preprocessador():
-    """O corte de IMC 30 da regra ADA não sobrevive a uma padronização."""
+    """O corte de IMC 25 da regra ADA não sobrevive a uma padronização."""
     montado = md.montar(md.estimadores()["Regra ADA"], conjunto="B_composto")
     assert not isinstance(montado, Pipeline)
 
@@ -505,10 +505,9 @@ def test_equiparado_exige_a_regra(particao, grid_dois_conjuntos):
 def test_artefato_equiparado_traz_as_seis_linhas_publicadas():
     """O artefato versionado, com os dois lados do contraste dentro dele.
 
-    Cinco células calibráveis mais a regra. A linha da logística em `B_composto` é o
-    número que o `ESTADO.md` e D-046 citavam sem ter `.csv` para apontar, e agora tem.
-    Está fixado aqui de propósito: quando uma guarda que fixa resultado medido falha,
-    investiga-se, não se ajusta a asserção (D-016, D-046).
+    Cinco células calibráveis mais a regra. A linha da logística em `B_composto`
+    fica fixada no valor emitido. Uma deriva posterior se investiga; não se ajusta
+    a asserção para a suíte voltar ao verde.
     """
     caminho = cfg.PATH_TABELAS / f"{xp.NOME_EQUIPARADO}.csv"
     assert caminho.exists(), f"artefato ausente: {caminho}"
@@ -520,10 +519,10 @@ def test_artefato_equiparado_traz_as_seis_linhas_publicadas():
 
     logreg = emitido[(emitido["modelo"] == "LogReg")
                      & (emitido["conjunto"] == "B_composto")].iloc[0]
-    assert logreg["encaminhados"] == 1000
-    assert logreg["casos_detectados"] == 109
-    assert round(logreg["recall_obtido"], 3) == 0.916
-    assert round(logreg["nns"], 6) == 9.174312
+    assert logreg["encaminhados"] == 1470
+    assert logreg["casos_detectados"] == 117
+    assert round(logreg["recall_obtido"], 3) == 0.983
+    assert round(logreg["nns"], 6) == 12.564103
 
     floresta = emitido[(emitido["modelo"] == xp.NOME_FLORESTA)
                        & (emitido["conjunto"] == "B_composto")].iloc[0]
@@ -675,16 +674,16 @@ def test_leitura_do_custo_marginal_segue_o_sinal_dos_deltas():
 
 
 def test_custo_marginal_versionado_traz_os_quatro_pares():
-    """Os quatro pares que o texto usa, entre eles os 48 encaminhamentos por um caso.
+    """Os quatro pares que o texto usa, com o esperado igual ao CSV emitido.
 
-    Fixado de propósito: se um destes números se mover, investiga-se (D-016, D-046).
+    Fixado de propósito: se um destes números se mover, investiga-se.
     """
     tabela = _versionado(xp.NOME_CUSTO_MARGINAL).set_index(["conjunto", "regime"])
     esperado = {
         ("B_composto", "padrao"): (24, 5, 4.8, "troca"),
-        ("B_composto", "equiparado"): (48, 1, 48.0, "troca"),
+        ("B_composto", "equiparado"): (-9, 0, None, "floresta domina"),
         ("A_atomico", "padrao"): (-4, 4, None, "floresta domina"),
-        ("A_atomico", "equiparado"): (-1, 1, None, "floresta domina"),
+        ("A_atomico", "equiparado"): (-23, 1, None, "floresta domina"),
     }
     assert set(tabela.index) == set(esperado)
     for chave, (delta_enc, delta_det, custo, leitura) in esperado.items():

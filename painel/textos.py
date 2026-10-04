@@ -267,7 +267,7 @@ TABELA_ARTEFATO = ("artefato", "arquivos")
 # Visão clínica e de gestão
 # ---------------------------------------------------------------------------
 
-COMPARADOR_ADA = "Comparador: regra clínica ADA (idade ≥ 45 ou IMC ≥ 30)"
+COMPARADOR_ADA = "Comparador: regra clínica ADA (idade ≥ 35 ou IMC ≥ 25)"
 LEGENDA_DESEMPENHO = (
     "Métricas no conjunto de teste. Limiar calibrado no treino para recall-alvo "
     "{recall_alvo}."

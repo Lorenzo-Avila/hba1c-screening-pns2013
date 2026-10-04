@@ -162,7 +162,7 @@ construção. Isso aparece na tabela de SHAP por coluna, não como irrelevância
 ## Uma célula do grid
 
 `models.montar` embrulha logística e floresta no preprocessador. A regra ADA e o
-dummy saem crus: o corte de IMC 30 não sobrevive a uma padronização, e o dummy
+dummy saem crus: o corte de IMC 25 não sobrevive a uma padronização, e o dummy
 ignora `X`. Os dois declaram `invariante_ao_conjunto` e rodam uma vez, com
 conjunto ausente na tabela. Rodá-los em A, B e C repetiria a mesma linha.
 
@@ -184,7 +184,7 @@ o alvo, fica o maior: mesmo recall, menos encaminhamento. Recall é a métrica
 prioritária. Especificidade, F1 e AUC-ROC acompanham em toda tabela. PR-AUC,
 Brier e NNS entram junto.
 
-A regra clínica é idade ≥ 45 ou IMC ≥ 30. O dummy prevê a classe majoritária.
+A regra clínica é idade ≥ 35 ou IMC ≥ 25. O dummy prevê a classe majoritária.
 Os dois devolvem 0 ou 1, então não há curva para calibrar limiar. Métrica que
 depende de curva, neles, não se compara com a dos modelos.
 

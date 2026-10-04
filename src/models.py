@@ -126,7 +126,7 @@ def montar(estimador: Estimador, conjunto: str | dict | None = None):
 
     Quem depende do conjunto sai embrulhado no preprocessador de três estágios; os
     invariantes saem crus, porque operam sobre as preditoras em escala clínica: o
-    corte de IMC 30 da regra ADA não sobrevive a uma padronização.
+    corte de IMC 25 da regra ADA não sobrevive a uma padronização.
 
     Raises:
         ValueError: se um estimador dependente do conjunto for montado sem um.
