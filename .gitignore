@@ -12,6 +12,9 @@ reports/figuras/*.pdf
 .env
 .vscode/
 .idea/
+
+# artefatos da compilação LaTeX da monografia
+monografia/build/
 claude.md
 # baseline congelado mantém outputs
 !docs/baseline/Baseline_TCC.ipynb
