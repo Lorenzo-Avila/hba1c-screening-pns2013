@@ -150,7 +150,7 @@
 		pdfauthor={\@author},
     	pdfsubject={\imprimirpreambulo},
 	    pdfcreator={LaTeX with abnTeX2},
-		pdfkeywords={iffar, latex, abntex2}, 
+		pdfkeywords={diabetes mellitus tipo 2, aprendizado de máquina, PNS 2013, triagem, SHAP}, 
 		colorlinks=true,       		% false: boxed links; true: colored links
     	linkcolor=black,%blue,          	% color of internal links
     	citecolor=black,%blue,        		% color of links to bibliography
@@ -166,13 +166,37 @@
 % ---
 
 % Declaração das siglas
-\siglalista{ABNT}{Associação Brasileira de Normas Técnicas}
+\siglalista{APS}{Atenção Primária à Saúde}
+\siglalista{AUC-ROC}{Área sob a Curva ROC}
+\siglalista{CC}{Circunferência da Cintura}
+\siglalista{CEP}{Comitê de Ética em Pesquisa}
+\siglalista{CNS}{Conselho Nacional de Saúde}
+\siglalista{CRISP-DM}{\textit{Cross Industry Standard Process for Data Mining}}
+\siglalista{DM}{Diabetes Mellitus}
+\siglalista{DM2}{Diabetes Mellitus tipo 2}
+\siglalista{ELSA-Brasil}{Estudo Longitudinal de Saúde do Adulto}
+\siglalista{FINDRISC}{\textit{Finnish Diabetes Risk Score}}
+\siglalista{HAS}{Hipertensão Arterial Sistêmica}
+\siglalista{HbA1c}{Hemoglobina Glicada}
+\siglalista{IBGE}{Instituto Brasileiro de Geografia e Estatística}
+\siglalista{IMC}{Índice de Massa Corporal}
+\siglalista{KNN}{\textit{K-Nearest Neighbors}}
+\siglalista{ML}{\textit{Machine Learning}}
+\siglalista{PEC}{Prontuário Eletrônico do Cidadão}
+\siglalista{PNS}{Pesquisa Nacional de Saúde}
+\siglalista{RCEst}{Razão Cintura-Estatura}
+\siglalista{SHAP}{\textit{SHapley Additive exPlanations}}
+\siglalista{SIGTAP}{Sistema de Gerenciamento da Tabela de Procedimentos, Medicamentos e OPM do SUS}
+\siglalista{SIPD}{Sistema Integrado de Pesquisas Domiciliares}
+\siglalista{SISAB}{Sistema de Informação em Saúde para a Atenção Básica}
+\siglalista{SMOTE}{\textit{Synthetic Minority Over-sampling Technique}}
+\siglalista{SRH}{\textit{Self-Rated Health}}
+\siglalista{SUS}{Sistema Único de Saúde}
+\siglalista{VIF}{Fator de Inflação de Variância}
+\siglalista{XAI}{Inteligência Artificial Explicável}
 
 % Declaração dos simbolos
-\simbololista{C}{\ensuremath{C}}{Circunferência de um círculo}
-\simbololista{pi}{\ensuremath{\pi}}{Número pi} 
-\simbololista{r}{\ensuremath{r}}{Raio de um círculo}
-\simbololista{A}{\ensuremath{A}}{Área de um círculo}
+% O trabalho não usa símbolos próprios; a lista de símbolos está desativada no pré-texto.
 
 % compila a lista de abreviaturas e siglas e a lista de símbolos
 \makenoidxglossaries 
@@ -193,6 +217,9 @@
 % Seleciona o idioma do documento (conforme pacotes do babel)
 %\selectlanguage{english}
 \selectlanguage{brazil}
+
+% Registra todas as siglas declaradas, para que a lista as imprima sem exigir \gls no texto.
+\glsaddall[types={acronym}]
 
 % Retira espaço extra obsoleto entre as frases.
 \frenchspacing 
@@ -226,35 +253,39 @@
 % ---
 
 % ---
-% 2 - Capítulo 2
+% 2 - Fundamentação Teórica
 % ---
 \include{chapters/2-referencial}
 % ---
 
 % ---
-% 3 - Capítulo 3
+% 3 - Metodologia
 % ---
 \include{chapters/3-metodologia}
 % ---
 
 % ---
-% 4 - Capítulo 4
+% 4 - Desenvolvimento
 % ---
-\include{chapters/4-resultados}
-% ---
-
-
-% ---
-% 5 - Discussões
-% ---
-%\phantompart
-\include{chapters/5-discussoes}
+\include{chapters/4-desenvolvimento}
 % ---
 
 % ---
-% 6 - Capítulo 6
+% 5 - Resultados
 % ---
-\include{chapters/6-consideracoesfinais}
+\include{chapters/5-resultados}
+% ---
+
+% ---
+% 6 - Discussões
+% ---
+\include{chapters/6-discussoes}
+% ---
+
+% ---
+% 7 - Considerações Finais
+% ---
+\include{chapters/7-consideracoesfinais}
 % ---
 
 
