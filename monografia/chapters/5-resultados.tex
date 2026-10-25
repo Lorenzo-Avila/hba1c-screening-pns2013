@@ -43,8 +43,53 @@ Após as exclusões, apenas quatro variáveis apresentaram valores ausentes, con
 \end{table}
 
 \section{Multicolinearidade e Escolha do Conjunto de Atributos}\label{sec:res-multicolinearidade}
-% pearson_A/B/C (figuras), vif_comparativo, vif_resumo, vif_ablacao_rcest, decomposicao_escore
-% descarte do C_completo; assimetria do grid (logística em três conjuntos, floresta em dois)
+A matriz de correlação de Pearson entre as variáveis numéricas, calculada sobre o conjunto de treino, é apresentada na Figura~\ref{fig:pearson} para o conjunto C, que reúne todas as variáveis dessa natureza utilizadas nos três conjuntos. As correlações mais elevadas concentraram-se no bloco antropométrico, com coeficiente de 0,92 entre a circunferência da cintura e a RCEst, de 0,80 entre o IMC e a RCEst e de 0,79 entre o IMC e a circunferência da cintura, seguidas pela correlação de 0,74 entre as pressões arteriais sistólica e diastólica. O escore de Multimorbidade Metabólica apresentou correlações moderadas com as variáveis que alimentam as suas parcelas, de 0,64 com a RCEst e de 0,59 com a circunferência da cintura, enquanto as demais correlações permaneceram abaixo de 0,50 em valor absoluto.
+
+\begin{figure}[htb]
+  \centering
+  \caption{\label{fig:pearson}Correlação de Pearson entre as variáveis numéricas do conjunto C, no conjunto de treino.}
+  \includegraphics[width=0.85\textwidth]{figs/pearson_c_completo.png}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+\end{figure}
+
+O diagnóstico por VIF, apresentado na Tabela~\ref{tab:vif-resumo}, identificou violação do limiar apenas no conjunto C, no qual duas colunas excederam o valor de 10: a RCEst, com VIF de 14,03, e a circunferência da cintura, com 13,73, o que corresponde a um $R^2$ auxiliar de 0,93 nas duas colunas. Nos conjuntos A e B, o maior VIF foi de 3,51 e de 3,92, respectivamente, ambos observados na circunferência da cintura, com mediana de 1,40 nos dois conjuntos.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:vif-resumo}Resumo do diagnóstico de VIF por conjunto de atributos, no conjunto de treino.}
+  \begin{tabular}{lrrrr}
+    \hline
+    Conjunto & Colunas & VIF máximo & VIF mediano & Colunas com VIF $>$ 10 \\ \hline
+    A, atômico & 20 & 3,51 & 1,40 & 0 \\
+    B, composto & 16 & 3,92 & 1,40 & 0 \\
+    C, completo & 23 & 14,03 & 1,62 & 2 \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+\end{table}
+
+Cabe ressaltar que as colunas que carregam a redundância deliberada do conjunto C, isto é, o escore de Multimorbidade Metabólica, a HAS Combinada e as indicadoras da HAS autorreferida e do colesterol alto, não excederam o limiar, apresentando VIF de 8,60, 6,03, 2,85 e 2,52, respectivamente, ainda que o VIF do escore tenha se elevado de 2,01, no conjunto B, para 8,60 no conjunto C. Diante disso, o VIF sinalizou apenas a colinearidade antropométrica, e não a redundância entre o escore e os seus componentes.
+
+O teste complementar descrito na Metodologia explica essa diferença. A regressão do escore sobre as suas três parcelas resultou em um $R^2$ de 1,000, isto é, a soma das parcelas reproduz o escore em todos os registros do treino, enquanto a regressão auxiliar do VIF, que dispõe apenas das colunas do modelo, alcançou um $R^2$ de 0,884. A diferença decorre do componente de obesidade, que não constitui uma coluna do modelo e resulta da aplicação de pontos de corte sobre o IMC e a circunferência da cintura, transformação que uma combinação linear das colunas contínuas não é capaz de recuperar. Por consequência, a redundância do escore no conjunto C é total, porém o VIF a subestima por construção.
+
+Em conformidade com o protocolo, a RCEst, coluna de maior VIF do bloco antropométrico, foi removida experimentalmente do conjunto C e o diagnóstico foi recalculado, conforme a Tabela~\ref{tab:vif-ablacao}. Sem a RCEst, nenhuma coluna excedeu o limiar, e o VIF da circunferência da cintura caiu de 13,73 para 4,70, enquanto o escore de multimorbidade e a HAS Combinada permaneceram inalterados, de maneira que a remoção resolveu integralmente a violação observada e restringiu o seu efeito às colunas relacionadas às medidas corporais. Diante disso, a exclusão da RCEst dos conjuntos A e B possui respaldo empírico direto.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:vif-ablacao}Efeito da remoção experimental da RCEst sobre o VIF das colunas do conjunto C com maior variação e das colunas agregadas.}
+  \begin{tabular}{lrrrr}
+    \hline
+    Coluna & VIF antes & VIF depois & $R^2$ antes & $R^2$ depois \\ \hline
+    Circunferência da cintura & 13,73 & 4,70 & 0,927 & 0,787 \\
+    IMC & 3,39 & 3,12 & 0,705 & 0,680 \\
+    Sexo feminino & 2,28 & 1,58 & 0,561 & 0,368 \\
+    Idade & 1,97 & 1,79 & 0,493 & 0,442 \\
+    Multimorbidade Metabólica & 8,60 & 8,60 & 0,884 & 0,884 \\
+    HAS Combinada & 6,03 & 6,03 & 0,834 & 0,834 \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+\end{table}
+
+Em síntese, o VIF fundamentou a exclusão da RCEst, porém não sustenta, isoladamente, a preferência pelos conjuntos A e B em relação ao conjunto C, visto que a redundância de canal deste último não foi detectada pelo limiar. A escolha decorre do quarto princípio orientador da seleção de variáveis, que exige variáveis conceitualmente ortogonais a fim de preservar a interpretabilidade das contribuições individuais, e da demonstração, pelo teste de identidade, de que o escore nada acrescenta às suas parcelas quando estas também estão presentes no modelo. Diante disso, o conjunto C foi descartado e mantido apenas na Regressão Logística, como evidência de que a redundância não resultou em desempenho superior, conforme apresentado na seção de Desempenho no Ponto de Operação Principal, enquanto o \textit{Random Forest} foi avaliado somente nos conjuntos A e B. Por consequência, as seções seguintes apresentam a Regressão Logística em três conjuntos de atributos e o \textit{Random Forest} em dois.
 
 \section{Busca de Hiperparâmetros}\label{sec:res-busca}
 % busca_rf; empate dentro da dispersão (0,2494 x 0,2484 em A; 0,2482 x 0,2446 em B; ±0,026 a 0,030)
