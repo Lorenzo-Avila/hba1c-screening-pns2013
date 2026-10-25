@@ -3,8 +3,68 @@
 % ----------------------------------------------------------
 
 \section{Ambiente e Tecnologias}\label{sec:ambiente}
+O desenvolvimento foi realizado na linguagem Python, na versão 3.14.0, em um ambiente virtual cujas versões de bibliotecas foram fixadas em um arquivo de requisitos, a fim de que a reprodução dos resultados não dependesse de atualizações posteriores dessas bibliotecas. As principais bibliotecas utilizadas e suas funções foram: pandas 3.0.5 e NumPy 2.5.3, para a leitura e a manipulação dos dados; scikit-learn 1.9.1, para a construção do \textit{pipeline}, dos modelos, da validação cruzada e das métricas \cite{pedregosa2011scikit}; SciPy 1.18.1, para o teste binomial exato utilizado no teste de McNemar; SHAP 0.52.0, para a explicabilidade; Matplotlib 3.11.2, para a geração das figuras; pytest 9.1.1, para os testes automatizados; Jupyter, para o notebook de resultados; e Streamlit 1.64.0, em conjunto com a biblioteca Altair 6.3.0, para o painel de resultados. Os comandos de execução do projeto foram reunidos em um arquivo \textit{Makefile}, cujos alvos correspondem, cada um, a uma única linha de comando em Python, de maneira que o projeto também possa ser executado em ambientes sem a ferramenta \textit{make}.
 
 \section{Arquitetura do Software}\label{sec:arquitetura}
+O software foi organizado em três camadas com responsabilidades distintas, visando que nenhuma decisão metodológica fosse implementada em mais de um lugar. A primeira camada, composta pelos módulos do diretório \texttt{src}, concentra todo o cálculo, isto é, a carga e a limpeza dos dados, a preparação, a modelagem, a avaliação e a explicabilidade. A segunda camada é o notebook de resultados, cuja função é orquestrar as chamadas aos módulos na ordem de apresentação dos resultados, sem conter lógica de modelagem própria, sendo versionado juntamente com as suas saídas, visto que é a partir dele que são geradas as figuras deste trabalho. A terceira camada é o painel de resultados, que apenas lê as tabelas geradas pela primeira camada e não importa nenhum de seus módulos. A responsabilidade de cada módulo da primeira camada é apresentada no Quadro~\ref{qua:modulos}.
+
+\begin{quadro}[htb]
+  \caption{\label{qua:modulos}Módulos do diretório \texttt{src} e suas responsabilidades.}
+  \small
+  \begin{tabular}{|p{3.4cm}|p{11.0cm}|}
+    \hline
+    \textbf{Módulo} & \textbf{Responsabilidade} \\ \hline
+    \texttt{config} & Constantes, caminhos, mapeamento dos códigos da PNS, pontos de corte clínicos e semente aleatória \\ \hline
+    \texttt{data} & Carga e limpeza dos dados, exclusões e variáveis derivadas registro a registro \\ \hline
+    \texttt{features} & Imputação, variáveis compostas, conjuntos de atributos e \textit{pipeline} de preparação \\ \hline
+    \texttt{colinearidade} & Correlação de Pearson, VIF, ablação e teste de identidade do escore \\ \hline
+    \texttt{models} & Configuração da Regressão Logística e do \textit{Random Forest} \\ \hline
+    \texttt{benchmark} & Regra clínica, classificador da classe majoritária e critério de sucesso \\ \hline
+    \texttt{evaluate} & Definição do limiar, métricas, calibração, teste de McNemar e figuras \\ \hline
+    \texttt{experimento} & Execução completa dos experimentos, geração das tabelas e conferência da reprodução \\ \hline
+    \texttt{tuning} & Busca de hiperparâmetros do \textit{Random Forest} \\ \hline
+    \texttt{explicabilidade} & Atribuições SHAP nos dois regimes, blocos colineares e casos locais \\ \hline
+    \texttt{artefatos} & Gravação padronizada das tabelas em arquivo \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor.}
+\end{quadro}
+
+Todas as constantes utilizadas por mais de um módulo, como os pontos de corte clínicos, a semente aleatória e o mapeamento entre os códigos da PNS e os nomes das variáveis, foram concentradas em um único módulo de configuração, de maneira que a alteração de qualquer uma delas ocorra em um único ponto do código. A partir desse mapeamento, os códigos originais da PNS não aparecem em nenhuma outra parte do código, das tabelas ou do painel, que utilizam exclusivamente os nomes apresentados no Quadro~\ref{qua:dicionario}.
+
+\begin{quadro}[htb]
+  \caption{\label{qua:dicionario}Correspondência entre os códigos da PNS 2013 e os nomes utilizados no código.}
+  \small
+  \begin{tabular}{|p{2.4cm}|p{4.0cm}|p{7.8cm}|}
+    \hline
+    \textbf{Código PNS} & \textbf{Nome no código} & \textbf{Variável} \\ \hline
+    C008 & \texttt{idade} & Idade, em anos \\ \hline
+    Z001 & \texttt{sexo} & Sexo \\ \hline
+    Z003 & \texttt{raca\_cor} & Raça/cor \\ \hline
+    z004 & \texttt{peso\_kg} & Peso final, em quilogramas \\ \hline
+    z005 & \texttt{altura\_cm} & Altura final, em centímetros \\ \hline
+    W00303 & \texttt{circ\_cintura} & Circunferência da cintura, em centímetros \\ \hline
+    W00407 & \texttt{pas} & Pressão arterial sistólica, em mmHg \\ \hline
+    W00408 & \texttt{pad} & Pressão arterial diastólica, em mmHg \\ \hline
+    Q002 & \texttt{has\_autorrelato} & Diagnóstico autorrelatado de hipertensão \\ \hline
+    Q060 & \texttt{colesterol\_alto} & Diagnóstico autorrelatado de colesterol alto \\ \hline
+    N001 & \texttt{saude\_autoaval} & Estado de saúde autoavaliado \\ \hline
+    VDD004 & \texttt{escolaridade} & Nível de instrução \\ \hline
+    I001 & \texttt{plano\_saude} & Posse de plano de saúde \\ \hline
+    regiao & \texttt{regiao} & Macrorregião de residência \\ \hline
+    Z034 & \texttt{hba1c} & Hemoglobina glicada, desfecho \\ \hline
+    peso\_lab & \texttt{peso\_lab} & Peso amostral laboratorial, uso descritivo \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor.}
+\end{quadro}
+
+O \textit{pipeline} de preparação descrito na Metodologia foi implementado em três estágios encadeados: o primeiro realiza a imputação dos valores ausentes; o segundo constrói as variáveis compostas a partir das variáveis já imputadas; e o terceiro seleciona as colunas do conjunto de atributos e aplica a padronização, a manutenção das binárias e a codificação das nominais. Os dois primeiros estágios foram implementados como componentes próprios, compatíveis com a interface de transformadores da biblioteca \textit{scikit-learn} \cite{pedregosa2011scikit}, enquanto o terceiro utiliza os componentes da própria biblioteca. Por consequência, o \textit{pipeline} completo, incluindo os estágios próprios, é reajustado a cada partição da validação cruzada e da busca de hiperparâmetros, sem que nenhuma etapa enxergue os dados de validação ou de teste. O percurso completo dos dados, desde os microdados até a avaliação no conjunto de teste, é apresentado na Figura~\ref{fig:fluxo-dados}.
+
+\begin{figure}[htb]
+  \centering
+  \caption{\label{fig:fluxo-dados}Fluxo dos dados, dos microdados à avaliação no conjunto de teste.}
+  \input{figs/fluxo_dados}
+  \fonte{Elaborado pelo autor.}
+\end{figure}
 
 \section{Reprodutibilidade dos Resultados}\label{sec:reprodutibilidade}
 

@@ -1,0 +1,40 @@
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  node distance=4mm and 6mm,
+  etapa/.style={draw, rounded corners=2pt, align=center, text width=4.6cm, minimum height=8mm, inner sep=3pt},
+  dado/.style={draw, align=center, text width=3.4cm, minimum height=8mm, inner sep=3pt},
+  pipe/.style={draw, align=center, text width=3.6cm, minimum height=8mm, inner sep=3pt, fill=black!5},
+  seta/.style={-{Stealth[length=2mm]}, thick},
+  aplica/.style={-{Stealth[length=2mm]}, thick, dashed}
+]
+\node[dado, text width=4.6cm] (csv) {Microdados da Subamostra\\ Laboratorial (CSV)};
+\node[etapa, below=of csv] (carga) {Carga das colunas do mapeamento\\ de variáveis};
+\node[etapa, below=of carga] (limpeza) {Limpeza registro a registro: tipos, raça/cor ignorada, duplicatas, exclusões, IMC, RCEst e desfecho};
+\node[etapa, below=of limpeza] (sep) {Separação entre variáveis, desfecho\\ e peso amostral};
+\node[dado, right=of sep] (peso) {\textit{Peso\_Lab}: apenas etapa descritiva};
+\node[etapa, below=of sep] (split) {Divisão 80/20 estratificada\\ pelo desfecho};
+\node[dado, below left=8mm and -1.6cm of split] (treino) {Conjunto de treino};
+\node[dado, below right=8mm and -1.6cm of split] (teste) {Conjunto de teste};
+
+\node[pipe, below=9mm of treino] (imp) {Imputação por KNN};
+\node[pipe, below=of imp] (comp) {Variáveis compostas};
+\node[pipe, below=of comp] (ct) {Seleção do conjunto, padronização e codificação};
+\node[etapa, text width=3.6cm, below=8mm of ct] (modelo) {Classificador};
+\node[draw, dashed, rounded corners=3pt, inner sep=6pt, fit=(imp)(ct), label={[font=\sffamily\scriptsize]left:\textit{pipeline}}] (caixa) {};
+
+\node[etapa, text width=3.4cm, below=24mm of teste] (aval) {Avaliação no\\ conjunto de teste};
+
+\draw[seta] (csv) -- (carga);
+\draw[seta] (carga) -- (limpeza);
+\draw[seta] (limpeza) -- (sep);
+\draw[seta] (sep) -- (peso);
+\draw[seta] (sep) -- (split);
+\draw[seta] (split) -- (treino);
+\draw[seta] (split) -- (teste);
+\draw[seta] (treino) -- (imp);
+\draw[seta] (imp) -- (comp);
+\draw[seta] (comp) -- (ct);
+\draw[seta] (ct) -- (modelo);
+\draw[seta] (teste) -- (aval);
+\draw[aplica] (modelo.east) -| node[pos=0.22, below, font=\sffamily\scriptsize, align=center]{pipeline e classificador ajustados\\ no treino, apenas aplicados} (aval.south);
+\end{tikzpicture}
