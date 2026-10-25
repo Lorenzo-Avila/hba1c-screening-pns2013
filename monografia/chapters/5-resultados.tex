@@ -71,18 +71,16 @@ Cabe ressaltar que as colunas que carregam a redundância deliberada do conjunto
 
 O teste complementar descrito na Metodologia explica essa diferença. A regressão do escore sobre as suas três parcelas resultou em um $R^2$ de 1,000, isto é, a soma das parcelas reproduz o escore em todos os registros do treino, enquanto a regressão auxiliar do VIF, que dispõe apenas das colunas do modelo, alcançou um $R^2$ de 0,884. A diferença decorre do componente de obesidade, que não constitui uma coluna do modelo e resulta da aplicação de pontos de corte sobre o IMC e a circunferência da cintura, transformação que uma combinação linear das colunas contínuas não é capaz de recuperar. Por consequência, a redundância do escore no conjunto C é total, porém o VIF a subestima por construção.
 
-Em conformidade com o protocolo, a RCEst, coluna de maior VIF do bloco antropométrico, foi removida experimentalmente do conjunto C e o diagnóstico foi recalculado, conforme a Tabela~\ref{tab:vif-ablacao}. Sem a RCEst, nenhuma coluna excedeu o limiar, e o VIF da circunferência da cintura caiu de 13,73 para 4,70, enquanto o escore de multimorbidade e a HAS Combinada permaneceram inalterados, de maneira que a remoção resolveu integralmente a violação observada e restringiu o seu efeito às colunas relacionadas às medidas corporais. Diante disso, a exclusão da RCEst dos conjuntos A e B possui respaldo empírico direto.
+Em conformidade com o protocolo, a RCEst, coluna de maior VIF do bloco antropométrico, foi removida experimentalmente do conjunto C e o diagnóstico foi recalculado, conforme a Tabela~\ref{tab:vif-ablacao}. Sem a RCEst, nenhuma coluna excedeu o limiar, e o VIF da circunferência da cintura caiu de 13,73 para 4,70, enquanto o escore de multimorbidade e a HAS Combinada permaneceram inalterados, de maneira que a remoção resolveu integralmente a violação observada, com efeito concentrado no bloco antropométrico. Diante disso, a exclusão da RCEst dos conjuntos A e B possui respaldo empírico direto.
 
 \begin{table}[htb]
   \centering
-  \caption{\label{tab:vif-ablacao}Efeito da remoção experimental da RCEst sobre o VIF das colunas do conjunto C com maior variação e das colunas agregadas.}
+  \caption{\label{tab:vif-ablacao}Efeito da remoção experimental da RCEst sobre o VIF das colunas antropométricas e agregadas do conjunto C.}
   \begin{tabular}{lrrrr}
     \hline
     Coluna & VIF antes & VIF depois & $R^2$ antes & $R^2$ depois \\ \hline
     Circunferência da cintura & 13,73 & 4,70 & 0,927 & 0,787 \\
     IMC & 3,39 & 3,12 & 0,705 & 0,680 \\
-    Sexo feminino & 2,28 & 1,58 & 0,561 & 0,368 \\
-    Idade & 1,97 & 1,79 & 0,493 & 0,442 \\
     Multimorbidade Metabólica & 8,60 & 8,60 & 0,884 & 0,884 \\
     HAS Combinada & 6,03 & 6,03 & 0,834 & 0,834 \\ \hline
   \end{tabular}
@@ -92,11 +90,85 @@ Em conformidade com o protocolo, a RCEst, coluna de maior VIF do bloco antropom�
 Em síntese, o VIF fundamentou a exclusão da RCEst, porém não sustenta, isoladamente, a preferência pelos conjuntos A e B em relação ao conjunto C, visto que a redundância de canal deste último não foi detectada pelo limiar. A escolha decorre do quarto princípio orientador da seleção de variáveis, que exige variáveis conceitualmente ortogonais a fim de preservar a interpretabilidade das contribuições individuais, e da demonstração, pelo teste de identidade, de que o escore nada acrescenta às suas parcelas quando estas também estão presentes no modelo. Diante disso, o conjunto C foi descartado e mantido apenas na Regressão Logística, como evidência de que a redundância não resultou em desempenho superior, conforme apresentado na seção de Desempenho no Ponto de Operação Principal, enquanto o \textit{Random Forest} foi avaliado somente nos conjuntos A e B. Por consequência, as seções seguintes apresentam a Regressão Logística em três conjuntos de atributos e o \textit{Random Forest} em dois.
 
 \section{Busca de Hiperparâmetros}\label{sec:res-busca}
-% busca_rf; empate dentro da dispersão (0,2494 x 0,2484 em A; 0,2482 x 0,2446 em B; ±0,026 a 0,030)
+A busca avaliou as mesmas sessenta combinações de hiperparâmetros nos conjuntos A e B, e os seus principais resultados são apresentados na Tabela~\ref{tab:busca}. No conjunto B, a melhor combinação, adotada para os dois conjuntos, utilizou profundidade máxima de 10, mínimo de 20 registros por folha, raiz quadrada do número de colunas em cada divisão e o valor \texttt{balanced\_subsample}, alcançando PR-AUC média de 0,2482 entre as partições, com desvio padrão de 0,0296. No conjunto A, a melhor combinação, sem limite de profundidade e com metade das colunas avaliadas em cada divisão, alcançou 0,2494, enquanto a configuração adotada ocupou a 18ª posição, com 0,2447, diferença de 0,0047 que corresponde a menos de um quarto do desvio padrão entre partições. Em ambos os conjuntos, a PR-AUC obtida correspondeu a aproximadamente 3,5 vezes o valor de referência de um classificador sem capacidade discriminativa, igual à prevalência do conjunto de treino, de 0,070.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:busca}Principais combinações da busca de hiperparâmetros do \textit{Random Forest}, por validação cruzada no conjunto de treino.}
+  \small
+  \begin{tabular}{llrrlrrr}
+    \hline
+    Conjunto & Combinação & Prof. & Folha & Colunas & Posição & PR-AUC & DP \\ \hline
+    A & Melhor geral & Sem limite & 20 & 50\% & 1 & 0,2494 & 0,0261 \\
+    A & Melhor com \texttt{balanced} & 10 & 20 & 30\% & 4 & 0,2484 & 0,0266 \\
+    A & Adotada & 10 & 20 & Raiz & 18 & 0,2447 & 0,0219 \\
+    B & Melhor geral e adotada & 10 & 20 & Raiz & 1 & 0,2482 & 0,0296 \\
+    B & Melhor com \texttt{balanced} & 10 & 10 & 30\% & 6 & 0,2446 & 0,0273 \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+  \legend{Prof.: profundidade máxima; Folha: mínimo de registros por folha; Colunas: colunas avaliadas em cada divisão; DP: desvio padrão entre as partições. Exceto quando indicado, as combinações utilizam \texttt{balanced\_subsample}.}
+\end{table}
+
+A superfície da busca mostrou-se plana. Em cada conjunto, a diferença entre a melhor e a pior das sessenta combinações, de 0,0165 no conjunto A e de 0,0204 no conjunto B, foi inferior ao desvio padrão entre partições de qualquer uma das combinações, de maneira que nenhuma configuração se destacou além da variação esperada entre partições dos dados. O único padrão consistente foi observado no número mínimo de registros por folha, visto que as doze piores combinações de cada conjunto utilizaram o menor valor avaliado, de cinco registros, comportamento coerente com a restrição descrita na Metodologia.
+
+Na comparação entre as duas formas de reponderamento, a melhor combinação com \texttt{balanced\_subsample} superou a melhor com \texttt{balanced} por 0,0010 no conjunto A, com 0,2494 contra 0,2484, e por 0,0036 no conjunto B, com 0,2482 contra 0,2446, diferenças inferiores ao desvio padrão entre partições dessas combinações, situado entre 0,026 e 0,030. Diante disso, a busca não separou as duas formas de reponderamento, e a escolha do \texttt{balanced\_subsample} apoiou-se no argumento descrito na seção de Tratamento do Desbalanceamento, e não na diferença numérica.
 
 \section{Desempenho no Ponto de Operação Principal}\label{sec:res-desempenho}
-% comparativo_consolidado (teste + média e dp da CV); figuras ROC, PR e confusão da célula de referência
-% PR-AUC contra o piso da prevalência
+O desempenho dos cinco modelos no conjunto de teste, cada um em seu limiar de decisão, é apresentado na Tabela~\ref{tab:desempenho-teste}, e a média e o desvio padrão das mesmas métricas entre as partições da validação cruzada, na Tabela~\ref{tab:desempenho-cv}. Na validação cruzada, os cinco modelos atingiram a sensibilidade-alvo de 0,80, conforme o procedimento de definição do limiar. Os limiares resultantes diferiram entre os algoritmos, situando-se entre 0,419 e 0,445 na Regressão Logística e em 0,320 e 0,306 no \textit{Random Forest}, visto que a escala dos escores produzidos por um algoritmo não corresponde à do outro. Os comparadores são apresentados na seção de Comparação com a Regra Clínica.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:desempenho-teste}Desempenho no conjunto de teste, no ponto de operação principal.}
+  \small
+  \begin{tabular}{llrrrrrrrr}
+    \hline
+    Modelo & Conjunto & Limiar & Sensib. & Espec. & F1 & AUC-ROC & PR-AUC & NNS & Encam. (\%) \\ \hline
+    RL & A & 0,424 & 0,748 & 0,627 & 0,224 & 0,775 & 0,253 & 7,58 & 39,9 \\
+    RL & B & 0,445 & 0,765 & 0,637 & 0,233 & 0,781 & 0,244 & 7,26 & 39,1 \\
+    RL & C & 0,419 & 0,756 & 0,625 & 0,226 & 0,770 & 0,246 & 7,54 & 40,2 \\
+    RF & A & 0,320 & 0,782 & 0,632 & 0,235 & 0,786 & 0,233 & 7,22 & 39,7 \\
+    RF & B & 0,306 & 0,807 & 0,625 & 0,239 & 0,778 & 0,226 & 7,14 & 40,5 \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+  \legend{RL: Regressão Logística; RF: \textit{Random Forest}; Sensib.: sensibilidade; Espec.: especificidade; Encam.: proporção de encaminhados a exame.}
+\end{table}
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:desempenho-cv}Média e desvio padrão das métricas entre as partições da validação cruzada no treino, no mesmo limiar.}
+  \small
+  \begin{tabular}{llrrrr}
+    \hline
+    Modelo & Conjunto & Sensibilidade & Especificidade & F1 & AUC-ROC \\ \hline
+    RL & A & 0,802 (0,027) & 0,644 (0,015) & 0,246 (0,010) & 0,786 (0,015) \\
+    RL & B & 0,802 (0,008) & 0,640 (0,023) & 0,244 (0,011) & 0,782 (0,013) \\
+    RL & C & 0,802 (0,026) & 0,642 (0,015) & 0,245 (0,007) & 0,787 (0,014) \\
+    RF & A & 0,802 (0,024) & 0,635 (0,017) & 0,242 (0,011) & 0,791 (0,016) \\
+    RF & B & 0,802 (0,031) & 0,624 (0,021) & 0,236 (0,011) & 0,788 (0,015) \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+  \legend{RL: Regressão Logística; RF: \textit{Random Forest}. Valores apresentados como média (desvio padrão).}
+\end{table}
+
+Na comparação entre conjuntos de atributos, as diferenças permaneceram dentro da variação entre partições. Na Regressão Logística, a amplitude entre os três conjuntos foi de 0,017 na sensibilidade, contra desvio padrão de até 0,027 entre as partições, e o mesmo ocorreu na especificidade, no F1 e na AUC-ROC, com amplitudes de 0,012, 0,009 e 0,011, contra desvios de até 0,023, 0,011 e 0,015, respectivamente. No \textit{Random Forest}, a diferença de sensibilidade entre os conjuntos A e B foi de 0,025, da mesma ordem dos desvios padrão desses modelos, de 0,024 e 0,031. Diante disso, nenhum conjunto de atributos se mostrou superior em desempenho, e a escolha entre eles foi orientada pela parcimônia e pela interpretabilidade, conforme a primeira regra de comparação. Pela terceira regra, o modelo de referência foi o \textit{Random Forest} com o conjunto B, que apresentou o menor NNS no ponto de operação principal, de 7,14.
+
+Na comparação entre algoritmos, o \textit{Random Forest} superou a Regressão Logística na sensibilidade do teste nos dois conjuntos, com 0,782 contra 0,748 no conjunto A e 0,807 contra 0,765 no conjunto B, diferenças de 0,034 e 0,042 que excederam o desvio padrão entre partições de ambos os modelos. Por consequência, a segunda regra de comparação, referente ao empate, não foi acionada. Três observações qualificam esse resultado. A primeira refere-se à ordenação global dos indivíduos, visto que a PR-AUC do \textit{Random Forest} foi inferior à da Regressão Logística nos dois conjuntos, com 0,233 contra 0,253 e 0,226 contra 0,244, diferenças que permanecem dentro da dispersão observada na busca de hiperparâmetros, enquanto a AUC-ROC favoreceu o \textit{Random Forest} no conjunto A e a Regressão Logística no conjunto B. Diante disso, o ganho de sensibilidade é específico do ponto de operação, e não uma melhora da capacidade discriminativa. A segunda refere-se à origem da diferença, visto que, na validação cruzada, os cinco modelos atingiram a mesma sensibilidade de 0,802, enquanto no teste o \textit{Random Forest} manteve valores próximos desse patamar e a Regressão Logística situou-se abaixo dele. A terceira refere-se ao custo operacional, visto que, no conjunto B, o \textit{Random Forest} encaminhou 685 indivíduos, ou 40,5\% do conjunto de teste, contra 661, ou 39,1\%, da Regressão Logística, com especificidade de 0,625 contra 0,637, detectando 96 casos contra 91, de maneira que o NNS diminuiu de 7,26 para 7,14.
+
+As curvas ROC e de precisão e sensibilidade do modelo de referência são apresentadas nas Figuras~\ref{fig:roc-referencia} e \ref{fig:pr-referencia}. No ponto de operação, o modelo detectou 96 dos 119 casos positivos do conjunto de teste, deixando de detectar 23, e encaminhou 589 indivíduos sem o desfecho, com precisão de 0,140. Em todos os modelos, a PR-AUC situou-se entre 0,226 e 0,253, isto é, entre 3,2 e 3,6 vezes o valor de referência de um classificador sem capacidade discriminativa, igual à prevalência do conjunto de teste, de 0,070, valor obtido pelo classificador que atribui todos os indivíduos à classe majoritária.
+
+\begin{figure}[htb]
+  \centering
+  \caption{\label{fig:roc-referencia}Curva ROC do modelo de referência no conjunto de teste.}
+  \includegraphics[width=\textwidth]{figs/roc_rf_b.png}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+\end{figure}
+
+\begin{figure}[htb]
+  \centering
+  \caption{\label{fig:pr-referencia}Curva de precisão e sensibilidade do modelo de referência no conjunto de teste, com o ponto de operação.}
+  \includegraphics[width=\textwidth]{figs/pr_rf_b.png}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+\end{figure}
 
 \section{Comparação com a Regra Clínica}\label{sec:res-regra}
 % carga_operacional (três regimes), equiparado_por_modelo (critério de sucesso, resultado negativo)
