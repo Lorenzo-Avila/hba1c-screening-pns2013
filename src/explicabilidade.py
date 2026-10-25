@@ -50,7 +50,6 @@ import sys
 import time
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import shap
@@ -62,6 +61,7 @@ from . import config as cfg
 from . import evaluate as ev
 from . import experimento as xp
 from . import features as ft
+from . import figuras as figu
 from . import models as md
 
 # `C_completo` ficou fora do grid publicado por D-016, então não há o que explicar nele.
@@ -1076,14 +1076,9 @@ NOTA_LOCAL = (
 )
 
 
-def _eixo_figura(ax, titulo: str, xlabel: str, ylabel: str = "") -> None:
-    """Título, rótulos e grade na identidade visual do projeto."""
-    ax.set_title(titulo, fontweight="bold", color=cfg.INK, fontsize=11)
-    ax.set_xlabel(xlabel, color=cfg.INK, fontsize=9)
-    if ylabel:
-        ax.set_ylabel(ylabel, color=cfg.INK, fontsize=9)
-    ax.grid(color=cfg.GRID, linewidth=0.8, axis="x")
-    ax.set_axisbelow(True)
+def _eixo_figura(ax, xlabel: str, ylabel: str = "") -> None:
+    """Rótulos e grade. O título da figura fica na legenda do LaTeX."""
+    figu.eixo(ax, xlabel, ylabel, grade="x")
     for lado in ("top", "right"):
         ax.spines[lado].set_visible(False)
 
@@ -1098,8 +1093,8 @@ def _destino(path_figuras, nome: str) -> Path:
 def _formatar_valor(valor: float) -> str:
     """Valor observado como quem lê a variável o escreve: 87,3 e não 87,300000."""
     valor = float(valor)
-    texto = f"{valor:.0f}" if valor.is_integer() else f"{valor:.1f}"
-    return texto.replace(".", ",")
+    casas = 0 if valor.is_integer() else 1
+    return figu.numero(valor, casas)
 
 
 def atribuicao_por_atributo(valores: np.ndarray, mapa: pd.DataFrame) -> pd.DataFrame:
@@ -1164,7 +1159,7 @@ def figura_beeswarm(medida: dict, path_figuras: Path | None = None) -> Path:
     nominais = _nominais(mapa)
     clinicos = medida["clinicos"].loc[medida["design_te"].index]
 
-    fig, ax = plt.subplots(figsize=(8.2, 1.9 + 0.42 * len(ordem)))
+    fig, ax = figu.subplots(figu.LARGURA_INTEIRA, 1.4 + 0.42 * len(ordem))
     imagem = None
 
     for linha, atributo in enumerate(ordem):
@@ -1185,33 +1180,24 @@ def figura_beeswarm(medida: dict, path_figuras: Path | None = None) -> Path:
                             linewidths=0)
 
     ax.axvline(0, color=cfg.INK, lw=1, ls=":")
-    ax.set_yticks(range(len(ordem)), list(reversed(ordem)), fontsize=9, color=cfg.INK)
-    _eixo_figura(
-        ax,
-        f"Atribuição SHAP por variável, {MODELO} · {celula}\n"
-        f"regime {REGIME_PRINCIPAL} sobre a {OBJETO_COMPLETA}, teste completo, "
-        f"n={len(por_atributo)}",
-        "contribuição para o escore, em fração de votos",
-    )
+    ax.set_yticks(range(len(ordem)), [figu.rotulo(a) for a in reversed(ordem)])
+    ax.xaxis.set_major_formatter(figu.formatador(2))
+    _eixo_figura(ax, "contribuição para o escore, em fração de votos")
 
     if imagem is not None:
         barra = fig.colorbar(imagem, ax=ax, pad=0.02, fraction=0.035, shrink=0.42)
-        barra.set_ticks([0, 1], labels=["valor baixo", "valor alto"], fontsize=8)
+        barra.set_ticks([0, 1], labels=["valor baixo", "valor alto"])
         barra.outline.set_visible(False)
 
-    fig.text(0.01, -0.02,
-             "Nominais em cinza: o código da categoria não tem ordem para colorir. A "
-             "categoria de referência de cada nominal tem atribuição zero por "
-             "construção, efeito do drop=\"first\", e entra na soma da variável.\n"
-             "Escala de fração de votos: a soma das contribuições reconstrói o escore "
-             "do indivíduo, nunca o risco dele (D-022, D-040, D-053).",
-             fontsize=8, color=cfg.INK, va="top")
-
     destino = _destino(path_figuras, f"shap_beeswarm_{celula}.png")
-    fig.tight_layout()
-    fig.savefig(destino, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return destino
+    return figu.salvar(
+        fig, destino,
+        "Nominais em cinza: o código da categoria não tem ordem para colorir. A "
+        "categoria de referência de cada nominal tem atribuição zero por "
+        "construção, efeito do drop=\"first\", e entra na soma da variável.\n"
+        "Escala de fração de votos: a soma das contribuições reconstrói o escore "
+        "do indivíduo, nunca o risco dele (D-022, D-040, D-053).",
+    )
 
 
 def ler_tabela(nome: str, path: Path | None = None) -> pd.DataFrame:
@@ -1269,21 +1255,22 @@ def figura_contraste_de_regimes(celula: str, tabela: pd.DataFrame | None = None,
         lados[regime] = lado.set_index("atributo")["posicao"].astype(int).sort_values()
 
     esquerda, direita = lados[REGIME_PRINCIPAL], lados[REGIME_CONTRASTE]
-    topo_estavel = _prefixo_comum(list(esquerda.index), list(direita.index))
     n = len(esquerda)
 
-    fig, ax = plt.subplots(figsize=(8.6, 1.9 + 0.40 * n))
+    fig, ax = figu.subplots(figu.LARGURA_INTEIRA, 1.4 + 0.40 * n)
     for atributo, posicao in esquerda.items():
         partida, chegada = int(posicao), int(direita[atributo])
         moveu = chegada != partida
         cor = cfg.CORAL if moveu else cfg.TEAL
+        # Traço cheio e pontilhado: no cinza a cor sozinha não separa quem moveu.
         ax.plot([0, 1], [n - partida, n - chegada], color=cor,
-                lw=2.0 if moveu else 1.2, alpha=0.9 if moveu else 0.55,
-                marker="o", markersize=5)
-        ax.text(-0.03, n - partida, f"{partida}. {atributo}", ha="right", va="center",
+                lw=2.0 if moveu else 1.2, ls="-" if moveu else ":",
+                alpha=0.9 if moveu else 0.55, marker="o", markersize=5)
+        nome = figu.rotulo(str(atributo))
+        ax.text(-0.03, n - partida, f"{partida}. {nome}", ha="right", va="center",
                 fontsize=9, color=cfg.INK, fontweight="bold" if moveu else "normal")
-        deslocou = f"  ({chegada - partida:+d})" if moveu else ""
-        ax.text(1.03, n - chegada, f"{chegada}. {atributo}{deslocou}", ha="left",
+        deslocou = f" ({chegada - partida:+d})" if moveu else ""
+        ax.text(1.03, n - chegada, f"{chegada}. {nome}{deslocou}", ha="left",
                 va="center", fontsize=9, color=cor if moveu else cfg.INK,
                 fontweight="bold" if moveu else "normal")
 
@@ -1296,25 +1283,15 @@ def figura_contraste_de_regimes(celula: str, tabela: pd.DataFrame | None = None,
     ax.grid(visible=False)
     for lado in ("top", "right", "left", "bottom"):
         ax.spines[lado].set_visible(False)
-    ax.set_title(
-        f"Ranking de atribuição sob os dois regimes, {MODELO} · {celula}\n"
-        f"as {topo_estavel} primeiras posições não se movem, e a movimentação fica na "
-        f"cauda",
-        fontweight="bold", color=cfg.INK, fontsize=11)
-
-    fig.text(0.01, -0.02,
-             "O regime de contraste assume independência entre as variáveis, que é a "
-             "formulação apontada como frágil, e roda sobre a floresta reduzida, "
-             "objeto de diagnóstico e nunca modelo publicado.\n"
-             "A divergência entre os dois rankings é a medida da exposição deste "
-             "trabalho ao problema (D-053).",
-             fontsize=8, color=cfg.INK, va="top")
-
     destino = _destino(path_figuras, f"shap_contraste_{celula}.png")
-    fig.tight_layout()
-    fig.savefig(destino, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return destino
+    return figu.salvar(
+        fig, destino,
+        "O regime de contraste assume independência entre as variáveis, que é a "
+        "formulação apontada como frágil, e roda sobre a floresta reduzida, "
+        "objeto de diagnóstico e nunca modelo publicado.\n"
+        "A divergência entre os dois rankings é a medida da exposição deste "
+        "trabalho ao problema (D-053).",
+    )
 
 
 def _painel_waterfall(ax, caso: pd.DataFrame) -> tuple[float, float]:
@@ -1333,51 +1310,57 @@ def _painel_waterfall(ax, caso: pd.DataFrame) -> tuple[float, float]:
     ordenado = caso.reindex(
         caso["contribuicao"].abs().sort_values(ascending=False, kind="stable").index
     )
-    inicio, esquerdas, tamanhos, cores, rotulos = valor_base, [], [], [], []
+    inicio, esquerdas, tamanhos, cores, hachuras, rotulos = valor_base, [], [], [], [], []
     for _, contribuicao in ordenado.iterrows():
         valor = float(contribuicao["contribuicao"])
         esquerdas.append(inicio)
         tamanhos.append(valor)
         cores.append(cfg.CORAL if valor >= 0 else cfg.TEAL)
-        rotulos.append(f"{contribuicao['atributo']} = "
+        # Hachura na contribuição negativa: no cinza a cor sozinha não separa o sinal.
+        hachuras.append("" if valor >= 0 else "///")
+        rotulos.append(f"{figu.rotulo(str(contribuicao['atributo']))} = "
                        f"{_formatar_valor(contribuicao['valor_observado'])}")
         inicio += valor
 
     y = np.arange(len(tamanhos))[::-1]
-    ax.barh(y, tamanhos, left=esquerdas, height=0.62, color=cores, alpha=0.9)
+    for altura, comeco, tamanho, cor, hachura in zip(
+            y, esquerdas, tamanhos, cores, hachuras):
+        ax.barh(altura, tamanho, left=comeco, height=0.62, color=cor, alpha=0.9,
+                hatch=hachura, edgecolor=cfg.INK, linewidth=0.4)
     for altura, (comeco, tamanho) in enumerate(zip(esquerdas, tamanhos)):
         fim = comeco + tamanho
-        ax.text(fim + (0.003 if tamanho >= 0 else -0.003), y[altura],
-                f"{tamanho:+.3f}".replace(".", ","),
+        texto = figu.numero(abs(tamanho), 3)
+        texto = f"+{texto}" if tamanho >= 0 else f"-{texto}"
+        ax.text(fim + (0.003 if tamanho >= 0 else -0.003), y[altura], texto,
                 ha="left" if tamanho >= 0 else "right", va="center", fontsize=8,
                 color=cfg.INK)
 
     ax.axvline(valor_base, color=cfg.INK, lw=1.2, ls=":")
     ax.axvline(limiar, color=cfg.CORAL, lw=1.8, ls="--")
     ax.scatter([escore], [-1.0], color=cfg.INK, s=45, marker="D", zorder=5)
-    ax.text(escore, -1.5, f"escore {escore:.3f}".replace(".", ","), ha="center",
+    ax.text(escore, -1.5, f"escore {figu.numero(escore, 3)}", ha="center",
             va="top", fontsize=8, fontweight="bold", color=cfg.INK)
 
     # As duas marcas de referência ficam no alto da área de dados, e não dentro dela:
     # na altura da primeira barra elas cairiam por cima do valor da contribuição.
     no_alto = ("data", "axes fraction")
-    ax.annotate(f"valor de base {valor_base:.3f}".replace(".", ","),
+    ax.annotate(f"valor de base {figu.numero(valor_base, 3)}",
                 (valor_base, 0.99), xycoords=no_alto, ha="right", va="top",
                 fontsize=8, color=cfg.INK)
-    ax.annotate(f"limiar {limiar:.3f}".replace(".", ","), (limiar, 0.99),
+    ax.annotate(f"limiar {figu.numero(limiar, 3)}", (limiar, 0.99),
                 xycoords=no_alto, ha="left", va="top", fontsize=8,
                 fontweight="bold", color=cfg.CORAL)
 
     ax.set_ylim(-2.2, len(tamanhos) + 0.1)
-    ax.set_yticks(y, rotulos, fontsize=9, color=cfg.INK)
+    ax.set_yticks(y, rotulos)
+    ax.xaxis.set_major_formatter(figu.formatador(2))
     decisao = "encaminhado" if escore >= limiar else "não encaminhado"
-    distancia = f"{abs(escore - limiar):.3f}".replace(".", ",")
-    _eixo_figura(
-        ax,
-        f"{linha['caso']}, {ROTULO_CASO[linha['caso']]}\n"
-        f"indivíduo {int(linha['indice'])}, {decisao}, a {distancia} do limiar",
-        "escore, em fração de votos",
-    )
+    distancia = figu.numero(abs(escore - limiar), 3)
+    ax.text(0.0, 1.02,
+            f"{ROTULO_CASO[linha['caso']]}, indivíduo {int(linha['indice'])}, "
+            f"{decisao}, a {distancia} do limiar",
+            transform=ax.transAxes, ha="left", va="bottom", fontsize=9, color=cfg.INK)
+    _eixo_figura(ax, "escore, em fração de votos")
 
     fins = [e + t for e, t in zip(esquerdas, tamanhos)]
     return min(fins + [escore, limiar]), max(fins + [valor_base])
@@ -1402,9 +1385,9 @@ def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
     celula = medida["celula"]
 
     n_variaveis = tabela["atributo"].nunique()
-    fig, eixos = plt.subplots(
+    fig, eixos = figu.subplots(
+        figu.LARGURA_INTEIRA, 2.2 + 0.38 * n_variaveis,
         1, len(casos), sharex=True,
-        figsize=(6.2 * len(casos), 2.8 + 0.42 * n_variaveis),
     )
     extremos = []
     for ax, caso in zip(np.atleast_1d(eixos), casos):
@@ -1419,16 +1402,8 @@ def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
     maior = max(e[1] for e in extremos)
     np.atleast_1d(eixos)[0].set_xlim(menor - 0.30 * (maior - menor), maior)
 
-    fig.suptitle(f"Explicação local, {MODELO} · {celula}\n"
-                 f"regime {REGIME_PRINCIPAL} sobre a {OBJETO_COMPLETA}",
-                 fontweight="bold", color=cfg.INK, fontsize=12)
-    fig.text(0.01, -0.01, NOTA_LOCAL, fontsize=8, color=cfg.INK, va="top")
-
     destino = _destino(path_figuras, f"shap_waterfall_{celula}.png")
-    fig.tight_layout()
-    fig.savefig(destino, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return destino
+    return figu.salvar(fig, destino, NOTA_LOCAL)
 
 
 def material_das_figuras(celula: str, particao: xp.Particao) -> dict:

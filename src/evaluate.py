@@ -22,7 +22,6 @@ import re
 import warnings
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import binomtest
@@ -42,6 +41,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 
 from . import config as cfg
+from . import figuras as figu
 
 # Métricas assinadas no TCC I: obrigatórias em toda tabela de resultado.
 METRICAS_ASSINADAS = ["recall", "especificidade", "f1", "auc_roc"]
@@ -377,12 +377,9 @@ def curva_pr(y_te, proba_te) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def _preparar_eixo(ax, titulo: str, xlabel: str, ylabel: str) -> None:
-    ax.set_title(titulo, fontweight="bold", color=cfg.INK)
-    ax.set_xlabel(xlabel, color=cfg.INK)
-    ax.set_ylabel(ylabel, color=cfg.INK)
-    ax.grid(color=cfg.GRID, linewidth=0.8)
-    ax.set_axisbelow(True)
+def _preparar_eixo(ax, xlabel: str, ylabel: str) -> None:
+    """Rótulos e grade. O título da figura fica na legenda do LaTeX."""
+    figu.eixo(ax, xlabel, ylabel)
 
 
 def figura_matriz_confusao(y_te, proba_te, limiar: float, rotulo: str,
@@ -395,26 +392,23 @@ def figura_matriz_confusao(y_te, proba_te, limiar: float, rotulo: str,
     y_pred = (np.asarray(proba_te) >= limiar).astype(int)
     matriz = confusion_matrix(y_te, y_pred, labels=[0, 1])
 
-    fig, ax = plt.subplots(figsize=(5.2, 4.4))
+    fig, ax = figu.subplots(figu.LARGURA_INTEIRA, figu.LARGURA_INTEIRA * 0.78)
     ax.imshow(matriz, cmap="Greys", vmin=0, vmax=matriz.max())
     rotulos = ["HbA1c < 6,5%", "HbA1c ≥ 6,5%"]
     ax.set_xticks([0, 1], rotulos)
     ax.set_yticks([0, 1], rotulos, rotation=90, va="center")
-    _preparar_eixo(ax, f"Matriz de confusão — {rotulo}\nlimiar {limiar:.3f}",
-                   "Classificado como", "Observado")
+    _preparar_eixo(ax, "Classificado como", "Observado")
     ax.grid(visible=False)
 
     nomes = [["VN", "FP"], ["FN", "VP"]]
     for i in range(2):
         for j in range(2):
             destaque = cfg.CORAL if nomes[i][j] in ("FN", "VP") else cfg.TEAL
-            ax.text(j, i, f"{nomes[i][j]}\n{matriz[i, j]:,}".replace(",", "."),
-                    ha="center", va="center", fontweight="bold", color=destaque)
+            ax.text(j, i, f"{nomes[i][j]}\n{figu.numero(matriz[i, j], 0)}",
+                    ha="center", va="center", fontweight="bold", color=destaque,
+                    fontsize=9)
 
-    fig.tight_layout()
-    fig.savefig(destino, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return destino
+    return figu.salvar(fig, destino)
 
 
 def figura_roc(y_te, proba_te, rotulo: str,
@@ -427,18 +421,17 @@ def figura_roc(y_te, proba_te, rotulo: str,
     curva = curva_roc(y_te, proba_te)
     auc = roc_auc_score(y_te, proba_te)
 
-    fig, ax = plt.subplots(figsize=(5.4, 4.6))
-    ax.plot(curva["fpr"], curva["tpr"], color=cfg.TEAL, lw=2.2, label=f"AUC-ROC = {auc:.3f}")
+    fig, ax = figu.subplots(figu.LARGURA_INTEIRA, figu.LARGURA_INTEIRA * 0.78)
+    ax.plot(curva["fpr"], curva["tpr"], color=cfg.TEAL, lw=2.2,
+            label=f"AUC-ROC = {figu.numero(auc, 3)}")
     ax.plot([0, 1], [0, 1], color=cfg.INK, lw=1, ls=":", label="aleatório")
-    _preparar_eixo(ax, f"Curva ROC — {rotulo}",
-                   "1 − especificidade (falsos positivos)",
+    _preparar_eixo(ax, "1 − especificidade (falsos positivos)",
                    "Recall (sensibilidade)")
-    ax.legend(frameon=False, fontsize=9, loc="lower right")
+    ax.xaxis.set_major_formatter(figu.formatador(2))
+    ax.yaxis.set_major_formatter(figu.formatador(2))
+    ax.legend(frameon=False, loc="lower right")
 
-    fig.tight_layout()
-    fig.savefig(destino, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return destino
+    return figu.salvar(fig, destino)
 
 
 def figura_precision_recall(y_te, proba_te, limiar: float, rotulo: str,
@@ -456,24 +449,24 @@ def figura_precision_recall(y_te, proba_te, limiar: float, rotulo: str,
     prec_op = precision_score(y_te, y_pred, zero_division=0)
     prevalencia = float(np.mean(y_te))
 
-    fig, ax = plt.subplots(figsize=(5.4, 4.6))
-    ax.plot(rec, prec, color=cfg.TEAL, lw=2.2, label=f"PR-AUC = {pr_auc:.3f}")
+    nns = 1 / prec_op if prec_op else float("inf")
+    fig, ax = figu.subplots(figu.LARGURA_INTEIRA, figu.LARGURA_INTEIRA * 0.78)
+    ax.plot(rec, prec, color=cfg.TEAL, lw=2.2,
+            label=f"PR-AUC = {figu.numero(pr_auc, 3)}")
     ax.axhline(prevalencia, color=cfg.INK, lw=1, ls=":",
-               label=f"prevalência = {prevalencia:.3f}")
-    ax.scatter([rec_op], [prec_op], color=cfg.CORAL, s=90, zorder=5,
-               label=f"operação: limiar {limiar:.3f}")
-    ax.annotate(f"recall {rec_op:.3f}\nprecisão {prec_op:.3f}\nNNS "
-                f"{(1 / prec_op if prec_op else float('inf')):.1f}",
+               label=f"prevalência = {figu.numero(prevalencia, 3)}")
+    ax.scatter([rec_op], [prec_op], color=cfg.CORAL, s=90, zorder=5, marker="o",
+               label=f"operação, limiar {figu.numero(limiar, 3)}")
+    ax.annotate(f"recall {figu.numero(rec_op, 3)}\nprecisão {figu.numero(prec_op, 3)}\n"
+                f"NNS {figu.numero(nns, 1)}",
                 (rec_op, prec_op), textcoords="offset points", xytext=(10, 10),
                 fontsize=9, color=cfg.CORAL, fontweight="bold")
-    _preparar_eixo(ax, f"Precision-Recall — {rotulo}",
-                   "Recall (sensibilidade)", "Precisão")
-    ax.legend(frameon=False, fontsize=9, loc="upper right")
+    _preparar_eixo(ax, "Recall (sensibilidade)", "Precisão")
+    ax.xaxis.set_major_formatter(figu.formatador(2))
+    ax.yaxis.set_major_formatter(figu.formatador(2))
+    ax.legend(frameon=False, loc="upper right")
 
-    fig.tight_layout()
-    fig.savefig(destino, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return destino
+    return figu.salvar(fig, destino)
 
 
 def figura_calibracao(y_te, proba_te, rotulo: str, n_bins: int = 10,
@@ -486,18 +479,16 @@ def figura_calibracao(y_te, proba_te, rotulo: str, n_bins: int = 10,
     decis = calibracao_decis(y_te, proba_te, n_bins=n_bins)
     brier = brier_score_loss(y_te, proba_te)
 
-    fig, ax = plt.subplots(figsize=(5.4, 4.6))
+    fig, ax = figu.subplots(figu.LARGURA_INTEIRA, figu.LARGURA_INTEIRA * 0.78)
     ax.plot([0, 1], [0, 1], color=cfg.INK, lw=1, ls=":", label="calibração perfeita")
-    ax.plot(decis["prob_media"], decis["freq_observada"], color=cfg.TEAL, lw=2.2, marker="o",
-            markersize=5, label=f"Brier = {brier:.4f}")
-    _preparar_eixo(ax, f"Curva de calibração — {rotulo}",
-                   "Probabilidade estimada", "Frequência observada")
-    ax.legend(frameon=False, fontsize=9, loc="upper left")
+    ax.plot(decis["prob_media"], decis["freq_observada"], color=cfg.TEAL, lw=2.2,
+            marker="o", markersize=5, label=f"Brier = {figu.numero(brier, 4)}")
+    _preparar_eixo(ax, "Probabilidade estimada", "Frequência observada")
+    ax.xaxis.set_major_formatter(figu.formatador(2))
+    ax.yaxis.set_major_formatter(figu.formatador(2))
+    ax.legend(frameon=False, loc="upper left")
 
-    fig.tight_layout()
-    fig.savefig(destino, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return destino
+    return figu.salvar(fig, destino)
 
 
 # ---------------------------------------------------------------------------
