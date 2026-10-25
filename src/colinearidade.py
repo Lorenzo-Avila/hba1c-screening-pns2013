@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
@@ -21,6 +20,7 @@ from sklearn.utils.validation import check_is_fitted
 from . import artefatos as art
 from . import config as cfg
 from . import features as ft
+from . import figuras as figu
 
 # Paleta divergente Clinical Teal: coral (correlação negativa) -> teal (positiva).
 CMAP_CLINICAL_TEAL = LinearSegmentedColormap.from_list(
@@ -87,34 +87,31 @@ def heatmap_pearson(matriz: pd.DataFrame, feature_set: str,
     destino = path_figuras / f"pearson_{feature_set}.png"
 
     n = len(matriz)
-    fig, ax = plt.subplots(figsize=(1.05 * n + 2, 1.05 * n + 1.2))
+    nomes = [figu.rotulo(str(coluna)) for coluna in matriz.columns]
+    fig, ax = figu.subplots(figu.LARGURA_PARCIAL, figu.LARGURA_PARCIAL)
     imagem = ax.imshow(matriz.to_numpy(), cmap=CMAP_CLINICAL_TEAL, vmin=-1, vmax=1)
 
-    ax.set_xticks(range(n), matriz.columns, rotation=45, ha="right")
-    ax.set_yticks(range(n), matriz.index)
-    ax.set_title(f"Correlação de Pearson entre contínuas — {feature_set}",
-                 fontweight="bold", color=cfg.INK)
+    ax.set_xticks(range(n), nomes, rotation=45, ha="right")
+    ax.set_yticks(range(n), nomes)
 
     for i in range(n):
         for j in range(n):
             valor = matriz.iat[i, j]
             # Texto claro sobre fundo saturado, escuro sobre fundo pálido.
             cor = "#FFFFFF" if abs(valor) > 0.55 else cfg.INK
-            ax.text(j, i, f"{valor:.2f}", ha="center", va="center",
-                    color=cor, fontsize=9)
+            ax.text(j, i, figu.numero(valor, 2), ha="center", va="center",
+                    color=cor, fontsize=8)
 
     barra = fig.colorbar(imagem, ax=ax, shrink=0.82)
     barra.set_label("coeficiente de Pearson", color=cfg.INK)
+    barra.ax.yaxis.set_major_formatter(figu.formatador(1))
     ax.set_xticks(np.arange(-0.5, n, 1), minor=True)
     ax.set_yticks(np.arange(-0.5, n, 1), minor=True)
     ax.grid(which="minor", color=cfg.GRID, linewidth=0.8)
     ax.grid(which="major", visible=False)
     ax.tick_params(which="minor", length=0)
 
-    fig.tight_layout()
-    fig.savefig(destino, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return destino
+    return figu.salvar(fig, destino)
 
 
 # ---------------------------------------------------------------------------
