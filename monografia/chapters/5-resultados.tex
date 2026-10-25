@@ -337,4 +337,31 @@ As atribuições dos pares e do bloco nomeados antes da medição são apresenta
   \legend{CC: circunferência da cintura. Regime principal sobre a floresta completa; regime de contraste sobre a floresta reduzida. O traço indica par ou bloco ausente do conjunto.}
 \end{table}
 
-% shap_casos_locais e waterfall da célula de referência
+Para a dimensão local, os quatro casos do modelo de referência selecionados conforme a Metodologia são apresentados na Tabela~\ref{tab:shap-casos}. Três dos quatro casos situaram-se a menos de 0,005 do limiar de decisão, e o falso positivo e o verdadeiro negativo, a menos de 0,001, de maneira que a classificação desses indivíduos foi decidida por diferenças de escore inferiores à contribuição individual de quase todas as variáveis.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:shap-casos}Casos selecionados para a explicação local do modelo de referência, no conjunto de teste.}
+  \begin{tabular}{lrrl}
+    \hline
+    Caso & Escore & Distância ao limiar & Decisão \\ \hline
+    Verdadeiro positivo & 0,3105 & $+$0,0050 & Encaminhado \\
+    Falso positivo & 0,3057 & $+$0,0002 & Encaminhado \\
+    Falso negativo & 0,2947 & $-$0,0108 & Não encaminhado \\
+    Verdadeiro negativo & 0,3049 & $-$0,0006 & Não encaminhado \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+  \legend{Limiar de decisão: 0,3055. Em cada célula da matriz de confusão, o caso de escore mais próximo do limiar.}
+\end{table}
+
+As decomposições do verdadeiro positivo e do falso negativo são apresentadas na Figura~\ref{fig:shap-casos}, que exibe, para cada variável, o valor observado ao lado da contribuição, partindo do valor de base de 0,500 e indicando a posição do limiar. O verdadeiro positivo, com 49 anos, IMC de 24,7 kg/m² e circunferência da cintura de 86 cm, foi encaminhado com escore de 0,310, resultado de contribuições negativas da circunferência da cintura, de $-$0,100, do IMC, de $-$0,060, e do escore de Multimorbidade Metabólica, de $-$0,057, compensadas em parte por contribuições positivas da saúde autoavaliada, de $+$0,040, e da região, de $+$0,027. O falso negativo, com 54 anos, IMC de 22,9 kg/m², circunferência da cintura de 89 cm e escore de multimorbidade igual a zero, recebeu da idade a maior contribuição positiva, de $+$0,069, porém as contribuições negativas do escore de multimorbidade, de $-$0,093, do IMC, de $-$0,075, da circunferência da cintura, de $-$0,059, e da saúde autoavaliada, de $-$0,055, levaram o seu escore a 0,295, abaixo do limiar.
+
+\begin{figure}[htb]
+  \centering
+  \caption{\label{fig:shap-casos}Explicação local do verdadeiro positivo e do falso negativo mais próximos do limiar, no modelo de referência.}
+  \includegraphics[width=\textwidth,height=0.8\textheight,keepaspectratio]{figs/shap_casos_rf_b.png}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+  \legend{O valor de base corresponde à média das saídas da floresta sob reponderamento de classes e situa-se próximo de 0,5 em virtude desse reponderamento, e não da prevalência do desfecho. A referência das contribuições é o indivíduo médio sob esse reponderamento, e não a população, de maneira que uma contribuição negativa indica valor abaixo dessa referência, e nunca efeito protetor. A soma das contribuições reconstrói o escore de ordenação do indivíduo, e não o seu risco.}
+\end{figure}
+
+O verdadeiro positivo ilustra a restrição de leitura descrita na Metodologia, visto que um indivíduo encaminhado a exame, e que de fato apresentou HbA1c $\geq$ 6,5\%, recebeu contribuições negativas das medidas antropométricas. Essas contribuições não indicam efeito protetor, mas apenas que os valores observados situam-se abaixo da referência representada pelo indivíduo médio sob reponderamento de classes, cujo escore de 0,500 supera o de quase todos os indivíduos avaliados. Diante disso, a figura apresenta essa restrição junto da decomposição, e não apenas no texto.
