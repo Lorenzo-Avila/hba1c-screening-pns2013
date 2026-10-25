@@ -2,3 +2,68 @@
 \chapter{Resultados}\label{cap:resultados}
 % ----------------------------------------------------------
 
+\section{Caracterização da Amostra}\label{sec:res-amostra}
+A aplicação dos critérios de exclusão descritos na Metodologia sobre os 8.952 registros da Subamostra Laboratorial resultou em uma amostra analítica de 8.451 indivíduos, conforme apresentado na Tabela~\ref{tab:funil-amostra}. Nenhum registro duplicado foi identificado, de maneira que as exclusões decorreram integralmente da ausência de dados, sendo 411 registros excluídos por não possuírem valor válido de HbA1c e 90 por não possuírem nenhuma das medidas do bloco de aferição física. Diante disso, a amostra analítica preservou 94,4\% dos registros originais.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:funil-amostra}Construção da amostra analítica e particionamento.}
+  \begin{tabular}{lr}
+    \hline
+    Etapa & Registros \\ \hline
+    Registros da Subamostra Laboratorial & 8.952 \\
+    Registros duplicados & 0 \\
+    Excluídos por ausência de HbA1c válida & $-$411 \\
+    Excluídos por ausência do bloco de aferição física & $-$90 \\
+    Amostra analítica & 8.451 \\
+    Conjunto de treino & 6.760 \\
+    Conjunto de teste & 1.691 \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+\end{table}
+
+Na amostra analítica, 593 indivíduos apresentaram HbA1c $\geq$ 6,5\%, o que corresponde a uma prevalência amostral de 7,0\%, enquanto os 7.858 restantes compuseram a classe negativa, configurando uma razão de aproximadamente 13 negativos para cada caso positivo. A prevalência ponderada pelo peso amostral laboratorial, calculada exclusivamente para fins descritivos, foi de 6,4\%, inferior à amostral, o que indica que os indivíduos com o desfecho se encontram ligeiramente sobrerrepresentados na amostra em relação à população que ela representa. Por consequência, as métricas de desempenho apresentadas nas seções seguintes referem-se à amostra, e não foram ponderadas para a população.
+
+A divisão estratificada resultou em um conjunto de treino com 6.760 registros, dos quais 474 positivos, e em um conjunto de teste com 1.691 registros, dos quais 119 positivos, de maneira que a prevalência foi preservada em 7,0\% nos dois conjuntos. Cabe ressaltar que todas as métricas obtidas no conjunto de teste, em especial a sensibilidade, são calculadas sobre esses 119 casos positivos.
+
+Após as exclusões, apenas quatro variáveis apresentaram valores ausentes, conforme a Tabela~\ref{tab:ausentes}, de maneira que as variáveis contínuas, incluindo as medidas do bloco de aferição física, não apresentaram ausentes residuais. A maior proporção foi observada no diagnóstico autorreferido de colesterol alto, com 1.297 registros ausentes, seguido pelo diagnóstico autorreferido de hipertensão, com 261, enquanto região e raça/cor apresentaram quatro e dois registros ausentes, respectivamente. A imputação descrita na Metodologia foi ajustada sobre os ausentes do conjunto de treino, apresentados na última coluna da tabela.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:ausentes}Valores ausentes por variável na amostra analítica, antes da imputação.}
+  \begin{tabular}{lrrr}
+    \hline
+    Variável & Ausentes & Proporção (\%) & Ausentes no treino \\ \hline
+    Colesterol alto (autorreferido) & 1.297 & 15,35 & 1.048 \\
+    Hipertensão (autorreferida) & 261 & 3,09 & 223 \\
+    Região & 4 & 0,05 & 3 \\
+    Raça/cor & 2 & 0,02 & 1 \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+\end{table}
+
+\section{Multicolinearidade e Escolha do Conjunto de Atributos}\label{sec:res-multicolinearidade}
+% pearson_A/B/C (figuras), vif_comparativo, vif_resumo, vif_ablacao_rcest, decomposicao_escore
+% descarte do C_completo; assimetria do grid (logística em três conjuntos, floresta em dois)
+
+\section{Busca de Hiperparâmetros}\label{sec:res-busca}
+% busca_rf; empate dentro da dispersão (0,2494 x 0,2484 em A; 0,2482 x 0,2446 em B; ±0,026 a 0,030)
+
+\section{Desempenho no Ponto de Operação Principal}\label{sec:res-desempenho}
+% comparativo_consolidado (teste + média e dp da CV); figuras ROC, PR e confusão da célula de referência
+% PR-AUC contra o piso da prevalência
+
+\section{Comparação com a Regra Clínica}\label{sec:res-regra}
+% carga_operacional (três regimes), equiparado_por_modelo (critério de sucesso, resultado negativo)
+% custo_marginal_pareado
+
+\section{Comparação Pareada entre Modelos}\label{sec:res-mcnemar}
+% mcnemar_pareado; formulação qualificada; teste acrescentado após a regra de decisão, sem alterá-la
+
+\section{Calibração}\label{sec:res-calibracao}
+% calibracao_comparada (após a correção), figura de calibração por decis; intercepto x logito da prevalência de treino
+
+\section{Explicabilidade}\label{sec:res-explicabilidade}
+% shap_global_atributo, shap_global_coluna, shap_pares_colineares, shap_arvores_excluidas
+% shap_concordancia_topo (pré-registrada: 3 em A, 5 em B; 7 e 5 como leitura secundária)
+% shap_casos_locais e waterfall da célula de referência
