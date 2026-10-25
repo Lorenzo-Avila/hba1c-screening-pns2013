@@ -393,7 +393,9 @@ def figura_matriz_confusao(y_te, proba_te, limiar: float, rotulo: str,
     matriz = confusion_matrix(y_te, y_pred, labels=[0, 1])
 
     fig, ax = figu.subplots(figu.LARGURA_INTEIRA, figu.LARGURA_INTEIRA * 0.78)
-    ax.imshow(matriz, cmap="Greys", vmin=0, vmax=matriz.max())
+    # O máximo da escala fica no quarto do cinza. No vmax da própria matriz a célula
+    # VN saía preta e o texto verde-azulado sumia.
+    ax.imshow(matriz, cmap="Greys", vmin=0, vmax=float(matriz.max()) * 4)
     rotulos = ["HbA1c < 6,5%", "HbA1c ≥ 6,5%"]
     ax.set_xticks([0, 1], rotulos)
     ax.set_yticks([0, 1], rotulos, rotation=90, va="center")
@@ -458,7 +460,7 @@ def figura_precision_recall(y_te, proba_te, limiar: float, rotulo: str,
     ax.scatter([rec_op], [prec_op], color=cfg.CORAL, s=90, zorder=5, marker="o",
                label=f"operação, limiar {figu.numero(limiar, 3)}")
     ax.annotate(f"recall {figu.numero(rec_op, 3)}\nprecisão {figu.numero(prec_op, 3)}\n"
-                f"NNS {figu.numero(nns, 1)}",
+                f"NNS {figu.numero(nns, 2)}",
                 (rec_op, prec_op), textcoords="offset points", xytext=(10, 10),
                 fontsize=9, color=cfg.CORAL, fontweight="bold")
     _preparar_eixo(ax, "Recall (sensibilidade)", "Precisão")

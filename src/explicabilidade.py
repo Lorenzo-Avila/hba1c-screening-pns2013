@@ -1335,31 +1335,31 @@ def _painel_waterfall(ax, caso: pd.DataFrame) -> tuple[float, float]:
                 ha="left" if tamanho >= 0 else "right", va="center", fontsize=8,
                 color=cfg.INK)
 
-    ax.axvline(valor_base, color=cfg.INK, lw=1.2, ls=":")
-    ax.axvline(limiar, color=cfg.CORAL, lw=1.8, ls="--")
+    n = len(tamanhos)
+    decisao = "encaminhado" if escore >= limiar else "não encaminhado"
+    distancia = figu.numero(abs(escore - limiar), 3)
+    # As retas param na faixa das barras. Se cruzarem o eixo inteiro, cortam o cabeçalho.
+    ax.plot([valor_base, valor_base], [-1.8, n - 0.7], color=cfg.INK, lw=1.2, ls=":")
+    ax.plot([limiar, limiar], [-1.8, n - 0.7], color=cfg.CORAL, lw=1.8, ls="--")
     ax.scatter([escore], [-1.0], color=cfg.INK, s=45, marker="D", zorder=5)
     ax.text(escore, -1.5, f"escore {figu.numero(escore, 3)}", ha="center",
             va="top", fontsize=8, fontweight="bold", color=cfg.INK)
 
-    # As duas marcas de referência ficam no alto da área de dados, e não dentro dela:
-    # na altura da primeira barra elas cairiam por cima do valor da contribuição.
-    no_alto = ("data", "axes fraction")
-    ax.annotate(f"valor de base {figu.numero(valor_base, 3)}",
-                (valor_base, 0.99), xycoords=no_alto, ha="right", va="top",
-                fontsize=8, color=cfg.INK)
-    ax.annotate(f"limiar {figu.numero(limiar, 3)}", (limiar, 0.99),
-                xycoords=no_alto, ha="left", va="top", fontsize=8,
-                fontweight="bold", color=cfg.CORAL)
+    # Cabeçalho à esquerda, acima das retas. As duas marcas ficam em alturas
+    # diferentes, cada uma sobre a sua reta, para não se cobrirem.
+    ax.set_ylim(-2.3, n + 2.8)
+    ax.text(0.0, n + 2.55,
+            f"{ROTULO_CASO[linha['caso']]}, indivíduo {int(linha['indice'])}\n"
+            f"{decisao}, a {distancia} do limiar",
+            transform=ax.get_yaxis_transform(), ha="left", va="top", fontsize=9,
+            color=cfg.INK, linespacing=1.25)
+    ax.text(valor_base, n + 0.15, f"valor de base {figu.numero(valor_base, 3)}",
+            ha="center", va="bottom", fontsize=8, color=cfg.INK)
+    ax.text(limiar, n - 0.2, f"limiar {figu.numero(limiar, 3)}",
+            ha="center", va="bottom", fontsize=8, fontweight="bold", color=cfg.CORAL)
 
-    ax.set_ylim(-2.2, len(tamanhos) + 0.1)
     ax.set_yticks(y, rotulos)
     ax.xaxis.set_major_formatter(figu.formatador(2))
-    decisao = "encaminhado" if escore >= limiar else "não encaminhado"
-    distancia = figu.numero(abs(escore - limiar), 3)
-    ax.text(0.0, 1.02,
-            f"{ROTULO_CASO[linha['caso']]}, indivíduo {int(linha['indice'])}, "
-            f"{decisao}, a {distancia} do limiar",
-            transform=ax.transAxes, ha="left", va="bottom", fontsize=9, color=cfg.INK)
     _eixo_figura(ax, "escore, em fração de votos")
 
     fins = [e + t for e, t in zip(esquerdas, tamanhos)]
@@ -1368,7 +1368,7 @@ def _painel_waterfall(ax, caso: pd.DataFrame) -> tuple[float, float]:
 
 def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
                          path_figuras: Path | None = None) -> Path:
-    """O verdadeiro positivo e o falso negativo da célula, lado a lado.
+    """O verdadeiro positivo e o falso negativo da célula, um sobre o outro.
 
     Os dois têm o mesmo desfecho observado e decisões opostas, e explicá-los juntos é
     o que mostra por qual variável a decisão passou. A marca do limiar diz onde a
@@ -1384,10 +1384,13 @@ def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
     tabela = tabela_casos_locais([medida])
     celula = medida["celula"]
 
-    n_variaveis = tabela["atributo"].nunique()
+    # Um painel por linha. Lado a lado, cada eixo fica com menos da metade dos 16 cm
+    # e o rótulo por extenso não cabe: o tight_layout desiste e o texto estoura.
+    n_variaveis = int(tabela["atributo"].nunique())
+    por_painel = 0.26 * (n_variaveis + 5.1)
     fig, eixos = figu.subplots(
-        figu.LARGURA_INTEIRA, 2.2 + 0.38 * n_variaveis,
-        1, len(casos), sharex=True,
+        figu.LARGURA_INTEIRA, por_painel * len(casos) / 0.82,
+        len(casos), 1, sharex=True,
     )
     extremos = []
     for ax, caso in zip(np.atleast_1d(eixos), casos):
@@ -1400,7 +1403,9 @@ def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
     # sem encostar no rótulo da variável.
     menor = min(e[0] for e in extremos)
     maior = max(e[1] for e in extremos)
-    np.atleast_1d(eixos)[0].set_xlim(menor - 0.30 * (maior - menor), maior)
+    span = maior - menor or 1.0
+    # Folga nos dois lados para o número da contribuição não encostar na borda.
+    np.atleast_1d(eixos)[0].set_xlim(menor - 0.28 * span, maior + 0.16 * span)
 
     destino = _destino(path_figuras, f"shap_waterfall_{celula}.png")
     return figu.salvar(fig, destino, NOTA_LOCAL)
