@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.compose import ColumnTransformer
 from sklearn.exceptions import NotFittedError
 from sklearn.linear_model import LinearRegression
@@ -87,12 +88,14 @@ def heatmap_pearson(matriz: pd.DataFrame, feature_set: str,
     destino = path_figuras / f"pearson_{feature_set}.png"
 
     n = len(matriz)
-    nomes = [figu.rotulo(str(coluna)) for coluna in matriz.columns]
+    nomes = [figu.rotulo_eixo(str(coluna)) for coluna in matriz.columns]
+    nomes_y = [figu.rotulo_eixo(str(coluna), quebrar=True) for coluna in matriz.columns]
     fig, ax = figu.subplots(figu.LARGURA_PARCIAL, figu.LARGURA_PARCIAL)
-    imagem = ax.imshow(matriz.to_numpy(), cmap=CMAP_CLINICAL_TEAL, vmin=-1, vmax=1)
+    imagem = ax.imshow(matriz.to_numpy(), cmap=CMAP_CLINICAL_TEAL, vmin=-1, vmax=1,
+                       aspect="equal")
 
     ax.set_xticks(range(n), nomes, rotation=45, ha="right")
-    ax.set_yticks(range(n), nomes)
+    ax.set_yticks(range(n), nomes_y)
 
     for i in range(n):
         for j in range(n):
@@ -102,9 +105,17 @@ def heatmap_pearson(matriz: pd.DataFrame, feature_set: str,
             ax.text(j, i, figu.numero(valor, 2), ha="center", va="center",
                     color=cor, fontsize=8)
 
-    barra = fig.colorbar(imagem, ax=ax, shrink=0.82)
+    # A barra acompanha a matriz, não o eixo. shrink na altura do eixo deixava uma
+    # faixa branca acima da matriz, porque o imshow quadrado não enche o eixo.
+    divisor = make_axes_locatable(ax)
+    eixo_barra = divisor.append_axes("right", size="4.5%", pad=0.12)
+    barra = fig.colorbar(imagem, cax=eixo_barra)
+    barra.set_ticks([-1, -0.5, 0, 0.5, 1])
+    barra.ax.set_yticklabels([
+        figu.numero(marca, 0 if float(marca).is_integer() else 1)
+        for marca in (-1, -0.5, 0, 0.5, 1)
+    ])
     barra.set_label("coeficiente de Pearson", color=cfg.INK)
-    barra.ax.yaxis.set_major_formatter(figu.formatador(1))
     ax.set_xticks(np.arange(-0.5, n, 1), minor=True)
     ax.set_yticks(np.arange(-0.5, n, 1), minor=True)
     ax.grid(which="minor", color=cfg.GRID, linewidth=0.8)
