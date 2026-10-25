@@ -118,6 +118,36 @@ def formatador(casas: int | None = None):
     return FuncFormatter(lambda valor, _pos: numero(valor, casas))
 
 
+# Siglas já declaradas na lista do texto. O eixo do heatmap usa estas no lugar do
+# nome por extenso, para a matriz não perder metade da largura.
+SIGLAS = {
+    "imc": "IMC",
+    "circ_cintura": "CC",
+    "rcest": "RCEst",
+    "pas": "PAS",
+    "pad": "PAD",
+}
+
+# O nome inteiro numa linha só empurrava a matriz. A quebra mantém o extenso
+# e devolve a largura da célula.
+_QUEBRA_EIXO = {
+    "saude_autoaval": "Saúde\nautoavaliada",
+    "multimorbidade": "Multimorbidade\nMetabólica",
+}
+
+
+def rotulo_eixo(nome: str, quebrar: bool = False) -> str:
+    """Sigla da lista, quando houver. O restante sai por extenso.
+
+    `quebrar` parte o nome longo em duas linhas, para o eixo vertical.
+    """
+    if nome in SIGLAS:
+        return SIGLAS[nome]
+    if quebrar and nome in _QUEBRA_EIXO:
+        return _QUEBRA_EIXO[nome]
+    return rotulo(nome)
+
+
 def rotulo(nome: str) -> str:
     """Nome por extenso. `regiao_2.0` vira `Região: Nordeste`."""
     if nome in ROTULOS:
@@ -154,8 +184,14 @@ def eixo(ax, xlabel: str, ylabel: str = "", grade: str = "both") -> None:
 def salvar(fig, destino, nota: str | None = None) -> Path:
     """Grava o PNG a 300 dpi e devolve o caminho. Único `savefig` do `src`."""
     if nota:
-        fig.tight_layout(rect=(0, 0.18, 1, 1))
-        fig.text(0.0, 0.01, nota, fontsize=8, color=cfg.INK, va="bottom", ha="left")
+        # A reserva acompanha o número de linhas, não a altura da figura. Uma fração
+        # fixa deixava um vão enorme no waterfall e apertava a nota numa figura baixa.
+        linhas = nota.count("\n") + 1
+        linhas += sum(1 for linha in nota.split("\n") if len(linha) > 90)
+        fracao = min(0.40, (0.20 * linhas + 0.12) / fig.get_figheight())
+        fig.tight_layout(rect=(0, fracao, 1, 1))
+        fig.text(0.0, 0.01, nota, fontsize=8, color=cfg.INK, va="bottom", ha="left",
+                 wrap=True)
     else:
         fig.tight_layout()
     destino = Path(destino)
