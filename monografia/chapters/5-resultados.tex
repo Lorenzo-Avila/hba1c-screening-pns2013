@@ -281,6 +281,60 @@ Na regressão de calibração, as inclinações situaram-se entre 0,842 e 1,031,
 Por consequência, as probabilidades produzidas pelos dois algoritmos não são interpretáveis como risco individual de apresentar HbA1c $\geq$ 6,5\%, sendo tratadas como escores de ordenação, válidos para priorizar o encaminhamento a exame por meio do limiar calibrado, conforme estabelecido na Metodologia.
 
 \section{Explicabilidade}\label{sec:res-explicabilidade}
-% shap_global_atributo, shap_global_coluna, shap_pares_colineares, shap_arvores_excluidas
-% shap_concordancia_topo (pré-registrada: 3 em A, 5 em B; 7 e 5 como leitura secundária)
+A verificação da aditividade confirmou o comportamento descrito na Metodologia. No regime principal, aplicado à floresta completa, o erro de aditividade foi da ordem de $10^{-15}$. No regime de contraste, foram identificadas 121 das 500 árvores no conjunto A e 72 no conjunto B com erro superior ao corte de $10^{-4}$, com erros entre $4{,}1 \times 10^{-4}$ e 0,80 no conjunto A e entre $1{,}7 \times 10^{-3}$ e 0,84 no conjunto B, enquanto as árvores mantidas apresentaram erro máximo inferior a $9 \times 10^{-8}$, de maneira que os dois grupos ficaram separados por um fator de aproximadamente quatro mil a dezenove mil vezes. Sobre a floresta reduzida, com 379 árvores no conjunto A e 428 no conjunto B, o erro de aditividade do regime de contraste foi da ordem de $10^{-8}$, inferior ao erro de uma árvore isolada sem defeito, de aproximadamente $6 \times 10^{-8}$.
+
+A importância global das variáveis no regime principal, medida pela média do valor absoluto das contribuições sobre o conjunto de teste, é apresentada na Tabela~\ref{tab:shap-global}. Nos dois conjuntos, a idade ocupou a primeira posição e a circunferência da cintura a segunda, seguidas pela HAS autorreferida, no conjunto A, e pelo escore de Multimorbidade Metabólica, no conjunto B, enquanto o IMC ocupou a quarta posição em ambos. As variáveis sociodemográficas, isto é, escolaridade, região, raça/cor, sexo e plano de saúde, situaram-se nas posições finais, todas com importância inferior a 0,02. No nível das colunas, a codificação com omissão de uma categoria de referência mostrou-se visível na distribuição das atribuições, visto que, no conjunto A, a indicadora da resposta negativa da HAS autorreferida concentrou 99\% da atribuição da variável, sendo a resposta afirmativa a categoria de referência, e a indicadora da categoria parda concentrou 84\% da atribuição de raça/cor. Conforme a restrição descrita na Metodologia, esses valores expressam a magnitude média das contribuições ao escore de ordenação, e não efeitos sobre o risco, tampouco relações causais.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:shap-global}Importância global das variáveis no \textit{Random Forest}, no regime principal, sobre o conjunto de teste.}
+  \small
+  \begin{tabular}{lrrrr}
+    \hline
+    & \multicolumn{2}{c}{Conjunto A} & \multicolumn{2}{c}{Conjunto B} \\
+    Variável & Posição & Importância & Posição & Importância \\ \hline
+    Idade & 1 & 0,092 & 1 & 0,106 \\
+    Circunferência da cintura & 2 & 0,075 & 2 & 0,078 \\
+    HAS autorreferida & 3 & 0,050 & -- & -- \\
+    Multimorbidade Metabólica & -- & -- & 3 & 0,070 \\
+    IMC & 4 & 0,042 & 4 & 0,047 \\
+    PAS & 5 & 0,041 & -- & -- \\
+    Saúde autoavaliada & 6 & 0,034 & 5 & 0,041 \\
+    Colesterol alto autorreferido & 7 & 0,018 & -- & -- \\
+    Escolaridade & 8 & 0,014 & 6 & 0,017 \\
+    PAD & 9 & 0,013 & -- & -- \\
+    Região & 10 & 0,010 & 7 & 0,015 \\
+    Sexo feminino & 11 & 0,010 & 9 & 0,010 \\
+    Raça/cor & 12 & 0,008 & 8 & 0,011 \\
+    Plano de saúde & 13 & 0,003 & 10 & 0,003 \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+  \legend{Importância: média do valor absoluto das contribuições SHAP, na escala do escore de ordenação. Nas variáveis nominais, soma das colunas indicadoras. O traço indica variável ausente do conjunto.}
+\end{table}
+
+No contraste entre regimes, a comparação definida antes da medição, com os dois regimes aplicados à mesma floresta reduzida, resultou em três posições iniciais coincidentes, de um total de 13, no conjunto A, ocupadas pela idade, pela circunferência da cintura e pela HAS autorreferida, e em cinco posições coincidentes, de um total de 10, no conjunto B, ocupadas pela idade, pela circunferência da cintura, pelo escore de Multimorbidade Metabólica, pelo IMC e pela saúde autoavaliada. No conjunto A, a quarta e a quinta posições, ocupadas pelo IMC e pela PAS, trocaram de lugar entre os regimes, variáveis cujas importâncias na floresta completa, de 0,0418 e 0,0413, configuram um quase empate. A comparação entre o regime principal sobre a floresta completa e o regime de contraste sobre a floresta reduzida, tratada como leitura secundária, resultou em sete e cinco posições coincidentes, respectivamente, porém, no conjunto A, as sete posições decorrem de dois efeitos que se anulam, visto que a remoção das árvores troca o IMC e a PAS de posição e a troca de regime os devolve à ordem original. Diante disso, a suposição de independência do regime de contraste não alterou as três primeiras posições do conjunto A nem as cinco primeiras do conjunto B, e as demais mudanças de posição ocorreram entre variáveis cujas importâncias diferem em milésimos.
+
+As atribuições dos pares e do bloco nomeados antes da medição são apresentadas na Tabela~\ref{tab:shap-blocos}. No par formado pelo IMC e pela circunferência da cintura, a circunferência concentrou entre 62\% e 66\% da atribuição somada do par, nos dois conjuntos e nos dois regimes, sem que o IMC deixasse de receber atribuição. No par de pressões arteriais, a PAS concentrou 75,5\% da atribuição no regime principal e 80,2\% no de contraste, e a PAD passou da nona para a décima segunda posição. No bloco do conjunto B, o escore de Multimorbidade Metabólica reteve 34,0\% e 31,5\% da atribuição somada, contra 38,1\% e 40,2\% da circunferência da cintura. Por consequência, a predição registrada antes da medição confirmou-se apenas no par de pressões, na forma de uma assimetria acentuada no regime de contraste, enquanto no par antropométrico e no bloco do escore a divisão do crédito permaneceu estável entre os regimes, sem que nenhum membro tivesse a sua atribuição suprimida.
+
+\begin{table}[htb]
+  \centering
+  \caption{\label{tab:shap-blocos}Fração da atribuição somada de cada par ou bloco nomeado antes da medição, por regime.}
+  \small
+  \begin{tabular}{llrrrr}
+    \hline
+    & & \multicolumn{2}{c}{Conjunto A} & \multicolumn{2}{c}{Conjunto B} \\
+    Par ou bloco & Membro & Principal & Contraste & Principal & Contraste \\ \hline
+    IMC e CC & IMC & 35,9\% & 34,4\% & 37,6\% & 36,0\% \\
+             & CC & 64,1\% & 65,6\% & 62,4\% & 64,0\% \\ \hline
+    PAS e PAD & PAS & 75,5\% & 80,2\% & -- & -- \\
+              & PAD & 24,5\% & 19,8\% & -- & -- \\ \hline
+    Bloco do escore & IMC & -- & -- & 22,9\% & 22,6\% \\
+                    & CC & -- & -- & 38,1\% & 40,2\% \\
+                    & Sexo feminino & -- & -- & 5,0\% & 5,7\% \\
+                    & Multimorbidade & -- & -- & 34,0\% & 31,5\% \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
+  \legend{CC: circunferência da cintura. Regime principal sobre a floresta completa; regime de contraste sobre a floresta reduzida. O traço indica par ou bloco ausente do conjunto.}
+\end{table}
+
 % shap_casos_locais e waterfall da célula de referência
