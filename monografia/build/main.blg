@@ -1,0 +1,15 @@
+[0] Config.pm:328> INFO - This is Biber 2.21
+[0] Config.pm:331> INFO - Logfile is 'C:\Users\ávila\Documents\GitHub\hba1c-screening-pns2013\monografia\build\main.blg'
+[151] biber-MSWIN64:342> INFO - === 
+[196] Biber.pm:421> INFO - Reading 'C:\Users\ávila\Documents\GitHub\hba1c-screening-pns2013\monografia\build\main.bcf'
+[364] Biber.pm:1002> INFO - Found 64 citekeys in bib section 0
+[378] Biber.pm:4487> INFO - Processing section 0
+[392] Biber.pm:4678> INFO - Looking for bibtex file 'aftertext/references.bib' for section 0
+[433] bibtex.pm:1713> INFO - LaTeX decoding ...
+[496] bibtex.pm:1519> INFO - Found BibTeX data source 'aftertext/references.bib'
+[1075] UCollate.pm:68> INFO - Overriding locale 'pt-BR' defaults 'variable = shifted' with 'variable = non-ignorable'
+[1078] UCollate.pm:68> INFO - Overriding locale 'pt-BR' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[1078] Biber.pm:4307> INFO - Sorting list 'nty/global//global/global/global' of type 'entry' with template 'nty' and locale 'pt-BR'
+[1079] Biber.pm:4313> INFO - No sort tailoring available for locale 'pt-BR'
+[1168] bbl.pm:676> INFO - Writing 'C:\Users\ávila\Documents\GitHub\hba1c-screening-pns2013\monografia\build\main.bbl' with encoding 'UTF-8'
+[1244] bbl.pm:779> INFO - Output to C:\Users\ávila\Documents\GitHub\hba1c-screening-pns2013\monografia\build\main.bbl

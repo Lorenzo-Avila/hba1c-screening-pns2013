@@ -1,0 +1,98 @@
+\changetocdepth {4}
+\babel@toc {brazil}{}\relax 
+\babel@toc {brazil}{}\relax 
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {1}\MakeTextUppercase []{Introdução}}{14}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Justificativa}{14}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Problema a ser resolvido}{16}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Objetivos}{17}{section.1.3}%
+\contentsline {subsection}{\numberline {1.3.1}Objetivo Geral}{17}{subsection.1.3.1}%
+\contentsline {subsection}{\numberline {1.3.2}Objetivos específicos}{18}{subsection.1.3.2}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {2}\MakeTextUppercase []{Fundamentação Teórica}}{19}{chapter.2}%
+\contentsline {section}{\numberline {2.1}O Diabetes Mellitus Tipo 2 e o Desafio na Saúde Pública}{19}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Rastreamento, APS e Diretrizes Clínicas}{20}{subsection.2.1.1}%
+\contentsline {section}{\numberline {2.2}A Pesquisa Nacional de Saúde (PNS 2013) e os Determinantes da Saúde}{22}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Variáveis Antropométricas e Clínicas como Classificadoras de DM2}{25}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Mineração de Dados}{27}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Pré-processamento e Tratamento de Dados}{29}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Algoritmos de \textit {Machine Learning}}{30}{section.2.6}%
+\contentsline {section}{\numberline {2.7}Avaliação de Modelos Classificatórios}{31}{section.2.7}%
+\contentsline {section}{\numberline {2.8}Inteligência Artificial Explicável (XAI)}{32}{section.2.8}%
+\contentsline {section}{\numberline {2.9}Multicolinearidade e seus Efeitos sobre a Modelagem e a Interpretabilidade}{33}{section.2.9}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {3}\MakeTextUppercase []{Metodologia}}{35}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Caracterização da Pesquisa}{35}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Considerações Éticas}{35}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Base de Dados e Amostra Analítica}{36}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Estrutura do Pipeline CRISP-DM}{37}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Reformulação Conceitual do Desfecho}{39}{subsection.3.4.1}%
+\contentsline {section}{\numberline {3.5}Seleção de Variáveis}{40}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}Princípios Orientadores}{40}{subsection.3.5.1}%
+\contentsline {subsection}{\numberline {3.5.2}Variáveis Candidatas}{41}{subsection.3.5.2}%
+\contentsline {subsection}{\numberline {3.5.3}Conjuntos de Atributos}{44}{subsection.3.5.3}%
+\contentsline {section}{\numberline {3.6}Preparação dos Dados}{45}{section.3.6}%
+\contentsline {subsection}{\numberline {3.6.1}Particionamento}{45}{subsection.3.6.1}%
+\contentsline {subsection}{\numberline {3.6.2}Imputação de Valores Ausentes}{46}{subsection.3.6.2}%
+\contentsline {subsection}{\numberline {3.6.3}Variáveis Derivadas}{46}{subsection.3.6.3}%
+\contentsline {section}{\numberline {3.7}Tratamento da Multicolinearidade}{47}{section.3.7}%
+\contentsline {section}{\numberline {3.8}Tratamento do Desbalanceamento}{48}{section.3.8}%
+\contentsline {section}{\numberline {3.9}Modelagem}{49}{section.3.9}%
+\contentsline {subsection}{\numberline {3.9.1}Regressão Logística}{49}{subsection.3.9.1}%
+\contentsline {subsection}{\numberline {3.9.2}\textit {Random Forest} e Busca de Hiperparâmetros}{49}{subsection.3.9.2}%
+\contentsline {section}{\numberline {3.10}Avaliação}{51}{section.3.10}%
+\contentsline {subsection}{\numberline {3.10.1}Ponto de Operação}{51}{subsection.3.10.1}%
+\contentsline {subsection}{\numberline {3.10.2}Métricas}{51}{subsection.3.10.2}%
+\contentsline {subsection}{\numberline {3.10.3}Calibração das Probabilidades}{52}{subsection.3.10.3}%
+\contentsline {subsection}{\numberline {3.10.4}Comparadores e Critério de Sucesso}{53}{subsection.3.10.4}%
+\contentsline {subsection}{\numberline {3.10.5}Comparação Pareada entre Modelos}{54}{subsection.3.10.5}%
+\contentsline {section}{\numberline {3.11}Explicabilidade}{54}{section.3.11}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {4}\MakeTextUppercase []{Desenvolvimento}}{57}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Ambiente e Tecnologias}{57}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Arquitetura do Software}{57}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Reprodutibilidade dos Resultados}{58}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Testes Automatizados}{60}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Rastreabilidade das Decisões}{61}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Painel de Resultados}{62}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Implantação}{66}{section.4.7}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {5}\MakeTextUppercase []{Resultados}}{70}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Caracterização da Amostra}{70}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Multicolinearidade e Escolha do Conjunto de Atributos}{71}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Busca de Hiperparâmetros}{71}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Desempenho no Ponto de Operação Principal}{71}{section.5.4}%
+\contentsline {section}{\numberline {5.5}Comparação com a Regra Clínica}{71}{section.5.5}%
+\contentsline {section}{\numberline {5.6}Comparação Pareada entre Modelos}{71}{section.5.6}%
+\contentsline {section}{\numberline {5.7}Calibração}{71}{section.5.7}%
+\contentsline {section}{\numberline {5.8}Explicabilidade}{71}{section.5.8}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {6}\MakeTextUppercase []{Discussões}}{72}{chapter.6}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {7}\MakeTextUppercase []{Considerações Finais}}{73}{chapter.7}%
+\vspace {\cftbeforechapterskip }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\contentsline {chapter}{REFERÊNCIAS}{74}{section*.20}%
+\babel@toc {brazil}{}\relax 
+\babel@toc {brazil}{}\relax 
+\renewcommand *{\cftappendixname }{AP\^ENDICE \space }
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {A}\MakeTextUppercase []{Registro de decisões de implementação}}{80}{appendix.A}%
+\cftinsert {AAA}
+\renewcommand *{\cftappendixname }{ANEXO \space }
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {A}\MakeTextUppercase []{Resolução CNS nº 510, de 7 de abril de 2016}}{81}{appendix.anexochapback.1}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {B}\MakeTextUppercase []{Resolução CNS nº 466, de 12 de dezembro de 2012}}{91}{appendix.anexochapback.2}%
