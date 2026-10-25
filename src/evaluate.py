@@ -314,11 +314,12 @@ def diagnostico_calibracao(y_te, proba_te, n_bins: int = 10) -> dict:
     prevalencia = float(np.mean(y_te))
     proba_media = float(proba_te.mean())
 
-    # Calibração de Cox: y ~ logito(p), sem `class_weight`, para medir o
-    # deslocamento que o `class_weight` do modelo original introduziu.
+    # Calibração de Cox: y ~ logito(p), estimada sem penalização e sem
+    # `class_weight`, para medir o deslocamento que o `class_weight` do modelo
+    # original introduziu.
     p = np.clip(proba_te, 1e-6, 1 - 1e-6)
     logito = np.log(p / (1 - p)).reshape(-1, 1)
-    cox = LogisticRegression(max_iter=1000).fit(logito, y_te)
+    cox = LogisticRegression(C=np.inf, max_iter=1000).fit(logito, y_te)
 
     return {
         "brier": brier,
