@@ -211,7 +211,8 @@ def barras_encaminhados(df: pd.DataFrame, casas) -> alt.Chart:
         y=alt.Y("rotulo:N", sort=list(dados["rotulo"]), title=None,
                 axis=alt.Axis(labelLimit=440, labelOverlap=False, labelFontSize=12)),
         x=alt.X("taxa_encaminhamento:Q", title="encaminhados a exame",
-                axis=alt.Axis(format="%")),
+                axis=alt.Axis(format="%"),
+                scale=alt.Scale(domain=[0, 1])),
     )
     barras = base.mark_bar(height=26, cornerRadiusEnd=4).encode(
         color=alt.Color("regime_id:N", legend=None,

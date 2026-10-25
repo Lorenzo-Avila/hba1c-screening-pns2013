@@ -212,14 +212,16 @@ CRISP_DM = [
     ("Preparação dos dados", "concluída", True),
     ("Modelagem", "concluída", True),
     ("Avaliação", "concluída", True),
-    ("Implantação", "pendente, após a pré-banca", False),
+    # Na recaptura final: "concluída", True se o FastAPI estiver pronto;
+    # "pendente", False se não estiver.
+    ("Implantação", "em desenvolvimento", False),
 ]
 
 NAO_FAZ_TITULO = "O que o sistema não faz"
 NAO_FAZ = [
     "Não classifica novos pacientes",
     "Não estima risco individual",
-    "Não elege a célula principal",
+    "Não é o protótipo de classificação",
 ]
 
 REPRODUCAO_COMANDO = "Comando"
