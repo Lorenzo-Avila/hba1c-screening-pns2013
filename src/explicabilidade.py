@@ -54,6 +54,7 @@ import numpy as np
 import pandas as pd
 import shap
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.transforms import blended_transform_factory
 
 from . import artefatos as art
 from . import colinearidade as col
@@ -1062,19 +1063,6 @@ ROTULO_CASO = {
     "VN": "verdadeiro negativo",
 }
 
-# O que toda explicação local precisa dizer na própria figura, e não na legenda
-# (D-053). A primeira frase desarma a leitura de meio a meio; a segunda desarma a
-# leitura de efeito protetor, que é o inverso da leitura clínica.
-NOTA_LOCAL = (
-    "O valor de base é a média das saídas da floresta sob reponderamento de classes, "
-    "e fica perto de 0,5 por causa dele, não na prevalência de 7%.\n"
-    "A referência das contribuições é o indivíduo médio sob esse reponderamento, e "
-    "não a população: contribuição negativa significa abaixo dessa referência, nunca "
-    "efeito protetor.\n"
-    "A soma das contribuições reconstrói o escore do indivíduo, nunca o risco dele "
-    "(D-022, D-040, D-053)."
-)
-
 
 def _eixo_figura(ax, xlabel: str, ylabel: str = "") -> None:
     """Rótulos e grade. O título da figura fica na legenda do LaTeX."""
@@ -1095,6 +1083,40 @@ def _formatar_valor(valor: float) -> str:
     valor = float(valor)
     casas = 0 if valor.is_integer() else 1
     return figu.numero(valor, casas)
+
+
+# Categorias do dicionário da PNS. Sexo e plano são indicadores 0/1 do desenho,
+# não os códigos 1/2 da variável original. Multimorbidade fica numérica: é escore.
+_CATEGORIAS_WATERFALL = {
+    "regiao": cfg.COD_REGIAO,
+    "raca_cor": cfg.COD_RACA,
+    "escolaridade": cfg.COD_ESCOLARIDADE,
+    "saude_autoaval": cfg.COD_SAUDE_AUTOAVAL,
+    "has_autorrelato": cfg.COD_HAS,
+    "colesterol_alto": cfg.COD_COLEST,
+    "sexo_fem": {0: "masculino", 1: "feminino"},
+    "plano_sim": {0: "não", 1: "sim"},
+}
+
+
+def _rotulo_observado(atributo: str, valor: float) -> str:
+    """`Variável = categoria` quando o valor é código. O resto sai numérico."""
+    nome = "Sexo" if atributo == "sexo_fem" else figu.rotulo(str(atributo))
+    codigos = _CATEGORIAS_WATERFALL.get(atributo)
+    if codigos is None:
+        return f"{nome} = {_formatar_valor(valor)}"
+    categoria = codigos.get(int(float(valor)), _formatar_valor(valor))
+    return f"{nome} = {categoria}"
+
+
+def _texto_contribuicao(valor: float) -> str:
+    """Três casas, com sinal. Abaixo de 0,0005 a casa some, então sai `< 0,001`."""
+    if abs(valor) < 0.0005:
+        return "< 0,001"
+    texto = figu.numero(valor, 3)
+    if valor > 0:
+        return f"+{texto}"
+    return texto
 
 
 def atribuicao_por_atributo(valores: np.ndarray, mapa: pd.DataFrame) -> pd.DataFrame:
@@ -1318,8 +1340,8 @@ def _painel_waterfall(ax, caso: pd.DataFrame) -> tuple[float, float]:
         cores.append(cfg.CORAL if valor >= 0 else cfg.TEAL)
         # Hachura na contribuição negativa: no cinza a cor sozinha não separa o sinal.
         hachuras.append("" if valor >= 0 else "///")
-        rotulos.append(f"{figu.rotulo(str(contribuicao['atributo']))} = "
-                       f"{_formatar_valor(contribuicao['valor_observado'])}")
+        rotulos.append(_rotulo_observado(
+            str(contribuicao["atributo"]), contribuicao["valor_observado"]))
         inicio += valor
 
     y = np.arange(len(tamanhos))[::-1]
@@ -1329,9 +1351,8 @@ def _painel_waterfall(ax, caso: pd.DataFrame) -> tuple[float, float]:
                 hatch=hachura, edgecolor=cfg.INK, linewidth=0.4)
     for altura, (comeco, tamanho) in enumerate(zip(esquerdas, tamanhos)):
         fim = comeco + tamanho
-        texto = figu.numero(abs(tamanho), 3)
-        texto = f"+{texto}" if tamanho >= 0 else f"-{texto}"
-        ax.text(fim + (0.003 if tamanho >= 0 else -0.003), y[altura], texto,
+        ax.text(fim + (0.003 if tamanho >= 0 else -0.003), y[altura],
+                _texto_contribuicao(tamanho),
                 ha="left" if tamanho >= 0 else "right", va="center", fontsize=8,
                 color=cfg.INK)
 
@@ -1345,16 +1366,19 @@ def _painel_waterfall(ax, caso: pd.DataFrame) -> tuple[float, float]:
     ax.text(escore, -1.5, f"escore {figu.numero(escore, 3)}", ha="center",
             va="top", fontsize=8, fontweight="bold", color=cfg.INK)
 
-    # Cabeçalho à esquerda, acima das retas. As duas marcas ficam em alturas
-    # diferentes, cada uma sobre a sua reta, para não se cobrirem.
-    ax.set_ylim(-2.3, n + 2.8)
-    ax.text(0.0, n + 2.55,
-            f"{ROTULO_CASO[linha['caso']]}, indivíduo {int(linha['indice'])}\n"
-            f"{decisao}, a {distancia} do limiar",
-            transform=ax.get_yaxis_transform(), ha="left", va="top", fontsize=9,
-            color=cfg.INK, linespacing=1.25)
-    ax.text(valor_base, n + 0.15, f"valor de base {figu.numero(valor_base, 3)}",
-            ha="center", va="bottom", fontsize=8, color=cfg.INK)
+    # Cabeçalho na largura da figura: o eixo fica estreito por causa do nome da
+    # categoria, e a frase não cabe entre as duas espinhas.
+    ax.set_ylim(-2.3, n + 2.4)
+    trans = blended_transform_factory(ax.figure.transFigure, ax.transData)
+    ax.text(0.01, n + 2.15,
+            f"{ROTULO_CASO[linha['caso']]}, {decisao}, a {distancia} do limiar",
+            transform=trans, ha="left", va="top", fontsize=9, color=cfg.INK,
+            clip_on=False)
+    # À direita da frase e acima do limiar: no eixo estreito, centrar no 0,5
+    # cobria o número do limiar.
+    ax.text(0.99, n + 2.15, f"valor de base {figu.numero(valor_base, 3)}",
+            transform=trans, ha="right", va="top", fontsize=8, color=cfg.INK,
+            clip_on=False)
     ax.text(limiar, n - 0.2, f"limiar {figu.numero(limiar, 3)}",
             ha="center", va="bottom", fontsize=8, fontweight="bold", color=cfg.CORAL)
 
@@ -1372,8 +1396,7 @@ def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
 
     Os dois têm o mesmo desfecho observado e decisões opostas, e explicá-los juntos é
     o que mostra por qual variável a decisão passou. A marca do limiar diz onde a
-    decisão acontece, e a nota diz contra qual referência as contribuições são lidas,
-    que é o que D-053 manda pôr na figura em vez de na legenda.
+    decisão acontece. A ressalva sobre o valor de base fica na legenda do LaTeX.
 
     O falso positivo e o verdadeiro negativo ficam só na tabela: os quatro casos saem
     em `shap_casos_locais`, e a figura traz os dois que a triagem discute.
@@ -1386,10 +1409,13 @@ def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
 
     # Um painel por linha. Lado a lado, cada eixo fica com menos da metade dos 16 cm
     # e o rótulo por extenso não cabe: o tight_layout desiste e o texto estoura.
+    # 0,21 pol por linha de dado, teto de 20 cm: com a legenda e a fonte, a página
+    # útil cabe cerca de 24,7 cm.
     n_variaveis = int(tabela["atributo"].nunique())
-    por_painel = 0.26 * (n_variaveis + 5.1)
+    por_painel = 0.21 * (n_variaveis + 4.7)
+    altura = min(20 / 2.54, por_painel * len(casos))
     fig, eixos = figu.subplots(
-        figu.LARGURA_INTEIRA, por_painel * len(casos) / 0.82,
+        figu.LARGURA_INTEIRA, altura,
         len(casos), 1, sharex=True,
     )
     extremos = []
@@ -1405,10 +1431,10 @@ def figura_waterfall_par(medida: dict, casos: list[str] | None = None,
     maior = max(e[1] for e in extremos)
     span = maior - menor or 1.0
     # Folga nos dois lados para o número da contribuição não encostar na borda.
-    np.atleast_1d(eixos)[0].set_xlim(menor - 0.28 * span, maior + 0.16 * span)
+    np.atleast_1d(eixos)[0].set_xlim(menor - 0.50 * span, maior + 0.22 * span)
 
     destino = _destino(path_figuras, f"shap_waterfall_{celula}.png")
-    return figu.salvar(fig, destino, NOTA_LOCAL)
+    return figu.salvar(fig, destino)
 
 
 def material_das_figuras(celula: str, particao: xp.Particao) -> dict:

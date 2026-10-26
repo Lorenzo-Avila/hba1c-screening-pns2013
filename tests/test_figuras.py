@@ -93,7 +93,7 @@ def test_texto_de_figura_nao_tem_travessao_nem_ponto_medio():
 def test_numero_usa_virgula_decimal_e_ponto_de_milhar():
     assert figu.numero(0.78, 3) == "0,780"
     assert figu.numero(1421, 0) == "1.421"
-    assert figu.numero(-2.571, 3) == "-2,571"
+    assert figu.numero(-2.571, 3) == "\u22122,571"
     assert figu.formatador(2)(0.5, 0) == "0,50"
 
 
