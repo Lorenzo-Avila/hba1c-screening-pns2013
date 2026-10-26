@@ -89,8 +89,8 @@ def numero(valor, casas: int | None = None) -> str:
     if math.isnan(valor):
         return ""
     if math.isinf(valor):
-        return "∞" if valor > 0 else "-∞"
-    sinal = "-" if valor < 0 else ""
+        return "∞" if valor > 0 else "\u2212∞"
+    sinal = "\u2212" if valor < 0 else ""
     valor = abs(valor)
     if casas is None:
         if valor >= 100:
