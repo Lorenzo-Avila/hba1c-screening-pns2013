@@ -1,6 +1,6 @@
 """Contratos da explicabilidade via SHAP sobre a Random Forest publicada.
 
-Treze guardas, e elas se dividem em três naturezas. As de **identidade numérica**
+As guardas se dividem em três naturezas. As de **identidade numérica**
 conferem que a atribuição descreve o modelo: aditividade nos dois regimes e agregação
 por variável conceitual. As de **vazamento e determinismo** conferem o protocolo: o
 background sai do treino, e a seleção dos casos locais reproduz sozinha. As de
@@ -547,3 +547,21 @@ def test_indice_nas_duas_celulas_marca_o_mesmo_individuo(artefatos):
 
     assert repetidos, "nenhum índice nas duas células"
     assert (casos["indice_nas_duas_celulas"] == casos["indice"].isin(repetidos)).all()
+
+
+def test_waterfall_mostra_categoria_e_corta_contribuicao_minuscula():
+    """O rótulo da figura usa a categoria da PNS. Contribuição abaixo de 0,0005 some."""
+    assert ex._rotulo_observado("regiao", 3) == "Região = Sudeste"
+    assert ex._rotulo_observado("raca_cor", 4) == "Raça/cor = Parda"
+    assert ex._rotulo_observado("sexo_fem", 0) == "Sexo = masculino"
+    assert ex._rotulo_observado("sexo_fem", 1) == "Sexo = feminino"
+    assert ex._rotulo_observado("plano_sim", 0) == "Plano de saúde = não"
+    assert ex._rotulo_observado("escolaridade", 5) == (
+        "Escolaridade = Médio completo ou equivalente"
+    )
+    assert ex._rotulo_observado("saude_autoaval", 2) == "Saúde autoavaliada = Boa"
+    assert ex._rotulo_observado("multimorbidade", 2) == "Multimorbidade Metabólica = 2"
+    assert ex._texto_contribuicao(0.000173) == "< 0,001"
+    assert ex._texto_contribuicao(-0.0004) == "< 0,001"
+    assert ex._texto_contribuicao(0.04) == "+0,040"
+    assert ex._texto_contribuicao(-0.1) == "\u22120,100"

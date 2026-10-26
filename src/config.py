@@ -57,6 +57,24 @@ COD_RACA = {1: "Branca", 2: "Preta", 3: "Amarela", 4: "Parda", 5: "Indígena", 9
 COD_REGIAO = {1: "Norte", 2: "Nordeste", 3: "Sudeste", 4: "Sul", 5: "Centro-Oeste"}
 COD_HAS = {1: "Sim", 2: "Apenas na gravidez", 3: "Não"}
 COD_COLEST = {1: "Sim", 2: "Não"}
+# VDD004 no dicionário de variáveis da PNS 2013, sistema de 8 anos.
+COD_ESCOLARIDADE = {
+    1: "Sem instrução",
+    2: "Fundamental incompleto ou equivalente",
+    3: "Fundamental completo ou equivalente",
+    4: "Médio incompleto ou equivalente",
+    5: "Médio completo ou equivalente",
+    6: "Superior incompleto ou equivalente",
+    7: "Superior completo",
+}
+# N001 no dicionário de variáveis da PNS 2013.
+COD_SAUDE_AUTOAVAL = {
+    1: "Muito boa",
+    2: "Boa",
+    3: "Regular",
+    4: "Ruim",
+    5: "Muito ruim",
+}
 
 # Código de não resposta: vira NaN na limpeza.
 COD_IGNORADO_RACA = 9
