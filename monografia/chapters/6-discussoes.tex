@@ -2,3 +2,34 @@
 \chapter{Discussões}\label{cap:discussoes}
 % ----------------------------------------------------------
 
+\section{Aplicabilidade na Atenção Primária}\label{sec:disc-aplicabilidade}
+% regra encaminha 84,0% em ponto único; modelo escolhe o ponto conforme a capacidade da rede
+% troca quantificada: 736 encaminhamentos a menos (51,8%) ao custo de 19 casos
+% ordem de grandeza frente à literatura do referencial (FINDRISC, BrDMrisc, Carrillo-Larco),
+%   sem comparação direta: desfechos e desenhos diferentes (pendente: conferir o que cada artigo reporta)
+
+\section{O Critério de Sucesso no Regime de Sensibilidade Equiparada}\label{sec:disc-criterio}
+% resultado negativo da referência; só RF A cumpre, por 0,009 de NNS
+% critério decidido numa região em que todas as estratégias encaminham mais de 84%
+% por que a referência não foi trocada pela única célula que cumpre (escolha a partir do resultado)
+
+\section{\textit{Random Forest} e Regressão Logística}\label{sec:disc-algoritmos}
+% ganho de sensibilidade específico do ponto de operação; PR-AUC pior nos dois conjuntos
+% logística abaixo da própria validação cruzada no teste; McNemar: superconjunto dos casos
+% partição única com 119 positivos como escala de incerteza
+
+\section{Desbalanceamento e Calibração}\label{sec:disc-calibracao}
+% por que reponderar se o limiar já trata o desbalanceamento (van den Goorbergh)
+% mecanismos distintos: logística (deslocamento compatível com o reponderamento) x floresta (média de votos e reponderamento por subamostra)
+% escore de ordenação, não risco; recalibração posterior (Platt ou isotônica) como trabalho futuro
+
+\section{Multicolinearidade e Explicabilidade}\label{sec:disc-explicabilidade}
+% VIF não vê redundância por ponto de corte; escolha de A e B por interpretabilidade
+% predição confirmada só no par de pressões; hipóteses: correlação de 0,79 não é redundância; subamostragem de colunas reparte o crédito
+% topo estável entre regimes; restrição de leitura das contribuições negativas
+
+\section{Limitações}\label{sec:limitacoes}
+% métricas amostrais, não ponderadas; partição única; desenho transversal (associação, não incidência)
+% calibração; SHAP da logística não executado; hipótese de ausência não aleatória do colesterol não testada
+% IC bootstrap de raça/cor não realizado; regra clínica simplificada (sem histórico familiar)
+% protótipo da fase de implantação, se não concluído
