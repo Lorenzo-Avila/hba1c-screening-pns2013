@@ -372,6 +372,51 @@ def curva_pr(y_te, proba_te) -> pd.DataFrame:
     })
 
 
+# Decis fixos de sensibilidade, fechados à direita: (início; fim]. Definidos antes da
+# execução. A divisão em duas faixas com corte em 0,1 saiu de olhar os dados e não entra.
+FAIXAS_RECALL = [(i / 10, (i + 1) / 10) for i in range(10)]
+
+
+def conferir_faixas(faixas) -> None:
+    """Falha se as faixas não forem contíguas, sem sobreposição, cobrindo (0; 1].
+
+    Raises:
+        ValueError: com a primeira lacuna, sobreposição ou faixa vazia encontrada.
+    """
+    if not faixas or faixas[0][0] != 0 or faixas[-1][1] != 1:
+        raise ValueError(f"As faixas não cobrem (0; 1]: {faixas}")
+    for inicio, fim in faixas:
+        if inicio >= fim:
+            raise ValueError(f"Faixa vazia ou invertida: ({inicio}; {fim}]")
+    for (_, fim), (inicio, _) in zip(faixas, faixas[1:]):
+        if fim != inicio:
+            tipo = "lacuna" if fim < inicio else "sobreposição"
+            raise ValueError(f"{tipo.capitalize()} entre {fim} e {inicio}")
+
+
+def pr_auc_por_faixa(curva: pd.DataFrame, faixas=FAIXAS_RECALL) -> pd.DataFrame:
+    """Decompõe a soma em degrau da PR-AUC por faixa de sensibilidade.
+
+    Recebe a saída de `curva_pr`, para que curva e decomposição venham da mesma chamada
+    de `precision_recall_curve`. Com os pontos em recall crescente e `recall_0 = 0`, a
+    contribuição de cada ponto é `(recall_n − recall_{n−1}) · precisao_n` e vai para a
+    faixa que contém `recall_n`, extremidade direita incluída. Ponto que repete o recall
+    contribui com zero.
+
+    Returns:
+        DataFrame com `faixa_inicio`, `faixa_fim` e `contribuicao`, uma linha por faixa.
+    """
+    conferir_faixas(faixas)
+    recall = curva["recall"].to_numpy()[::-1]
+    precisao = curva["precisao"].to_numpy()[::-1]
+    contribuicao = np.diff(recall, prepend=0.0) * precisao
+    return pd.DataFrame([
+        {"faixa_inicio": inicio, "faixa_fim": fim,
+         "contribuicao": float(contribuicao[(recall > inicio) & (recall <= fim)].sum())}
+        for inicio, fim in faixas
+    ])
+
+
 # ---------------------------------------------------------------------------
 # Figuras
 # ---------------------------------------------------------------------------

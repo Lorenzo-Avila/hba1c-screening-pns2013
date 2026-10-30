@@ -29,6 +29,7 @@ from sklearn.pipeline import Pipeline
 
 from src import benchmark as bm
 from src import config as cfg
+from src import evaluate as ev
 from src import experimento as xp
 from src import models as md
 
@@ -782,6 +783,59 @@ def test_curvas_do_grid_reproduzem_as_areas_recalculadas(particao, grid_dois_con
             pontos = tabela[(tabela["modelo"] == chave[0])
                             & (tabela["conjunto"] == chave[1])]
             assert area(pontos) == pytest.approx(r[metrica], abs=1e-6), (chave, metrica)
+
+
+def test_faixas_de_recall_sao_os_dez_decis_e_formam_particao():
+    assert ev.FAIXAS_RECALL == [(i / 10, (i + 1) / 10) for i in range(10)]
+    ev.conferir_faixas(ev.FAIXAS_RECALL)
+
+
+@pytest.mark.parametrize("faixas", [
+    [(0.0, 0.5), (0.4, 1.0)],                # sobreposição
+    [(0.0, 0.4), (0.5, 1.0)],                # lacuna
+    [(0.0, 0.5)],                            # não chega a 1
+    [(0.1, 1.0)],                            # não parte de 0
+])
+def test_faixas_que_nao_particionam_falham(faixas):
+    with pytest.raises(ValueError):
+        ev.conferir_faixas(faixas)
+
+
+def test_ponto_na_extremidade_vai_para_a_faixa_da_esquerda():
+    """Recall 0,5 exato fica em (0,4; 0,5]. Fechar à esquerda o mandaria a (0,5; 0,6]."""
+    # Dois positivos: o primeiro limiar dá recall 0,5 com precisão 1, o segundo, recall 1.
+    curva = ev.curva_pr([1, 0, 1], [0.9, 0.5, 0.1])
+    faixas = ev.pr_auc_por_faixa(curva).set_index("faixa_fim")["contribuicao"]
+    assert faixas[0.5] == pytest.approx(0.5)
+    assert faixas[0.6] == 0
+    assert faixas[1.0] == pytest.approx(0.5 * 2 / 3)
+
+
+def test_pr_auc_por_faixa_soma_a_pr_auc_do_grid(particao, grid_dois_conjuntos):
+    curva = xp.curvas(grid_dois_conjuntos, particao)[xp.NOME_CURVA_PR]
+    tabela = xp.pr_auc_por_faixa(grid_dois_conjuntos, curva)
+    for r in [r for r in grid_dois_conjuntos if r["limiar_calibrado"]]:
+        da_celula = tabela[(tabela["modelo"] == r["modelo"])
+                           & (tabela["conjunto"] == r["conjunto"])]
+        assert len(da_celula) == len(ev.FAIXAS_RECALL)
+        assert abs(da_celula["contribuicao"].sum() - r["pr_auc"]) <= 1e-9
+        assert da_celula["fracao_da_pr_auc"].sum() == pytest.approx(1, abs=1e-9)
+
+
+def test_pr_auc_por_faixa_versionada_tem_cinco_celulas_por_dez_faixas():
+    tabela = _versionado(xp.NOME_PR_AUC_FAIXA)
+    assert list(tabela.columns) == ["modelo", "conjunto", "faixa_inicio", "faixa_fim",
+                                    "contribuicao", "fracao_da_pr_auc"]
+    calibraveis = [c for c in xp.composicao_esperada() if c[1] != xp.SEM_CONJUNTO]
+    esperado = [(m, c, inicio) for m, c in calibraveis
+                for inicio, _ in ev.FAIXAS_RECALL]
+    assert len(tabela) == 50
+    assert list(zip(tabela["modelo"], tabela["conjunto"],
+                    tabela["faixa_inicio"])) == esperado
+    consolidado = _versionado(xp.NOME_CONSOLIDADO).set_index(["modelo", "conjunto"])
+    for chave, faixas in tabela.groupby(["modelo", "conjunto"]):
+        assert round(faixas["contribuicao"].sum(), 3) == round(
+            consolidado.loc[chave, "pr_auc"], 3), chave
 
 
 def test_calibracao_decis_reproduz_o_decimo_decil_de_d040():

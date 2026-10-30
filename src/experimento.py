@@ -83,6 +83,11 @@ NOME_CUSTO_MARGINAL = "custo_marginal_pareado"
 NOME_CURVA_ROC = "curva_roc"
 NOME_CURVA_PR = "curva_pr"
 NOME_DECIS = "calibracao_decis"
+NOME_PR_AUC_FAIXA = "pr_auc_por_faixa"
+
+# Folga da guarda de soma: a decomposição soma os mesmos termos de `average_precision`
+# em outra ordem, então só o arredondamento de ponto flutuante pode separar os dois.
+TOLERANCIA_SOMA_PR = 1e-9
 
 # O par do custo marginal: a floresta contra a logística, nos conjuntos em que as duas
 # rodam. O sinal dos deltas é sempre floresta menos logística.
@@ -582,6 +587,45 @@ def curvas(resultados: list[dict], particao: Particao) -> dict[str, pd.DataFrame
     return saida
 
 
+def pr_auc_por_faixa(resultados: list[dict], curva_pr: pd.DataFrame) -> pd.DataFrame:
+    """A PR-AUC de cada célula calibrável, decomposta por decil de sensibilidade.
+
+    Lê a `curva_pr` que `curvas` acabou de montar, e não o CSV: a decomposição e a
+    curva publicada saem da mesma chamada de `precision_recall_curve`. Serve para
+    localizar em que trecho da curva os modelos diferem.
+
+    Raises:
+        ValueError: se a soma das faixas de alguma célula se afastar da `pr_auc` da
+            tabela consolidada em mais de `TOLERANCIA_SOMA_PR`.
+
+    Returns:
+        DataFrame com `modelo`, `conjunto`, `faixa_inicio`, `faixa_fim`,
+        `contribuicao` e `fracao_da_pr_auc`, uma linha por célula e faixa.
+    """
+    partes = []
+    for r in resultados:
+        if not r.get("limiar_calibrado", True):
+            continue
+        pontos = curva_pr[(curva_pr["modelo"] == r["modelo"])
+                          & (curva_pr["conjunto"] == r["conjunto"])]
+        faixas = ev.pr_auc_por_faixa(pontos)
+        soma = faixas["contribuicao"].sum()
+        if abs(soma - r["pr_auc"]) > TOLERANCIA_SOMA_PR:
+            raise ValueError(f"{_rotulo(r)}: faixas somam {soma!r}, PR-AUC "
+                             f"publicada é {r['pr_auc']!r}.")
+        faixas["fracao_da_pr_auc"] = faixas["contribuicao"] / r["pr_auc"]
+        faixas.insert(0, "conjunto", r["conjunto"])
+        faixas.insert(0, "modelo", r["modelo"])
+        partes.append(faixas)
+    tabela = pd.concat(partes, ignore_index=True)
+    tabela.attrs["nota"] = (
+        "Contribuição de cada decil de sensibilidade, fechado à direita, à soma em "
+        "degrau da PR-AUC no teste. As faixas de cada célula somam a PR-AUC da tabela "
+        "consolidada."
+    )
+    return tabela
+
+
 def veredito_do_criterio(carga: pd.DataFrame,
                          nome_regra: str = "Regra ADA") -> pd.DataFrame:
     """Aplica o critério de sucesso a cada regime da carga operacional.
@@ -1004,8 +1048,13 @@ def executar(modelos: list[str] | None = None,
         artefatos[NOME_CUSTO_MARGINAL] = exportar(custo, NOME_CUSTO_MARGINAL,
                                                   destino=destino, na_rep="")
     if any(r.get("limiar_calibrado", True) for r in resultados):
-        for nome, curva in curvas(resultados, particao).items():
+        tabelas_curva = curvas(resultados, particao)
+        for nome, curva in tabelas_curva.items():
             artefatos[nome] = exportar_curva(curva, nome, destino=destino)
+        artefatos[NOME_PR_AUC_FAIXA] = exportar(
+            pr_auc_por_faixa(resultados, tabelas_curva[NOME_CURVA_PR]),
+            NOME_PR_AUC_FAIXA, destino=destino, float_format="%.4f",
+        )
 
     divergencias = pd.DataFrame()
     composicao = pd.DataFrame()
