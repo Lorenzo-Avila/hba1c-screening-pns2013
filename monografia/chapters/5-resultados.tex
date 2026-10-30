@@ -95,7 +95,8 @@ A busca avaliou as mesmas sessenta combinações de hiperparâmetros nos conjunt
 \begin{table}[htb]
   \centering
   \caption{\label{tab:busca}Principais combinações da busca de hiperparâmetros do \textit{Random Forest}, por validação cruzada no conjunto de treino.}
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \begin{tabular}{llrrlrrr}
     \hline
     Conjunto & Combinação & Prof. & Folha & Colunas & Posição & PR-AUC & DP \\ \hline
@@ -119,7 +120,8 @@ O desempenho dos cinco modelos no conjunto de teste, cada um em seu limiar de de
 \begin{table}[htb]
   \centering
   \caption{\label{tab:desempenho-teste}Desempenho no conjunto de teste, no ponto de operação principal.}
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \begin{tabular}{llrrrrrrrr}
     \hline
     Modelo & Conjunto & Limiar & Sensib. & Espec. & F1 & AUC-ROC & PR-AUC & NNS & Encam. (\%) \\ \hline
@@ -176,16 +178,17 @@ A comparação com a regra clínica foi realizada em três regimes de encaminham
 \begin{table}[htb]
   \centering
   \caption{\label{tab:regimes}Regimes de encaminhamento da regra clínica e do modelo de referência, no conjunto de teste.}
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \begin{tabular}{lrrrrrr}
     \hline
-    Estratégia & Encaminhados & (\%) & Detectados & Não detectados & Sensibilidade & NNS \\ \hline
+    Estratégia & Encam. & (\%) & Detect. & Não detect. & Sensib. & NNS \\ \hline
     Regra clínica & 1.421 & 84,0 & 115 & 4 & 0,966 & 12,36 \\
     RF, sensibilidade equiparada & 1.461 & 86,4 & 117 & 2 & 0,983 & 12,49 \\
-    RF, ponto de operação principal & 685 & 40,5 & 96 & 23 & 0,807 & 7,14 \\ \hline
+    RF, ponto principal & 685 & 40,5 & 96 & 23 & 0,807 & 7,14 \\ \hline
   \end{tabular}
   \fonte{Elaborado pelo autor, a partir de \textcite{IBGE_PNS2013_Exames}.}
-  \legend{RF: \textit{Random Forest} com o conjunto B, modelo de referência.}
+  \legend{RF: \textit{Random Forest} com o conjunto B, modelo de referência; Encam.: encaminhados; Detect.: detectados; Sensib.: sensibilidade.}
 \end{table}
 
 No regime de sensibilidade equiparada, os limiares dos modelos foram recalibrados para a sensibilidade de 0,977, obtida pela regra no conjunto de treino, e os resultados de todas as combinações são apresentados na Tabela~\ref{tab:equiparado}. No conjunto de teste, todos os modelos superaram a sensibilidade da regra, de 0,966, com valores entre 0,983 e 0,992, de maneira que o critério de sucesso foi decidido pelo NNS. Apenas o \textit{Random Forest} com o conjunto A cumpriu o critério, com NNS de 12,347 contra 12,357 da regra, diferença de 0,009, ao detectar 118 casos com 1.457 encaminhamentos. O modelo de referência não cumpriu o critério, visto que detectou 117 casos com 1.461 encaminhamentos, resultando em NNS de 12,487, superior ao da regra, e nenhuma das combinações da Regressão Logística o cumpriu, com NNS entre 12,385 e 12,650. Cabe ressaltar que, nesse regime, tanto a regra quanto os modelos encaminharam entre 84,0\% e 87,5\% do conjunto de teste.
@@ -193,7 +196,8 @@ No regime de sensibilidade equiparada, os limiares dos modelos foram recalibrado
 \begin{table}[htb]
   \centering
   \caption{\label{tab:equiparado}Regime de sensibilidade equiparada e cumprimento do critério de sucesso, no conjunto de teste.}
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \begin{tabular}{llrrrrrl}
     \hline
     Modelo & Conjunto & Sensibilidade & Encaminhados & (\%) & Detectados & NNS & Critério \\ \hline
@@ -215,7 +219,8 @@ Por fim, a Tabela~\ref{tab:custo-marginal} compara o \textit{Random Forest} e a 
 \begin{table}[htb]
   \centering
   \caption{\label{tab:custo-marginal}Custo marginal do \textit{Random Forest} em relação à Regressão Logística, no conjunto de teste.}
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \begin{tabular}{llrrrrl}
     \hline
     Conjunto & Regime & Encam. RF & Detect. RF & Encam. RL & Detect. RL & Leitura \\ \hline
@@ -253,7 +258,8 @@ Os indicadores de calibração dos cinco modelos são apresentados na Tabela~\re
 \begin{table}[htb]
   \centering
   \caption{\label{tab:calibracao}Indicadores de calibração no conjunto de teste.}
-  \small
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
   \begin{tabular}{llrrrrrrr}
     \hline
     Modelo & Conjunto & Brier & \textit{Brier skill} & Prob. média & Inflação & ECE & Inclinação & Intercepto \\ \hline
