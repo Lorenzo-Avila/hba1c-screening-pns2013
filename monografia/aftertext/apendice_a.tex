@@ -3,4 +3,93 @@
 % ----------------------------------------------------------
 \chapter{Registro de decisões de implementação}\label{apendice:decisoes}
 
-\textcolor{red}{[PENDENTE: redigir o índice das 58 decisões no padrão de escrita do trabalho, a partir do documento de rastreabilidade, com assunto e classificação de cada decisão, e retirar esta nota.]}
+Os Quadros~\ref{qua:decisoes-1}, \ref{qua:decisoes-2} e \ref{qua:decisoes-3} apresentam o índice das 59 decisões de implementação registradas ao longo do desenvolvimento, conforme o procedimento descrito na seção de Rastreabilidade das Decisões do capítulo de Desenvolvimento. Cada decisão é identificada pela sua ordem de registro, pelo seu assunto e pela sua classificação, segundo as cinco categorias ali definidas: conforme, execução de protocolo, extrapolação, divergência e pendência de redação.
+
+\begin{quadro}[H]
+  \caption{\label{qua:decisoes-1}Índice das decisões de implementação, parte 1 de 3.}
+  \small
+  \begin{tabular}{|c|p{9.2cm}|p{4.2cm}|}
+    \hline
+    \textbf{Ordem} & \textbf{Assunto} & \textbf{Classificação} \\ \hline
+    1 & Avaliação de três conjuntos de atributos & Execução de protocolo \\ \hline
+    2 & VIF calculado sobre a matriz de dados transformada & Conforme \\ \hline
+    3 & Correlação de Pearson entre as variáveis numéricas & Conforme \\ \hline
+    4 & Limiar de decisão definido por sensibilidade-alvo & Extrapolação \\ \hline
+    5 & Métricas complementares: PR-AUC, escore de Brier e NNS & Extrapolação \\ \hline
+    6 & Regra clínica como comparador & Extrapolação \\ \hline
+    7 & Agrupamento das categorias de raça/cor, não implementado & Extrapolação \\ \hline
+    8 & Categoria explícita para a ausência do colesterol, adiada & Divergência \\ \hline
+    9 & Peso amostral fora do treinamento & Pendência de redação \\ \hline
+    10 & Peso e altura utilizados apenas por meio das variáveis derivadas & Conforme \\ \hline
+    11 & Contagem de valores ausentes do colesterol & Conforme \\ \hline
+    12 & HAS Combinada fora do conjunto B e ortogonalidade em dois níveis & Execução de protocolo \\ \hline
+    13 & Imputação anterior à codificação das variáveis & Conforme \\ \hline
+    14 & Espaço de distância controlado na imputação por KNN & Conforme \\ \hline
+    15 & Escopo do \textit{pipeline} no cálculo do VIF & Conforme \\ \hline
+    16 & Resultado do VIF diferente da expectativa declarada & Divergência \\ \hline
+    17 & $R^2$ auxiliar ao lado do VIF & Conforme \\ \hline
+    18 & Coeficientes de Pearson em tabela & Conforme \\ \hline
+    19 & Remoção experimental da RCEst & Execução de protocolo \\ \hline
+    20 & Tratamento de caso extremo na definição do limiar & Conforme \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor.}
+\end{quadro}
+
+\begin{quadro}[H]
+  \caption{\label{qua:decisoes-2}Índice das decisões de implementação, parte 2 de 3.}
+  \small
+  \begin{tabular}{|c|p{9.2cm}|p{4.2cm}|}
+    \hline
+    \textbf{Ordem} & \textbf{Assunto} & \textbf{Classificação} \\ \hline
+    21 & Dispersão entre partições ao lado das métricas de teste & Conforme \\ \hline
+    22 & Probabilidades não interpretáveis como risco individual & Extrapolação \\ \hline
+    23 & Comparadores avaliados com limiar fixo & Conforme \\ \hline
+    24 & Critério de sucesso dependente do ponto de operação & Extrapolação \\ \hline
+    25 & Apresentação da comparação e das métricas de curva & Conforme \\ \hline
+    26 & Taxa de encaminhamento como argumento de aplicabilidade & Extrapolação \\ \hline
+    27 & Resultados iniciais não reproduzíveis por código versionado & Divergência \\ \hline
+    28 & Combinações de modelo e conjunto de atributos avaliadas & Conforme \\ \hline
+    29 & Fonte única de configuração dos modelos & Conforme \\ \hline
+    30 & Critério de escolha do modelo de referência & Execução de protocolo \\ \hline
+    31 & Prevalência ponderada na análise descritiva & Conforme \\ \hline
+    32 & Conferência automática do notebook de resultados & Conforme \\ \hline
+    33 & Busca de hiperparâmetros do \textit{Random Forest} & Extrapolação \\ \hline
+    34 & Reponderamento por subamostra no espaço de busca & Execução de protocolo \\ \hline
+    35 & Métrica de seleção da busca independente do limiar & Extrapolação \\ \hline
+    36 & Hiperparâmetros compartilhados entre os conjuntos A e B & Execução de protocolo \\ \hline
+    37 & Regra de empate entre os algoritmos, declarada antes da execução & Extrapolação \\ \hline
+    38 & Desempate do modelo de referência por parcimônia & Execução de protocolo \\ \hline
+    39 & Segunda tabela de referência para a conferência da reprodução & Conforme \\ \hline
+    40 & Calibração do \textit{Random Forest} & Extrapolação \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor.}
+\end{quadro}
+
+\begin{quadro}[H]
+  \caption{\label{qua:decisoes-3}Índice das decisões de implementação, parte 3 de 3.}
+  \small
+  \begin{tabular}{|c|p{9.2cm}|p{4.2cm}|}
+    \hline
+    \textbf{Ordem} & \textbf{Assunto} & \textbf{Classificação} \\ \hline
+    41 & Artefato próprio para os números publicados & Execução de protocolo \\ \hline
+    42 & \textit{Random Forest} restrito aos conjuntos A e B & Execução de protocolo \\ \hline
+    43 & Teste de McNemar entre os algoritmos & Extrapolação \\ \hline
+    44 & Correção das conferências que não detectavam linha ausente & Conforme \\ \hline
+    45 & Correção de texto gerado automaticamente & Extrapolação \\ \hline
+    46 & Critério de sucesso não cumprido pelo modelo de referência & Extrapolação \\ \hline
+    47 & Regime equiparado para todas as combinações calibráveis & Conforme \\ \hline
+    48 & Arredondamento na gravação das tabelas & Conforme \\ \hline
+    49 & Conferência automática do registro de decisões & Conforme \\ \hline
+    50 & Gravação das tabelas em módulo próprio & Conforme \\ \hline
+    51 & Atualização dos registros que descrevem a implementação & Conforme \\ \hline
+    52 & Codificação de caracteres na saída do comando de reprodução & Conforme \\ \hline
+    53 & Estratégia de explicabilidade diante da multicolinearidade & Extrapolação \\ \hline
+    54 & Painel de resultados anterior ao protótipo de implantação & Extrapolação \\ \hline
+    55 & Artefatos para os números publicados e para as curvas & Conforme \\ \hline
+    56 & Regra clínica com idade a partir de 35 anos ou IMC a partir de 25 kg/m² & Extrapolação \\ \hline
+    57 & Ponto de operação principal e modelo de referência & Extrapolação \\ \hline
+    58 & Regressão de calibração sem penalização & Conforme \\ \hline
+    59 & Decomposição da PR-AUC por decil de sensibilidade & Extrapolação \\ \hline
+  \end{tabular}
+  \fonte{Elaborado pelo autor.}
+\end{quadro}
