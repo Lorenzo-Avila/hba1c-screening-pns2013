@@ -1,0 +1,40 @@
+{
+  "modelo": "Random Forest",
+  "conjunto": "B_composto",
+  "limiar": 0.30550177603514955,
+  "recall_alvo": 0.8,
+  "random_state": 42,
+  "campos_entrada": [
+    "idade",
+    "peso_kg",
+    "altura_cm",
+    "circ_cintura",
+    "pas",
+    "pad",
+    "sexo",
+    "raca_cor",
+    "regiao",
+    "escolaridade",
+    "saude_autoaval",
+    "plano_saude",
+    "has_autorrelato",
+    "colesterol_alto"
+  ],
+  "campos_que_aceitam_ausencia": [
+    "raca_cor",
+    "regiao",
+    "has_autorrelato",
+    "colesterol_alto"
+  ],
+  "versoes": {
+    "python": "3.14.7",
+    "scikit-learn": "1.9.1",
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "scipy": "1.18.1",
+    "shap": "0.52.0",
+    "joblib": "1.6.0"
+  },
+  "sha256_csv_bruto": "171fa2a64943ff6518381883dd9dd045a30724de5e3e743b6cb5677c611cb2b4",
+  "gerado_em": "2026-10-30"
+}

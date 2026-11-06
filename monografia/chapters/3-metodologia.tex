@@ -96,7 +96,7 @@ A raça/cor (Z003), a escolaridade (VDD004) e a posse de plano de saúde (I001) 
 A variável região (regiao) abrange a dimensão da heterogeneidade territorial brasileira, visto que a literatura constatou disparidades expressivas na prevalência e na subnotificação do DM2 entre as cinco macrorregiões do país \cite{muzy2021prevalencia,deAlmeida-Pititto09112015,reis2022evolution}.
 
 \item[] \textbf{Autopercepção de Saúde: }
-O estado de saúde autoavaliado (N001) foi mantido no conjunto final apesar de sua natureza subjetiva, em virtude da consolidação desta variável como indicador associado a desfechos crônicos em estudos epidemiológicos transversais e longitudinais, conforme descrito no referencial teórico \cite{Rantanen2019}. 
+O estado de saúde autoavaliado (N001) foi mantido no conjunto final apesar de sua natureza subjetiva, em virtude da associação entre a sua autoavaliação negativa e condições crônicas não detectadas, descrita no referencial teórico \cite{Rantanen2019}, ainda que a variável também reflita dimensões psicológicas da percepção de saúde. 
 \end{itemize}
 
 \subsection{Conjuntos de Atributos}\label{sec:conjuntos-atributos}
@@ -165,7 +165,7 @@ Diferentemente da Regressão Logística, o \textit{Random Forest} possui hiperpa
 \begin{quadro}[htb]
   \caption{\label{qua:busca}Espaço da busca de hiperparâmetros do \textit{Random Forest} e configuração adotada.}
   \small
-  \begin{tabular}{|p{3.0cm}|p{4.4cm}|p{2.4cm}|p{4.4cm}|}
+  \begin{tabular}{|p{3.4cm}|p{4.4cm}|p{2.4cm}|p{4.0cm}|}
     \hline
     \textbf{Hiperparâmetro} & \textbf{Valores avaliados} & \textbf{Valor adotado} & \textbf{Função} \\ \hline
     \texttt{max\_depth} & Sem limite, 6, 10, 14 e 20 & 10 & Profundidade máxima de cada árvore \\ \hline
@@ -195,7 +195,7 @@ A sensibilidade-alvo foi fixada em 0,80, valor situado no limite superior da fai
 \subsection{Métricas}\label{sec:metricas}
 No conjunto de teste, cada modelo foi avaliado no seu limiar de decisão por meio das métricas previstas no projeto de pesquisa, isto é, a Sensibilidade, métrica prioritária, a Especificidade, o \textit{F1-Score} e a AUC-ROC, definidas no referencial teórico \cite{Swaminathan2024, fawcett2006introduction}. A acurácia não foi utilizada como critério, visto que, em dados desbalanceados, um classificador que atribui todos os indivíduos à classe majoritária obtém acurácia elevada sem identificar nenhum caso \cite{Swaminathan2024}.
 
-A essas métricas, somaram-se três complementares, não previstas no projeto de pesquisa. A primeira foi a PR-AUC, mais informativa que a AUC-ROC em dados desbalanceados \cite{Swaminathan2024}, cujo valor de referência para um classificador sem capacidade discriminativa corresponde à prevalência da classe positiva, e não a 0,5. A segunda foi o número necessário para rastrear (NNS), calculado como o número de indivíduos encaminhados a exame para cada caso detectado, métrica utilizada pela própria diretriz brasileira de rastreamento para fundamentar a idade de início do rastreamento \cite{Rodacki2025}. A terceira foi a taxa de encaminhamento, calculada como a fração dos indivíduos avaliados que o modelo encaminha a exame, a fim de traduzir cada ponto de operação na carga gerada para a rede de saúde.
+A essas métricas, somaram-se três complementares, não previstas no projeto de pesquisa. A primeira foi a PR-AUC, mais informativa que a AUC-ROC em dados desbalanceados \cite{Swaminathan2024, saito2015precision}, cujo valor de referência para um classificador sem capacidade discriminativa corresponde à prevalência da classe positiva, e não a 0,5 \cite{saito2015precision}. A segunda foi o número necessário para rastrear (NNS), calculado como o número de indivíduos encaminhados a exame para cada caso detectado, métrica utilizada pela própria diretriz brasileira de rastreamento para fundamentar a idade de início do rastreamento \cite{Rodacki2025}. A terceira foi a taxa de encaminhamento, calculada como a fração dos indivíduos avaliados que o modelo encaminha a exame, a fim de traduzir cada ponto de operação na carga gerada para a rede de saúde.
 
 Ao lado de cada métrica obtida no conjunto de teste, foram reportados a média e o desvio padrão da mesma métrica entre as cinco partições da validação cruzada no treino, calculados no mesmo limiar de decisão. Essa dispersão fornece a escala para julgar se a diferença entre dois modelos ou dois conjuntos de atributos excede a variação esperada entre partições dos dados, sendo utilizada nos critérios de comparação descritos na seção de Comparadores e Critério de Sucesso.
 
