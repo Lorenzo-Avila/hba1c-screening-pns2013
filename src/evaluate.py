@@ -556,8 +556,8 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
         X_tr, y_tr: treino. Único conjunto que participa da escolha do limiar.
         X_te, y_te: teste. Serve só para medir, nunca para decidir.
         nome: identificação do modelo na tabela comparativa.
-        recall_alvo: restrição de recall do ponto de operação. Provisório em 0,80,
-            a confirmar com o orientador.
+        recall_alvo: restrição de recall do ponto de operação. 0,80 é o ponto
+            principal, na faixa de sensibilidade do FINDRISC.
         conjunto: conjunto de atributos, registrado para a comparação.
         limiar: quando informado, **dispensa a calibração** e usa este valor. É o
             caso dos comparadores não-ML: a regra clínica ADA devolve uma indicadora

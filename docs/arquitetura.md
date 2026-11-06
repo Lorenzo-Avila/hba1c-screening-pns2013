@@ -8,6 +8,11 @@ lê `reports/tabelas/*.csv` e não importa `src/`. A única exceção de execuç
 página de reprodução ao vivo, que dispara `python -m src.experimento` num
 processo separado e apaga o diretório temporário no fim.
 
+A implantação acrescenta o protótipo. `api/` carrega o modelo que
+`src/servir.py` gravou em `modelo/` e classifica um indivíduo por HTTP. O formulário
+é a página de classificação individual do painel, que só fala com a API por HTTP:
+o painel continua sem importar `src/` nem `api/`.
+
 Constantes, caminhos, o de-para dos códigos da PNS, os cortes clínicos e a semente
 moram em `src/config.py`. Valor usado por mais de um módulo não é copiado para
 dentro de um notebook.
@@ -26,9 +31,12 @@ src/experimento.py       grid publicado, artefatos, conferência. CLI
 src/tuning.py            busca da floresta. CLI, fora do grid
 src/explicabilidade.py   SHAP da floresta publicada. CLI, fora do grid
 src/artefatos.py         gravação de CSV, sem depender do resto de src/
+src/servir.py            grava e carrega o modelo servido. CLI, fora do grid
 
 notebooks/03_resultados.ipynb
-painel/                  doze páginas em três seções
+painel/                  treze páginas em três seções
+api/                     FastAPI: /metadados e /classificacao
+modelo/                  binário e metadados do modelo servido, fora do Git
 reports/tabelas/         .csv e .tex versionados
 reports/figuras/         PNG gerado, fora do Git, salvo o .gitkeep
 docs/baseline/           notebook da primeira matriz, congelado
@@ -178,8 +186,8 @@ flowchart TD
     fit --> teste["Métricas, matriz e calibração no teste"]
 ```
 
-O recall-alvo mora em `config.RECALL_ALVO` (0,80) e está marcado no código como
-provisório. O teste não escolhe limiar. Entre os limiares do treino que atingem
+O recall-alvo mora em `config.RECALL_ALVO` (0,80), ponto de operação principal,
+escolhido na faixa de sensibilidade do FINDRISC. O teste não escolhe limiar. Entre os limiares do treino que atingem
 o alvo, fica o maior: mesmo recall, menos encaminhamento. Recall é a métrica
 prioritária. Especificidade, F1 e AUC-ROC acompanham em toda tabela. PR-AUC,
 Brier e NNS entram junto.
@@ -333,6 +341,7 @@ flowchart LR
     dados --> telas["Paginas"]
     selecao["Barra lateral"] --> telas
     botao["Reproduzir"] --> filho["Processo separado<br/>src.experimento --saida"]
+    formulario["Classificacao individual"] -->|HTTP| api["api/"]
     filho --> tmp["Diretorio temporario, apagado no fim"]
     filho --> log["Log na tela"]
     ancoras["Ancoras em reports/tabelas"] --> filho
@@ -347,18 +356,67 @@ processo. `reports/tabelas/` não é regravado.
 | Seção | Páginas |
 |---|---|
 | Projeto | Visão geral, Reprodução ao vivo |
-| Visão clínica e de gestão | Desempenho, Triagem na atenção primária, Fatores associados, Casos exemplares |
+| Visão clínica e de gestão | Desempenho, Triagem na atenção primária, Fatores associados, Casos exemplares, Classificação individual |
 | Visão técnica | Amostra, Colinearidade e escolha do conjunto, Modelagem, Floresta × logística, Calibração, Explicabilidade técnica |
 
 A visão geral desenha o funil, o desbalanceamento, o pipeline, a comparação
 entre reamostragem sintética e aprendizado sensível ao custo, as fases do
-CRISP-DM e o que o sistema não faz: não classifica paciente novo, não estima
-risco individual, não elege célula principal. A implantação com API e formulário
-de classificação individual não é este painel.
+CRISP-DM e o que o sistema não faz: não estima risco individual. A
+classificação individual é a única página com formulário e a única que não lê
+artefato: ela consulta a API, descrita na seção seguinte. `painel/cliente.py`
+concentra as duas chamadas HTTP, e a página ignora a célula da barra lateral, porque
+a API serve só a de referência.
 
 A célula abre na de menor NNS no ponto padrão, identificada como referência.
 Os dois regimes de operação aparecem lado a lado. Prints das telas estão em
 `docs/prints_prebanca/`.
+
+## Protótipo
+
+`python -m src.servir` (`make modelo`) ajusta `Random Forest · B_composto` pelo
+mesmo caminho da tabela consolidada, `models.montar` e `evaluate.avaliar`, e
+confere que ela é a linha marcada em `referencia_d030` e que o limiar bate em nove
+casas. Se não for, para. Grava `modelo/modelo.joblib` e `modelo/metadados.json`:
+modelo, conjunto, limiar, versões das bibliotecas, hash do CSV bruto e os campos
+que tiveram ausente no treino. `servir.carregar` recusa o artefato quando alguma
+versão instalada diverge da gravada, porque o binário depende das versões de
+scikit-learn e NumPy para desserializar o mesmo modelo.
+
+`api/app.py` sai de uma fábrica, `criar_app`, para importar o módulo não carregar
+modelo. A subida confere as versões e a API não sobe se divergirem
+(`make api`, que roda `uvicorn api.app:criar_app --factory`).
+
+```mermaid
+flowchart LR
+    form["painel · classificação individual"] -->|HTTP| rota["POST /classificacao"]
+    rota --> esquema["esquema: 14 campos, domínio pelos COD_* de config"]
+    esquema --> derivar["data.derivar: tipos, raça 9, IMC, RCEst"]
+    derivar --> ausentes["regra de ausentes"]
+    ausentes --> pipe["pipeline gravado: escore contra limiar"]
+    pipe --> shap["TreeExplainer tree_path_dependent, soma por variável"]
+```
+
+O contrato é clínico, porque um prontuário tem peso e altura, não IMC: peso e
+altura entram, IMC e RCEst saem de `data.derivar`, a mesma função que `limpar`
+chama no treino. Todo campo é obrigatório na requisição e aceita `null`. Só aceita
+ausência o campo que teve ausente no treino, lista lida dos metadados; o bloco de
+medição inteiro ausente é recusado, porque o treino excluiu esses registros e eles
+ficam fora do domínio do modelo. A resposta traz decisão, escore de ordenação,
+limiar, valor de base, contribuição e valor por variável, campos imputados e a
+restrição de leitura. `api/textos.py` guarda os textos fixos; a restrição é a única
+constante liberada na guarda de vocabulário, porque ela nega os termos vetados.
+
+A página de classificação individual monta as opções a partir de `/metadados`,
+usa o waterfall e os cartões do painel e mostra a restrição de leitura que vem na
+resposta. O endereço da API sai de `URL_API`; sem a API no ar, só essa página avisa.
+
+`tests/test_servir.py` reproduz do artefato o limiar e a matriz publicados.
+`tests/test_api.py` confere, sem servidor, equivalência do escore, os quatro casos
+de `shap_casos_locais`, contribuições até 1e-9, aditividade, domínio, vocabulário,
+versões e cada regra de ausentes. `tests/test_painel.py` restringe formulário,
+`cliente` e `httpx` à página de classificação, mantém o painel sem import de `src`,
+`api` e bibliotecas de modelo, e percorre a página pelo `AppTest` com a API do
+cliente de teste.
 
 ## Linguagem
 

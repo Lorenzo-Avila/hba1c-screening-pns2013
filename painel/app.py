@@ -26,6 +26,7 @@ SECOES = {
         st.Page("paginas/triagem.py", title="Triagem na atenção primária"),
         st.Page("paginas/fatores.py", title="Fatores associados"),
         st.Page("paginas/casos_exemplares.py", title="Casos exemplares"),
+        st.Page("paginas/classificacao.py", title="Classificação individual"),
     ],
     "tecnica": [
         st.Page("paginas/amostra.py", title="Amostra"),

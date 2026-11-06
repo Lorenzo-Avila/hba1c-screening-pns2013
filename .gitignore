@@ -9,6 +9,8 @@ __pycache__/
 reports/figuras/*.png
 reports/figuras/*.pdf
 !reports/figuras/.gitkeep
+# modelo servido pela API, regenerável por `make modelo`
+modelo/
 .env
 .vscode/
 .idea/

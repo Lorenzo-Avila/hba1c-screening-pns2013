@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from src import config as cfg
-from src.data import (ausentes_por_variavel, carregar_bruto, limpar,
+from src.data import (ausentes_por_variavel, carregar_bruto, derivar, limpar,
                       resumo_amostra, separar)
 
 # Contrato de saída da etapa de dados.
@@ -89,6 +89,33 @@ def test_derivadas_row_wise(df):
     esperado_rcest = df["circ_cintura"] / df["altura_cm"]
     assert np.allclose(df["imc"], esperado_imc)
     assert np.allclose(df["rcest"], esperado_rcest)
+
+
+def test_derivar_em_linha_isolada_reproduz_limpar(df):
+    """A API chama `derivar` sobre um registro só, com valores numéricos.
+
+    O IMC e a RCEst desse registro têm de ser **idênticos** aos que `limpar` produziu
+    para a mesma pessoa na base, sem tolerância: é o mesmo número que o modelo viu no
+    treino.
+    """
+    for i in df.sample(n=50, random_state=cfg.RANDOM_STATE).index:
+        linha = derivar(df.loc[[i], cfg.CONTINUAS + cfg.CATEGORICAS])
+        assert linha.at[i, "imc"] == df.at[i, "imc"], i
+        assert linha.at[i, "rcest"] == df.at[i, "rcest"], i
+
+
+def test_derivar_decodifica_raca_ignorada_em_linha_isolada():
+    """`raca_cor = 9` vira ausente também na inferência, como no treino."""
+    registro = pd.DataFrame([{
+        "idade": 50, "peso_kg": 80.0, "altura_cm": 160.0, "circ_cintura": 96.0,
+        "pas": 130.0, "pad": 85.0, "sexo": 2, "raca_cor": 9, "regiao": 3,
+        "escolaridade": 5, "saude_autoaval": 2, "plano_saude": 2,
+        "has_autorrelato": 3, "colesterol_alto": 2,
+    }])
+    linha = derivar(registro).iloc[0]
+    assert pd.isna(linha["raca_cor"])
+    assert linha["imc"] == 80.0 / 1.6 ** 2
+    assert linha["rcest"] == 96.0 / 160.0
 
 
 def test_nenhuma_imputacao_em_data(df):
