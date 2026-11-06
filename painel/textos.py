@@ -57,6 +57,12 @@ PAGINAS = {
         "Para cada conjunto, o caso mais próximo do limiar em cada célula da matriz de "
         "confusão.",
     ),
+    "classificacao": (
+        "Classificação individual",
+        "A triagem para uma pessoa nova",
+        "Os dados vão à API, que devolve a decisão, o escore contra o limiar e a "
+        "decomposição. Esta é a única página que não lê resultado publicado.",
+    ),
     "amostra": (
         "Amostra",
         "Exclusões, ausentes e prevalências",
@@ -212,16 +218,14 @@ CRISP_DM = [
     ("Preparação dos dados", "concluída", True),
     ("Modelagem", "concluída", True),
     ("Avaliação", "concluída", True),
-    # Na recaptura final: "concluída", True se o FastAPI estiver pronto;
-    # "pendente", False se não estiver.
-    ("Implantação", "em desenvolvimento", False),
+    # Concluída com a API em api/ e a página de classificação individual, que
+    # consulta a API por HTTP.
+    ("Implantação", "concluída", True),
 ]
 
 NAO_FAZ_TITULO = "O que o sistema não faz"
 NAO_FAZ = [
-    "Não classifica novos pacientes",
     "Não estima risco individual",
-    "Não é o protótipo de classificação",
 ]
 
 REPRODUCAO_COMANDO = "Comando"
@@ -379,6 +383,36 @@ WATERFALL = (
     "A barra parte do valor de base, soma as contribuições na ordem da tabela e "
     "termina no escore de ordenação. A linha vertical é o limiar calibrado."
 )
+
+# Classificação individual: o formulário consulta a API e mostra só o que ela devolve.
+SELO_SERVIDO = "Modelo servido: {modelo} · {conjunto}"
+API_FORA = "A API não respondeu em {url}. Suba com `make api` e recarregue a página."
+FORMULARIO = "Dados da pessoa"
+NAO_INFORMADO = "não informado"
+AUSENCIA_ACEITA = "Podem ficar sem resposta: {campos}. Os demais são obrigatórios."
+CLASSIFICAR = "Classificar"
+RECUSADO = "A API recusou o registro"
+IMPUTADOS = (
+    "Sem resposta, preenchidos pela imputação do modelo: {campos}. A contribuição "
+    "das variáveis marcadas como imputadas não reflete valor informado."
+)
+MARCA_IMPUTADA = " [imputada]"
+ROTULOS_CAMPOS = {
+    "idade": "Idade (anos)",
+    "peso_kg": "Peso (kg)",
+    "altura_cm": "Altura (cm)",
+    "circ_cintura": "Circunferência da cintura (cm)",
+    "pas": "Pressão arterial sistólica (mmHg)",
+    "pad": "Pressão arterial diastólica (mmHg)",
+    "sexo": "Sexo",
+    "raca_cor": "Raça/cor",
+    "regiao": "Região",
+    "escolaridade": "Escolaridade",
+    "saude_autoaval": "Saúde autoavaliada",
+    "plano_saude": "Plano de saúde",
+    "has_autorrelato": "Hipertensão autorreferida",
+    "colesterol_alto": "Colesterol alto autorreferido",
+}
 
 # ---------------------------------------------------------------------------
 # Visão técnica

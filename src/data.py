@@ -44,27 +44,50 @@ def carregar_bruto(path=None) -> pd.DataFrame:
     return df.rename(columns=cfg.DE_PARA)
 
 
-def limpar(df: pd.DataFrame) -> pd.DataFrame:
-    """Aplica a limpeza row-wise, nesta ordem, que não é negociável:
+def derivar(df: pd.DataFrame) -> pd.DataFrame:
+    """Passos da limpeza que valem para uma linha isolada, nesta ordem:
 
     1. Conversão de tipos: contínuas em `float64`, categóricas em `Int64` nullable.
     2. Decodificação de ausência: `raca_cor == 9` ("Ignorado") vira `NaN`.
-    3. `drop_duplicates()`.
-    4. Exclusões: alvo ausente e bloco de medição inteiramente ausente.
-    5. Derivadas row-wise: `imc` (Quetelet) e `rcest`.
-    6. Binarização do desfecho pelo critério ADA 2010.
+    3. Derivadas: `imc` (Quetelet) e `rcest`.
 
-    Nada de imputação aqui: ela é toda pós-split.
+    É a única implementação dessas fórmulas. `limpar` a chama no treino e a API a
+    chama na inferência: duas cópias do IMC seriam duas fórmulas prontas para
+    divergir. Não exige `hba1c` nem `peso_lab`, que a inferência não tem.
     """
     df = df.copy()
 
-    for col in cfg.CONTINUAS + [cfg.ALVO_CONTINUO, cfg.PESO]:
+    for col in cfg.CONTINUAS:
         df[col] = _para_numero(df[col]).astype("float64")
     for col in cfg.CATEGORICAS:
         df[col] = _para_numero(df[col]).astype("Int64")
 
     # "Ignorado" não é categoria, é não resposta.
     df["raca_cor"] = df["raca_cor"].replace(cfg.COD_IGNORADO_RACA, pd.NA)
+
+    df["imc"] = df["peso_kg"] / (df["altura_cm"] / 100.0) ** 2   # Quetelet
+    df["rcest"] = df["circ_cintura"] / df["altura_cm"]
+    return df
+
+
+def limpar(df: pd.DataFrame) -> pd.DataFrame:
+    """Aplica a limpeza row-wise, nesta ordem, que não é negociável:
+
+    1. `derivar`: tipos, `raca_cor == 9` para `NaN`, `imc` e `rcest`.
+    2. `drop_duplicates()`.
+    3. Exclusões: alvo ausente e bloco de medição inteiramente ausente.
+    4. Binarização do desfecho pelo critério ADA 2010.
+
+    As derivadas vêm antes das duplicadas sem mudar o conjunto de duplicadas: são
+    função de colunas que já entram na comparação.
+
+    Nada de imputação aqui: ela é toda pós-split.
+    """
+    df = df.copy()
+
+    for col in [cfg.ALVO_CONTINUO, cfg.PESO]:
+        df[col] = _para_numero(df[col]).astype("float64")
+    df = derivar(df)
 
     n_brutas = len(df)
     df = df.drop_duplicates().reset_index(drop=True)
@@ -86,9 +109,6 @@ def limpar(df: pd.DataFrame) -> pd.DataFrame:
     }
 
     df = df[~sem_alvo & ~sem_medicao].reset_index(drop=True)
-
-    df["imc"] = df["peso_kg"] / (df["altura_cm"] / 100.0) ** 2   # Quetelet
-    df["rcest"] = df["circ_cintura"] / df["altura_cm"]
 
     # Desfecho: hiperglicemia crônica clinicamente significativa.
     df[cfg.ALVO] = (df[cfg.ALVO_CONTINUO] >= cfg.LIMIAR_HBA1C).astype(int)

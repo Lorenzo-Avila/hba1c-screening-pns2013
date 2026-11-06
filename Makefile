@@ -17,7 +17,7 @@ else
 PYTHON ?= python
 endif
 
-.PHONY: tudo test test-rapido resultados figuras shap notebook painel limpar ajuda
+.PHONY: tudo test test-rapido resultados figuras shap modelo api notebook painel limpar ajuda
 
 ## tudo — suíte de testes e reprodução completa, na ordem em que importam
 tudo: test resultados notebook
@@ -51,6 +51,20 @@ figuras:
 shap:
 	$(PYTHON) -m src.explicabilidade
 
+## modelo: ajusta a célula de referência e grava em modelo/ o binário e os
+## metadados que a API serve. Confere a célula e o limiar contra a tabela
+## consolidada e falha se divergirem. modelo/ fica no .gitignore.
+##   equivale a: python -m src.servir
+modelo:
+	$(PYTHON) -m src.servir
+
+## api: sobe a API do protótipo em localhost:8000, sobre o artefato de modelo/.
+## Recusa subir se as versões instaladas divergirem das gravadas, porque o binário
+## depende delas para desserializar o mesmo modelo.
+##   equivale a: uvicorn api.app:criar_app --factory
+api:
+	$(PYTHON) -m uvicorn api.app:criar_app --factory
+
 ## notebook — reexecuta o documento de resultados in-place, preservando os outputs.
 ## É o mesmo grid de `figuras`, apresentado na ordem da arguição. Commitado com
 ## outputs de propósito: é a fonte das figuras do LaTeX, como `docs/baseline/`.
@@ -60,7 +74,9 @@ notebook:
 
 ## painel: painel de resultados sobre os CSV de reports/tabelas/, em localhost.
 ## As telas leem artefato versionado. A reprodução ao vivo dispara o experimento
-## em outro processo e não regrava reports/tabelas/.
+## em outro processo e não regrava reports/tabelas/. A classificação individual
+## consulta a API: suba `make api` antes, em outro terminal; o endereço sai de
+## URL_API (padrão 127.0.0.1:8000).
 ##   equivale a: streamlit run painel/app.py
 painel:
 	$(PYTHON) -m streamlit run painel/app.py

@@ -1,8 +1,10 @@
-"""Guardas do painel de resultados (D-054).
+"""Guardas do painel de resultados.
 
-O painel lê `reports/tabelas/` e não calcula, não importa `src/`, não recebe
-entrada, não usa vocabulário de risco e concentra as cores num módulo. Cada guarda
-abaixo verifica uma dessas fronteiras por AST ou pela renderização com `AppTest`.
+O painel lê `reports/tabelas/` e não calcula, não importa `src/`, não usa
+vocabulário de risco e concentra as cores num módulo. Só a página de classificação
+individual recebe entrada, e ela fala com a API por HTTP em vez de ler artefato. Cada
+guarda abaixo verifica uma dessas fronteiras por AST ou pela renderização com
+`AppTest`.
 """
 
 import ast
@@ -33,6 +35,7 @@ PAGINAS = {
     "triagem": "clinica",
     "fatores": "clinica",
     "casos_exemplares": "clinica",
+    "classificacao": "clinica",
     "amostra": "tecnica",
     "colinearidade": "tecnica",
     "modelagem": "tecnica",
@@ -50,7 +53,11 @@ WIDGETS_PROIBIDOS = {
 }
 # A reprodução ao vivo é a única página que dispara processo e tem botão.
 REPRODUCAO = PAINEL / "paginas" / "reproducao.py"
-LIBERADOS = {"subprocess": {REPRODUCAO}, "button": {REPRODUCAO}}
+# A classificação individual é a única página com formulário e a única que fala
+# com a API.
+CLASSIFICACAO = PAINEL / "paginas" / "classificacao.py"
+LIBERADOS = {"subprocess": {REPRODUCAO}, "button": {REPRODUCAO},
+             "form": {CLASSIFICACAO}, "number_input": {CLASSIFICACAO}}
 LEITURAS = {"read_csv", "open", "read_text"}
 VOCABULARIO_PROIBIDO = ["risco", "probabilidade de", "preditiv", "protetor",
                         "acurácia", "acuracia", "accuracy",
@@ -123,6 +130,22 @@ def test_subprocess_e_button_so_na_reproducao():
             elif isinstance(no, ast.Attribute) and no.attr == "button":
                 usos["button"].add(arquivo)
     assert usos == {"subprocess": {REPRODUCAO}, "button": {REPRODUCAO}}, usos
+
+
+def test_formulario_e_api_so_na_classificacao():
+    """Formulário, `cliente` e `httpx` ficam na página de classificação e no cliente."""
+    usos = {"formulario": set(), "cliente": set(), "httpx": set()}
+    for arquivo in ARQUIVOS:
+        for no in ast.walk(_arvore(arquivo)):
+            if isinstance(no, ast.Attribute) and no.attr in (
+                    "form", "form_submit_button", "number_input"):
+                usos["formulario"].add(arquivo)
+            elif isinstance(no, ast.Import):
+                for alias in no.names:
+                    if alias.name in ("cliente", "httpx"):
+                        usos[alias.name].add(arquivo)
+    assert usos == {"formulario": {CLASSIFICACAO}, "cliente": {CLASSIFICACAO},
+                    "httpx": {CLASSIFICACAO, PAINEL / "cliente.py"}}, usos
 
 
 def _chamadas_de_page(no: ast.AST) -> list:
@@ -399,6 +422,16 @@ def test_casos_exemplares_exibe_faixa_ressalva_e_valor_observado():
     assert "mesmo indivíduo" in _html_renderizado(app)
 
 
+def test_waterfall_ajusta_so_a_largura():
+    """Com `fit`, padrão do Streamlit, título e legenda comem a altura das barras e
+    os rótulos de linhas vizinhas se sobrepõem. O waterfall declara `fit-x`."""
+    app = _renderizar("casos_exemplares")
+    specs = [json.loads(no.proto.spec) for no in _nos(app._tree)
+             if getattr(no, "type", "") == "vega_lite_chart"]
+    assert specs, "waterfall não renderizado"
+    assert [s.get("autosize", {}).get("type") for s in specs] == ["fit-x"] * len(specs)
+
+
 def test_casos_exemplares_seguem_a_celula_da_barra_lateral():
     """Cada célula da floresta mostra os seus quatro casos, e o selo diz qual é."""
     casos = dados.ler("shap_casos_locais")
@@ -509,3 +542,128 @@ def test_reproducao_pelo_botao_confere_e_nao_toca_nas_tabelas():
     assert "Composição conferida" in corpo and "Reprodução conferida" in corpo
     assert "comparativo_consolidado" in corpo, "lista de artefatos ausente"
     assert _hashes(dados.RAIZ) == antes, "reports/tabelas/ mudou durante a reprodução"
+
+
+# ---------------------------------------------------------------------------
+# Classificação individual, com a API do cliente de teste
+# ---------------------------------------------------------------------------
+
+def _requer_artefato():
+    from src import config as cfg
+    from src import servir as sv
+    if not cfg.PATH_RAW.exists() or not (sv.PATH_MODELO / sv.ARQUIVO_METADADOS).exists():
+        pytest.skip("CSV bruto ou artefato ausente; rode python -m src.servir.")
+
+
+@pytest.fixture(scope="module")
+def api():
+    _requer_artefato()
+    from fastapi.testclient import TestClient
+    from api.app import criar_app
+    return TestClient(criar_app())
+
+
+@pytest.fixture(scope="module")
+def casos_b():
+    """Os quatro casos da célula servida, com o registro clínico de cada um."""
+    _requer_artefato()
+    from src import data as dt
+    from src import servir as sv
+    from tests.test_api import _payload
+    analitico = dt.carregar_analitico()
+    tabela = dados.carregar("shap_casos_locais")
+    recorte = tabela[tabela["celula"] == sv.CONJUNTO]
+    unicos = recorte[["caso", "indice", "escore"]].drop_duplicates().set_index("caso")
+    return {caso: (_payload(analitico.loc[int(linha.indice)]), linha.escore)
+            for caso, linha in unicos.iterrows()}
+
+
+@pytest.fixture
+def cliente_api(monkeypatch):
+    """O `cliente` que a página importa, o mesmo objeto que o `AppTest` usa."""
+    monkeypatch.syspath_prepend(str(PAINEL))
+    import cliente
+    return cliente
+
+
+@pytest.fixture
+def classificacao(cliente_api, api, monkeypatch):
+    monkeypatch.setattr(cliente_api, "ler_metadados",
+                        lambda: api.get("/metadados").json())
+    monkeypatch.setattr(cliente_api, "classificar",
+                        lambda registro: api.post("/classificacao", json=registro))
+    app = AppTest.from_file(str(PAINEL / "app.py"), default_timeout=60)
+    app.run()
+    app.switch_page("paginas/classificacao.py")
+    return app.run()
+
+
+def _enviar(app: AppTest, corpo: dict) -> AppTest:
+    for campo, valor in corpo.items():
+        if campo in CATEGORICAS_ENTRADA:
+            app.selectbox(key=campo).set_value(valor)
+        else:
+            app.number_input(key=campo).set_value(valor)
+    app.button[0].click().run()
+    assert not app.exception, [e.value for e in app.exception]
+    return app
+
+
+CATEGORICAS_ENTRADA = {"sexo", "raca_cor", "regiao", "escolaridade", "saude_autoaval",
+                       "plano_saude", "has_autorrelato", "colesterol_alto"}
+ENCAMINHA = {"VP": True, "FP": True, "FN": False, "VN": False}
+
+
+@pytest.mark.parametrize("caso", ["VP", "FP", "FN", "VN"])
+def test_classificacao_exibe_decisao_e_escore_dos_casos(classificacao, casos_b, caso):
+    corpo, escore = casos_b[caso]
+    app = _enviar(classificacao, corpo)
+    texto = _html_renderizado(app)
+    decisao = "Encaminhar a exame" if ENCAMINHA[caso] else "Não encaminhar"
+    assert html.escape(decisao) in texto, caso
+    assert html.escape(f"{escore:.3f}".replace(".", ",")) in texto, caso
+
+
+def test_classificacao_sem_vocabulario_vetado_fora_da_restricao(classificacao, casos_b):
+    from api import textos as textos_api
+    app = _enviar(classificacao, casos_b["VP"][0])
+    texto = _texto_renderizado(app)
+    restricao = textos_api.RESTRICAO_DE_LEITURA
+    assert restricao in texto, "restrição de leitura ausente da tela"
+    # A restrição vem da API e é a única constante liberada; o waterfall a quebra em
+    # frases no subtítulo. Sai antes dos literais do painel, que poderiam cortá-la.
+    for frase in sorted({restricao, *re.split(r"(?<=\.) ", restricao)},
+                        key=len, reverse=True):
+        texto = texto.replace(frase, "")
+    for literal in _literais_de_textos():
+        texto = texto.replace(literal, "")
+    minusculo = texto.lower()
+    achados = [t for t in VOCABULARIO_PROIBIDO if t in minusculo]
+    assert not achados, achados
+
+
+def test_classificacao_marca_ausente_como_imputado(classificacao, casos_b):
+    corpo = {**casos_b["VP"][0], "colesterol_alto": None}
+    app = _enviar(classificacao, corpo)
+    texto = _texto_renderizado(app)
+    assert "Colesterol alto autorreferido" in _html_renderizado(app)
+    assert "[imputada]" in texto
+
+
+def test_classificacao_mostra_recusa_da_api(classificacao, casos_b):
+    app = _enviar(classificacao, {**casos_b["VP"][0], "pas": None})
+    assert "recusou" in app.error[0].value and "pas" in app.error[0].value
+
+
+def test_classificacao_avisa_api_fora_do_ar(cliente_api, monkeypatch):
+    import httpx
+
+    def recusa():
+        raise httpx.ConnectError("sem conexão")
+    monkeypatch.setattr(cliente_api, "ler_metadados", recusa)
+    app = AppTest.from_file(str(PAINEL / "app.py"), default_timeout=60)
+    app.run()
+    app.switch_page("paginas/classificacao.py")
+    app.run()
+    assert not app.exception
+    assert "make api" in _html_renderizado(app)
