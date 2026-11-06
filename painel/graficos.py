@@ -341,8 +341,10 @@ def waterfall(caso: pd.DataFrame, ressalva: str, casas: int,
     ordem = [extremos["rotulo"][0], *barras["rotulo"], extremos["rotulo"][1]]
     eixo_y = alt.Y("rotulo:N", sort=ordem, title=None,
                    axis=alt.Axis(labelLimit=340, labelOverlap=False, labelFontSize=12))
+    # A folga em pixels nas pontas do eixo abre espaço para o valor da barra que
+    # termina na borda, que senão invade o rótulo da linha.
     eixo_x = alt.X("inicio:Q", title="escore de ordenação",
-                   scale=alt.Scale(zero=False))
+                   scale=alt.Scale(zero=False, padding=48))
 
     camada_barras = alt.Chart(barras).mark_bar(height=18, cornerRadius=2).encode(
         y=eixo_y, x=eixo_x, x2="fim:Q",
@@ -380,6 +382,9 @@ def waterfall(caso: pd.DataFrame, ressalva: str, casas: int,
                 subtitleColor=estilo.TEXTO,
             ),
             height=34 * len(ordem),
+            # Sem isto o Streamlit aplica `fit`, que espreme título, legenda e barras
+            # na altura acima e sobrepõe os rótulos. `fit-x` ajusta só a largura.
+            autosize=alt.AutoSizeParams(type="fit-x", contains="padding"),
         )
     )
 

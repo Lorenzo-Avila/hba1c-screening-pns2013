@@ -9,9 +9,14 @@ __pycache__/
 reports/figuras/*.png
 reports/figuras/*.pdf
 !reports/figuras/.gitkeep
+# modelo servido pela API, regenerável por `make modelo`
+modelo/
 .env
 .vscode/
 .idea/
+
+# artefatos da compilação LaTeX da monografia
+monografia/build/
 claude.md
 # baseline congelado mantém outputs
 !docs/baseline/Baseline_TCC.ipynb
