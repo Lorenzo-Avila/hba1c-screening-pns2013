@@ -22,7 +22,7 @@ A partir deste cenário, surge a proposta de desenvolver uma ferramenta de triag
 A proposta busca reduzir o vazio entre a evidência epidemiológica brasileira e a execução técnica na ponta do sistema assistencial, viabilizando a identificação precoce de perfis subnotificados no contexto da APS. Por meio da ferramenta proposta pretende-se conscientizar sobre a magnitude do fenômeno da subnotificação diagnóstica de DM2 e fornecer aos profissionais de saúde um recurso acessível, alinhado ao cenário nacional e capaz de operar sobre variáveis disponíveis no fluxo assistencial cotidiano. A contribuição esperada se estende tanto ao plano da gestão pública de saúde, ao viabilizar a priorização baseada em evidência, quanto ao plano individual, ao reduzir a invisibilidade de indivíduos que, muitas vezes, atravessam anos de hiperglicemia crônica não diagnosticada antes da manifestação clínica de complicações irreversíveis.
 
 % ----------------------------------------------------------
-\section{Problema a ser resolvido}
+\section{Problema a Ser Resolvido}
 % ----------------------------------------------------------
 
 O Diabetes Mellitus tipo 2 (DM2) se consolida como um desafio complexo para a saúde pública brasileira. O impacto da doença transcende a morbidade individual, acarretando custos financeiros e estruturais para o sistema público de saúde \cite{bezerra2025morbidade}. Dentro do cenário epidemiológico nacional, de acordo com \textcite{moreira2024predicting}, estima-se que a prevalência do DM2 atingirá 27\% da população adulta brasileira até 2036, o que representa um salto de quase 400\% em três décadas, totalizando cerca de 43 milhões de indivíduos afetados.
@@ -33,17 +33,17 @@ A identificação de indivíduos com perfil associado à hiperglicemia crônica 
 
 Diante desse cenário, algoritmos de \textit{Machine Learning} treinados sobre dados populacionais nacionais se apresentam como uma alternativa viável. Conforme evidenciado pela revisão de \textcite{islam2024comprehensive} a respeito do uso de algoritmos de aprendizado de máquina para previsão de doenças crônicas, esses modelos auxiliam os profissionais de saúde na categorização de pacientes de alto risco e podem ser integrados a sistemas de apoio à decisão clínica, a exemplo de propostas voltadas a pacientes com diabetes. Algoritmos como o \textit{Random Forest} aprendem as regras de classificação diretamente a partir dos dados da população estudada, por meio da combinação de múltiplas árvores de decisão, capazes de representar estruturas complexas de interação entre as variáveis \cite{hastie2009elements}. Por meio desta integração, torna-se viável a triagem de indivíduos, de maneira que proporcione condutas clínicas proporcionais ao perfil de cada paciente.
 
-Desta maneira, o problema central do presente trabalho é: como a aplicação de algoritmos de \textit{Machine Learning} sobre os microdados da Subamostra Laboratorial da PNS 2013, utilizando exclusivamente variáveis não invasivas como classificadoras, pode viabilizar um modelo classificatório e interpretável para a triagem de risco metabólico associado ao Diabetes Mellitus tipo 2 na população brasileira?
+Desta maneira, o problema central do presente trabalho é: como a aplicação de algoritmos de \textit{Machine Learning} sobre os microdados da Subamostra Laboratorial da PNS 2013, utilizando exclusivamente variáveis não invasivas como classificadoras, pode viabilizar um modelo classificatório e interpretável para a triagem de risco metabólico associado ao DM2 na população brasileira?
 
 % ----------------------------------------------------------
 \section{Objetivos}
 % ----------------------------------------------------------
 
 \subsection{Objetivo Geral}
-Desenvolver um modelo classificatório de \textit{Machine Learning} para a identificação de indivíduos com perfil associado à hiperglicemia crônica clinicamente significativa, utilizando variáveis não invasivas extraídas dos microdados da Subamostra Laboratorial da Pesquisa Nacional de Saúde (PNS 2013), a fim de produzir um protótipo conceitual de triagem interpretável, aplicável ao contexto da Atenção Primária à Saúde brasileira.
-\subsection{Objetivos específicos}
+Desenvolver um modelo classificatório de \textit{Machine Learning} para a identificação de indivíduos com perfil associado à hiperglicemia crônica clinicamente significativa, utilizando variáveis não invasivas extraídas dos microdados da Subamostra Laboratorial da PNS 2013, a fim de produzir um protótipo conceitual de triagem interpretável, aplicável ao contexto da Atenção Primária à Saúde brasileira.
+\subsection{Objetivos Específicos}
 \begin{itemize}
-    \item Levantar e analisar trabalhos correlatos sobre aplicação de \textit{Machine Learning} na identificação de risco do Diabetes Mellitus tipo 2, identificando abordagens metodológicas e limitações reportadas na literatura.
+    \item Levantar e analisar trabalhos correlatos sobre aplicação de \textit{Machine Learning} na identificação de risco do DM2, identificando abordagens metodológicas e limitações reportadas na literatura.
     \item Identificar e selecionar, a partir dos microdados da Subamostra Laboratorial da PNS 2013, as variáveis não invasivas mais relevantes para a identificação de perfis associados à hiperglicemia crônica.
     \item Desenvolver e comparar o desempenho dos algoritmos Regressão Logística e \textit{Random Forest} na identificação de indivíduos com perfil de risco elevado para o desfecho estabelecido.
     \item Avaliar os modelos desenvolvidos por meio de métricas de classificação e implementar a explicabilidade dos resultados por meio do método SHAP.

@@ -35,7 +35,7 @@
 % Pacotes de citações
 % ---
 \usepackage{csquotes}
-\usepackage[backend = biber, style = abnt]{biblatex}
+\usepackage[backend = biber, style = abnt, doi = false]{biblatex} % DOI fora de todas as referências, para não ficar só em parte delas
 % \citeonline pertence ao abntex2cite. Neste modelo o estilo é biblatex-abnt, e o equivalente é \textcite.
 \newcommand{\citeonline}{\textcite}
 % FIXME Se desejar estilo numérico de citações,  comente a linha acima e descomente a linha a seguir.
@@ -74,6 +74,11 @@
 %			\step[fieldset=url, null]
 %			\step[fieldset=urldate, null]
 %		}
+		% periódico não leva editora na NBR 6023
+		\map{
+			\pertype{article}
+			\step[fieldset=publisher, null]
+		}
 		\map{
 			\pertype{inproceedings}
 			% remove mostly redundant conference information
@@ -102,7 +107,7 @@
 % FIXME Substituir 'XXXXXX' pelo nome do seu
 % orientador.
 
-\orientador{Icaro Lins Iglesias}
+\orientador{Prof. Icaro Lins Iglesias, Me.}
 % FIXME Se for orientado por uma mulher, comente a linha acima e descomente a linha a seguir.
 % \orientador[Orientadora]{Nome da orientadora, Dra.}
 % FIXME Substituir 'XXXXXX' pelo nome do seu
@@ -118,7 +123,7 @@
 % FIXME Substituir '[ano da entrega]' pelo ano (ano) em que seu trabalho foi defendido.
 \ano{2026}
 % FIXME Substituir '[dia] de [mês] de [ano]' pela data em que ocorreu sua defesa.
-\data{[dia] de [mês] de [ano]}
+\data{23 de novembro de 2026}
 % FIXME Substituir '[Cidade da defesa]' pela cidade em que ocorreu sua defesa.
 \local{São Borja, RS}
 \instituicaosigla{IFFar}
@@ -179,9 +184,11 @@
 \siglalista{DM}{Diabetes Mellitus}
 \siglalista{DM1}{Diabetes Mellitus tipo 1}
 \siglalista{DM2}{Diabetes Mellitus tipo 2}
+\siglalista{DP}{Desvio Padrão}
 \siglalista{ECE}{Erro de Calibração Esperado}
 \siglalista{EDA}{Análise Exploratória de Dados}
 \siglalista{ELSA-Brasil}{Estudo Longitudinal de Saúde do Adulto}
+\siglalista{EPIC}{\textit{European Prospective Investigation into Cancer and Nutrition}}
 \siglalista{FINDRISC}{\textit{Finnish Diabetes Risk Score}}
 \siglalista{FN}{Falsos Negativos}
 \siglalista{FP}{Falsos Positivos}
@@ -190,22 +197,28 @@
 \siglalista{IBGE}{Instituto Brasileiro de Geografia e Estatística}
 \siglalista{IMC}{Índice de Massa Corporal}
 \siglalista{KNN}{\textit{K-Nearest Neighbors}}
+\siglalista{LANPOP}{Laboratório de Avaliação Nutricional de Populações}
 \siglalista{MCC}{\textit{Multi-Collinearity Corrected}}
 \siglalista{MIP}{\textit{Modified Index Position}}
 \siglalista{ML}{\textit{Machine Learning}}
+\siglalista{NCR}{\textit{National Cash Register}}
 \siglalista{NNS}{Número Necessário para Rastrear}
+\siglalista{OPM}{Órteses, Próteses e Materiais Especiais}
 \siglalista{PAD}{Pressão Arterial Diastólica}
 \siglalista{PAS}{Pressão Arterial Sistólica}
 \siglalista{PEC}{Prontuário Eletrônico do Cidadão}
 \siglalista{PNS}{Pesquisa Nacional de Saúde}
 \siglalista{PR-AUC}{Área sob a Curva de Precisão e Sensibilidade}
 \siglalista{RCEst}{Razão Cintura-Estatura}
+\siglalista{RF}{\textit{Random Forest}}
+\siglalista{RL}{Regressão Logística}
 \siglalista{ROC}{\textit{Receiver Operating Characteristic}}
 \siglalista{SHAP}{\textit{SHapley Additive exPlanations}}
 \siglalista{SIGTAP}{Sistema de Gerenciamento da Tabela de Procedimentos, Medicamentos e OPM do SUS}
 \siglalista{SIPD}{Sistema Integrado de Pesquisas Domiciliares}
 \siglalista{SISAB}{Sistema de Informação em Saúde para a Atenção Básica}
 \siglalista{SMOTE}{\textit{Synthetic Minority Over-sampling Technique}}
+\siglalista{SPSS}{\textit{Statistical Package for the Social Sciences}}
 \siglalista{SUS}{Sistema Único de Saúde}
 \siglalista{VIF}{Fator de Inflação de Variância}
 \siglalista{VN}{Verdadeiros Negativos}
