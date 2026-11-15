@@ -273,7 +273,7 @@ TABELA_ARTEFATO = ("artefato", "arquivos")
 # Visão clínica e de gestão
 # ---------------------------------------------------------------------------
 
-COMPARADOR_ADA = "Comparador: regra clínica ADA (idade ≥ 35 ou IMC ≥ 25)"
+COMPARADOR_SBD = "Comparador: regra clínica SBD (idade ≥ 35 ou IMC ≥ 25)"
 LEGENDA_DESEMPENHO = (
     "Métricas no conjunto de teste. Limiar calibrado no treino para recall-alvo "
     "{recall_alvo}."
@@ -292,7 +292,7 @@ ABA_ROC = "Curva ROC"
 ABA_PR = "Curva PR"
 COMPARAR_CELULAS = "Comparar células"
 NOTA_CORTE_UNICO = (
-    "Regra ADA e Dummy decidem num corte único. AUC-ROC e PR-AUC deles não se "
+    "Regra SBD e Dummy decidem num corte único. AUC-ROC e PR-AUC deles não se "
     "comparam com as dos modelos."
 )
 

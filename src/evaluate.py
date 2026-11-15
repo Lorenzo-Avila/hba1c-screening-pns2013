@@ -560,7 +560,7 @@ def avaliar(estimador, X_tr, y_tr, X_te, y_te, nome: str,
             principal, na faixa de sensibilidade do FINDRISC.
         conjunto: conjunto de atributos, registrado para a comparação.
         limiar: quando informado, **dispensa a calibração** e usa este valor. É o
-            caso dos comparadores não-ML: a regra clínica ADA devolve uma indicadora
+            caso dos comparadores não-ML: a regra clínica SBD devolve uma indicadora
             0/1, não um escore, e calibrar limiar sobre ela daria um ponto de
             operação sem significado. `limiar_calibrado` no retorno distingue os
             dois regimes.
@@ -857,7 +857,7 @@ def nota_corte_unico(tabela: pd.DataFrame) -> str:
 
     Devolve string vazia quando a tabela não tem nenhuma. A nota existe porque a
     tabela comparativa põe lado a lado objetos diferentes: sem ela, quem lê compara
-    a AUC-ROC 0,656 da regra ADA com a 0,781 do modelo como se medissem a mesma
+    a AUC-ROC 0,656 da regra SBD com a 0,781 do modelo como se medissem a mesma
     coisa.
     """
     if "corte_unico" not in tabela.columns or not tabela["corte_unico"].any():

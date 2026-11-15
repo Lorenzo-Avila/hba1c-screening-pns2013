@@ -1,6 +1,6 @@
 """Testes dos comparadores.
 
-A regra ADA precisa ser exatamente a regra: determinística, em escala clínica, sem
+A regra SBD precisa ser exatamente a regra: determinística, em escala clínica, sem
 nada estimado. E precisa atravessar o mesmo harness dos modelos, sobre as mesmas
 partições, senão a comparação não é comparação.
 """
@@ -42,21 +42,21 @@ def comparadores(split):
 # ---------------------------------------------------------------------------
 
 
-def test_regra_aplica_os_cortes_da_ada():
+def test_regra_aplica_os_cortes_da_sbd():
     """`idade >= 35` OU `imc >= 25`, incluindo as bordas."""
     X = pd.DataFrame({
         "idade": [35, 34, 34, 36, 30, 34],
         "imc": [22.0, 25.0, 24.9, 35.0, 18.0, 25.1],
     })
     esperado = [1, 1, 0, 1, 0, 1]
-    assert list(bm.RegraClinicaADA().fit(X).predict(X)) == esperado
+    assert list(bm.RegraClinicaSBD().fit(X).predict(X)) == esperado
 
 
 def test_regra_nao_aprende_nada(split):
     """Ajustar em 6.760 linhas ou em 10 produz o mesmo classificador."""
     X_train, X_test, y_train, _ = split
-    completa = bm.RegraClinicaADA().fit(X_train, y_train)
-    minima = bm.RegraClinicaADA().fit(X_train.head(10), y_train.head(10))
+    completa = bm.RegraClinicaSBD().fit(X_train, y_train)
+    minima = bm.RegraClinicaSBD().fit(X_train.head(10), y_train.head(10))
 
     assert np.array_equal(completa.predict(X_test), minima.predict(X_test))
     # Nada estimado além do que a API do scikit-learn exige.
@@ -65,7 +65,7 @@ def test_regra_nao_aprende_nada(split):
 
 
 def test_regra_e_clonavel_e_tem_parametros_explicitos():
-    regra = bm.RegraClinicaADA()
+    regra = bm.RegraClinicaSBD()
     assert regra.get_params() == {"corte_idade": 35, "corte_imc": 25}
     assert clone(regra).get_params() == regra.get_params()
 
@@ -73,7 +73,7 @@ def test_regra_e_clonavel_e_tem_parametros_explicitos():
 def test_predict_proba_devolve_a_indicadora_como_zero_ou_um(split):
     """Compatibilidade com o harness, e não são probabilidades."""
     X_train, _, y_train, _ = split
-    regra = bm.RegraClinicaADA().fit(X_train, y_train)
+    regra = bm.RegraClinicaSBD().fit(X_train, y_train)
     proba = regra.predict_proba(X_train)
 
     assert proba.shape == (len(X_train), 2)
@@ -92,8 +92,8 @@ def test_regra_opera_em_escala_clinica_original(split):
     # A matriz de design tem `idade` e `imc` padronizados: comparar z-score com
     # 45 e 30 daria zero positivos. O estimador recusa a entrada errada por exigir
     # as colunas cruas; aqui elas existem, mas em escala trocada.
-    padronizada = bm.RegraClinicaADA().fit(design).predict(design)
-    clinica = bm.RegraClinicaADA().fit(X_train).predict(X_train)
+    padronizada = bm.RegraClinicaSBD().fit(design).predict(design)
+    clinica = bm.RegraClinicaSBD().fit(X_train).predict(X_train)
     assert padronizada.sum() == 0
     assert clinica.sum() > 0
 
@@ -104,7 +104,7 @@ def test_regra_opera_em_escala_clinica_original(split):
 
 def test_regra_exige_idade_e_imc():
     with pytest.raises(KeyError, match="idade"):
-        bm.RegraClinicaADA().fit(pd.DataFrame({"pas": [120.0, 130.0]}))
+        bm.RegraClinicaSBD().fit(pd.DataFrame({"pas": [120.0, 130.0]}))
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ def test_tabela_nns_traduz_carga_operacional(split, comparadores):
     _, X_test, _, _ = split
     tabela = bm.tabela_nns(comparadores)
 
-    assert set(tabela["estrategia"]) == {"Regra ADA", "Dummy (maioria)"}
+    assert set(tabela["estrategia"]) == {"Regra SBD", "Dummy (maioria)"}
     positivos_no_teste = int(sum(comparadores[0][k] for k in ("vp", "fn")))
 
     for _, linha in tabela.iterrows():
@@ -181,7 +181,7 @@ def test_tabela_nns_traduz_carga_operacional(split, comparadores):
             linha["encaminhados"] / len(X_test)
         )
 
-    regra = tabela[tabela["estrategia"] == "Regra ADA"].iloc[0]
+    regra = tabela[tabela["estrategia"] == "Regra SBD"].iloc[0]
     assert regra["nns"] == pytest.approx(
         regra["encaminhados"] / regra["casos_detectados"], rel=1e-6
     )
@@ -193,7 +193,7 @@ def test_criterio_de_sucesso_exige_as_duas_condicoes():
     """Recall maior ao custo de encaminhar mais gente não é ganho."""
     base = {"conjunto": "", "vp": 0, "vn": 0, "fp": 0, "fn": 0}
     resultados = [
-        {**base, "modelo": "Regra ADA", "recall": 0.80, "nns": 9.0},
+        {**base, "modelo": "Regra SBD", "recall": 0.80, "nns": 9.0},
         {**base, "modelo": "so_recall", "recall": 0.90, "nns": 10.0},
         {**base, "modelo": "so_nns", "recall": 0.70, "nns": 7.0},
         {**base, "modelo": "ambos", "recall": 0.85, "nns": 8.0},
@@ -206,7 +206,7 @@ def test_criterio_de_sucesso_exige_as_duas_condicoes():
 
 
 def test_criterio_falha_sem_a_regra_nos_resultados():
-    with pytest.raises(ValueError, match="Regra ADA"):
+    with pytest.raises(ValueError, match="Regra SBD"):
         bm.supera_a_regra_clinica([{"modelo": "LogReg", "conjunto": "A",
                                     "recall": 0.8, "nns": 7.0}])
 
@@ -283,7 +283,7 @@ def test_leitura_operacional_enuncia_a_taxa_de_encaminhamento(split, comparadore
     ]
     frase = bm.leitura_operacional(resultados)
 
-    regra = next(r for r in comparadores if r["modelo"] == "Regra ADA")
+    regra = next(r for r in comparadores if r["modelo"] == "Regra SBD")
     taxa = 100 * (regra["vp"] + regra["fp"]) / len(X_test)
     assert f"{taxa:.1f}%" in frase
     assert str(regra["vp"] + regra["fp"]) in frase
@@ -315,7 +315,7 @@ def test_leitura_explica_o_volume_maior_no_regime_equiparado(split, comparadores
                               salvar_figuras=False), *comparadores]
 
     frase = bm.leitura_operacional(padrao, equiparados=equiparados)
-    regra = next(r for r in comparadores if r["modelo"] == "Regra ADA")
+    regra = next(r for r in comparadores if r["modelo"] == "Regra SBD")
     modelo_eq = equiparados[0]
 
     assert "regime de recall equiparado" in frase
@@ -351,8 +351,8 @@ def test_diferenca_escreve_o_sinal_inclusive_no_zero(delta, esperado):
 
 def test_veredito_da_carga_acompanha_a_taxa():
     """O julgamento da carga sai da comparação com o corte, não de frase fixa."""
-    acima = bm._veredito_da_carga("Regra ADA", bm.CORTE_TRIAGEM_AMPLA + 0.08)
-    abaixo = bm._veredito_da_carga("Regra ADA", bm.CORTE_TRIAGEM_AMPLA - 0.08)
+    acima = bm._veredito_da_carga("Regra SBD", bm.CORTE_TRIAGEM_AMPLA + 0.08)
+    abaixo = bm._veredito_da_carga("Regra SBD", bm.CORTE_TRIAGEM_AMPLA - 0.08)
 
     assert "mais da metade" in acima and "menos da metade" not in acima
     assert "menos da metade" in abaixo and "mais da metade" not in abaixo
@@ -395,7 +395,7 @@ def test_regressao_logistica_equiparada_mantem_o_nns_medido_abaixo_da_regra(spli
                                  salvar_figuras=False),
     ]
     logreg = resultados[0]
-    regra = next(r for r in resultados if r["modelo"] == "Regra ADA")
+    regra = next(r for r in resultados if r["modelo"] == "Regra SBD")
 
     # Calibrado para o recall da regra, o modelo opera na mesma faixa.
     assert abs(logreg["recall"] - regra["recall"]) < 0.10

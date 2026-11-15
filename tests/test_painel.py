@@ -378,9 +378,9 @@ def test_cartoes_tem_ajuda_do_glossario():
     assert total > 0, "nenhum cartão renderizado"
 
 
-def test_desempenho_exibe_faixa_ada_e_cartao_f1():
+def test_desempenho_exibe_faixa_sbd_e_cartao_f1():
     corpo = _html_renderizado(_renderizar("desempenho"))
-    assert html.escape(textos.COMPARADOR_ADA) in corpo, "faixa da regra ADA ausente"
+    assert html.escape(textos.COMPARADOR_SBD) in corpo, "faixa da regra SBD ausente"
     cartao_f1 = re.search(
         r'<div class="cartao"[^>]*data-ajuda="([^"]*)"[^>]*><div class="rotulo">F1<',
         corpo,

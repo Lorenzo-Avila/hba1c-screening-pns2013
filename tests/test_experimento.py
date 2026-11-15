@@ -80,8 +80,8 @@ def test_montar_sem_conjunto_falha_para_quem_depende_dele():
 
 
 def test_piso_nao_recebe_preprocessador():
-    """O corte de IMC 25 da regra ADA não sobrevive a uma padronização."""
-    montado = md.montar(md.estimadores()["Regra ADA"], conjunto="B_composto")
+    """O corte de IMC 25 da regra SBD não sobrevive a uma padronização."""
+    montado = md.montar(md.estimadores()["Regra SBD"], conjunto="B_composto")
     assert not isinstance(montado, Pipeline)
 
 
@@ -143,7 +143,7 @@ def test_produto_cartesiano_nao_e_cheio(grid_dois_conjuntos):
         ("LogReg", "B_composto"),
         (xp.NOME_FLORESTA, "A_atomico"),
         (xp.NOME_FLORESTA, "B_composto"),
-        ("Regra ADA", xp.SEM_CONJUNTO),
+        ("Regra SBD", xp.SEM_CONJUNTO),
         ("Dummy (maioria)", xp.SEM_CONJUNTO),
     ]
 
@@ -187,7 +187,7 @@ def test_composicao_publicada_tem_sete_celulas():
         ("LogReg", "C_completo"),
         (xp.NOME_FLORESTA, "A_atomico"),
         (xp.NOME_FLORESTA, "B_composto"),
-        ("Regra ADA", xp.SEM_CONJUNTO),
+        ("Regra SBD", xp.SEM_CONJUNTO),
         ("Dummy (maioria)", xp.SEM_CONJUNTO),
     ]
 
@@ -325,7 +325,7 @@ def test_conferencia_compara_so_as_colunas_que_a_referencia_cobre(grid_dois_conj
 def test_carga_operacional_tem_tres_regimes(particao, grid_dois_conjuntos):
     tabela = xp.carga_operacional(grid_dois_conjuntos, particao)
     assert len(tabela) == 3
-    assert tabela["regime"].iloc[0] == "Regra ADA"
+    assert tabela["regime"].iloc[0] == "Regra SBD"
     assert "recall equiparado" in tabela["regime"].iloc[1]
     assert "ponto padrão" in tabela["regime"].iloc[2]
 
@@ -445,7 +445,7 @@ def test_equiparado_cobre_toda_celula_calibravel(particao, grid_dois_conjuntos):
     calibraveis = [r for r in grid_dois_conjuntos if r.get("limiar_calibrado", True)]
 
     assert len(tabela) == len(calibraveis) + 1
-    assert tabela["estrategia"].iloc[0] == "Regra ADA"
+    assert tabela["estrategia"].iloc[0] == "Regra SBD"
     assert set(zip(tabela["modelo"].iloc[1:], tabela["conjunto"].iloc[1:])) == {
         (r["modelo"], r["conjunto"]) for r in calibraveis
     }
@@ -464,7 +464,7 @@ def test_equiparado_calibra_pelo_recall_da_regra_no_treino(particao,
     """
     alvo = bm.recall_da_regra_no_treino(particao.X_tr, particao.y_tr)
     tabela = xp.equiparado_por_modelo(grid_dois_conjuntos, particao)
-    regra = next(r for r in grid_dois_conjuntos if r["modelo"] == "Regra ADA")
+    regra = next(r for r in grid_dois_conjuntos if r["modelo"] == "Regra SBD")
 
     assert pd.isna(tabela["recall_alvo"].iloc[0])   # a regra opera em limiar fixo
     assert (tabela["recall_alvo"].iloc[1:] == alvo).all()
@@ -498,7 +498,7 @@ def test_equiparado_bate_com_a_carga_operacional(particao, grid_dois_conjuntos):
 
 
 def test_equiparado_exige_a_regra(particao, grid_dois_conjuntos):
-    sem_regra = [r for r in grid_dois_conjuntos if r["modelo"] != "Regra ADA"]
+    sem_regra = [r for r in grid_dois_conjuntos if r["modelo"] != "Regra SBD"]
     with pytest.raises(ValueError, match="ausente"):
         xp.equiparado_por_modelo(sem_regra, particao)
 
@@ -573,7 +573,7 @@ def test_duas_gravacoes_do_mesmo_numero_dao_o_mesmo_byte(tabelas_preservadas):
 
 
 def test_carga_operacional_exige_a_regra(particao, grid_dois_conjuntos):
-    sem_regra = [r for r in grid_dois_conjuntos if r["modelo"] != "Regra ADA"]
+    sem_regra = [r for r in grid_dois_conjuntos if r["modelo"] != "Regra SBD"]
     with pytest.raises(ValueError, match="ausente"):
         xp.carga_operacional(sem_regra, particao)
 
@@ -590,7 +590,7 @@ def test_executar_aceita_e_devolve_a_particao(particao, tabelas_preservadas):
     notebook falharia por rastro de teste anterior, não por defeito real. Foi
     exatamente o que aconteceu na primeira execução da suíte completa.
     """
-    saida = xp.executar(modelos=["LogReg", "Regra ADA"], conjuntos=["B_composto"],
+    saida = xp.executar(modelos=["LogReg", "Regra SBD"], conjuntos=["B_composto"],
                         particao=particao, conferir=False)
     assert saida["particao"] is particao
 
@@ -603,7 +603,7 @@ def test_executar_emite_a_calibracao(particao, tabelas_preservadas):
     Sem esta exportação eles só existiriam dentro de um dicionário em memória, e quem
     transcreve para o texto não teria contra o que conferir.
     """
-    saida = xp.executar(modelos=["LogReg", "Regra ADA"], conjuntos=["B_composto"],
+    saida = xp.executar(modelos=["LogReg", "Regra SBD"], conjuntos=["B_composto"],
                         particao=particao, conferir=False)
     assert xp.NOME_CALIBRACAO in saida["artefatos"]
 
@@ -984,7 +984,7 @@ def test_cumpre_criterio_bate_com_a_leitura_do_criterio():
 
     for _, linha in equiparado.iloc[1:].iterrows():
         carga = pd.DataFrame([
-            {"regime": "Regra ADA", "recall": regra["recall_obtido"],
+            {"regime": "Regra SBD", "recall": regra["recall_obtido"],
              "nns": regra["nns"]},
             {"regime": linha["estrategia"], "recall": linha["recall_obtido"],
              "nns": linha["nns"]},

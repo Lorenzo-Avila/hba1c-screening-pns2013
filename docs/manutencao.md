@@ -36,7 +36,7 @@ sem o critério voltar a ser cumprido esconde o achado.
 | Nova coluna da PNS | `config.DE_PARA`, grupos em `config`, `data.limpar` se o tipo ou a ausência mudarem, `features.FONTES` e `FEATURE_SETS` | `tests/test_data.py`, `tests/test_features.py`, rótulo em `painel/textos.py` |
 | Outro conjunto de atributos | `FEATURE_SETS` e, se a floresta for rodar nele, `experimento.CONJUNTOS_FLORESTA` e `tuning.CONJUNTOS` | Diagnóstico em `colinearidade`, composição esperada do grid, notebook |
 | Ablação de uma variável | `features.conjunto_sem` e `colinearidade.ablacao_vif` | Não crie uma quarta chave em `FEATURE_SETS` para um recorte de análise |
-| Outro corte clínico | `config` (HbA1c, PAS, PAD, IMC de obesidade, cintura). A regra ADA lê `CORTE_IDADE_ADA` e `CORTE_IMC_ADA` em `benchmark.py` | A regra não lê `CORTE_IMC_OBESIDADE`. Corte duplicado em outro arquivo diverge em silêncio |
+| Outro corte clínico | `config` (HbA1c, PAS, PAD, IMC de obesidade, cintura). A regra SBD lê `CORTE_IDADE_SBD` e `CORTE_IMC_SBD` em `benchmark.py` | A regra não lê `CORTE_IMC_OBESIDADE`. Corte duplicado em outro arquivo diverge em silêncio |
 | Outro limiar de operação | `config.RECALL_ALVO` | Todo número calibrado do grid muda. As âncoras e o notebook vão junto |
 | Outra configuração da floresta | Busca em `src/tuning.py`, depois o literal em `models.random_forest` | `tests/test_tuning.py` confere os dois. Não leia `busca_rf.csv` dentro de `random_forest` |
 | Outro modelo | Fábrica em `models.py`, marca de conjunto e de limiar no `Estimador`, entrada em `MODELOS_PADRAO` | Preprocessador só para quem depende do conjunto. XGBoost está fora do escopo |
