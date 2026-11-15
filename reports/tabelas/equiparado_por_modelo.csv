@@ -1,5 +1,5 @@
 estrategia,modelo,conjunto,recall_alvo,recall_obtido,recall_regra,encaminhados,casos_detectados,nns,cumpre_criterio,taxa_encaminhamento
-Regra ADA,Regra ADA,—,,0.966386555,0.966386555,1421,115,12.356521739,,0.840331165
+Regra SBD,Regra SBD,—,,0.966386555,0.966386555,1421,115,12.356521739,,0.840331165
 LogReg · A_atomico,LogReg,A_atomico,0.976793249,0.983193277,0.966386555,1480,117,12.64957265,False,0.875221762
 LogReg · B_composto,LogReg,B_composto,0.976793249,0.983193277,0.966386555,1470,117,12.564102564,False,0.869308102
 LogReg · C_completo,LogReg,C_completo,0.976793249,0.983193277,0.966386555,1449,117,12.384615385,False,0.856889415

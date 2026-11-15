@@ -2,7 +2,7 @@
 
 Dois pisos, avaliados pelo mesmo `evaluate.avaliar` e sobre as mesmas partições:
 
-- `RegraClinicaADA`: `idade >= 35 OU IMC >= 25`, que é o que a Atenção Primária faz
+- `RegraClinicaSBD`: `idade >= 35 OU IMC >= 25`, que é o que a Atenção Primária faz
   hoje, sem machine learning. Comparador honesto, com as mesmas variáveis não
   invasivas e nenhuma estimação.
 - `DummyClassifier(strategy="most_frequent")`: piso absoluto. Com 7% de positivos,
@@ -36,8 +36,8 @@ LIMIAR_INDICADORA = 0.5
 
 # Cortes da regra de rastreamento da American Diabetes Association.
 # O IMC da regra não é o da obesidade das compostas (`config.CORTE_IMC_OBESIDADE`).
-CORTE_IDADE_ADA = 35
-CORTE_IMC_ADA = 25
+CORTE_IDADE_SBD = 35
+CORTE_IMC_SBD = 25
 
 # Acima desta fração da população adulta, a estratégia deixa de selecionar quem
 # examinar e passa a empurrar a fila inteira para o laboratório. É o corte que a
@@ -64,8 +64,8 @@ NOTA_EQUIPARACAO = (
 )
 
 
-class RegraClinicaADA(BaseEstimator, ClassifierMixin):
-    """Regra de rastreamento da ADA: `idade >= 35` **ou** `IMC >= 25`.
+class RegraClinicaSBD(BaseEstimator, ClassifierMixin):
+    """Regra de rastreamento da SBD (Rodacki et al., 2025): `idade >= 35` **ou** `IMC >= 25`.
 
     Determinística e sem parâmetro estimado. `fit` não aprende nada: registra só
     `classes_` e o número de colunas, que a API do scikit-learn exige para o
@@ -79,13 +79,13 @@ class RegraClinicaADA(BaseEstimator, ClassifierMixin):
     preprocessador: ele é o comparador de quem não tem pipeline nenhum.
 
     Args:
-        corte_idade: idade mínima, em anos. Padrão 35 (ADA).
-        corte_imc: IMC mínimo, em kg/m². Padrão 25 (ADA). Não é o corte de
+        corte_idade: idade mínima, em anos. Padrão 35 (SBD).
+        corte_imc: IMC mínimo, em kg/m². Padrão 25 (SBD). Não é o corte de
             obesidade das compostas.
     """
 
-    def __init__(self, corte_idade: int = CORTE_IDADE_ADA,
-                 corte_imc: float = CORTE_IMC_ADA):
+    def __init__(self, corte_idade: int = CORTE_IDADE_SBD,
+                 corte_imc: float = CORTE_IMC_SBD):
         self.corte_idade = corte_idade
         self.corte_imc = corte_imc
 
@@ -102,7 +102,7 @@ class RegraClinicaADA(BaseEstimator, ClassifierMixin):
         faltantes = [c for c in ("idade", "imc") if c not in X.columns]
         if faltantes:
             raise KeyError(
-                f"RegraClinicaADA opera sobre idade e imc em escala clínica; "
+                f"RegraClinicaSBD opera sobre idade e imc em escala clínica; "
                 f"colunas ausentes: {faltantes}. Não passe a matriz de design "
                 f"padronizada — passe as preditoras de `data.separar`."
             )
@@ -146,7 +146,7 @@ def construir_comparadores() -> dict:
         sem preprocessador: a regra por definição, o Dummy por ignorar `X`.
     """
     return {
-        "Regra ADA": RegraClinicaADA(),
+        "Regra SBD": RegraClinicaSBD(),
         "Dummy (maioria)": DummyClassifier(strategy="most_frequent",
                                            random_state=cfg.RANDOM_STATE),
     }
@@ -209,7 +209,7 @@ def tabela_nns(resultados: list[dict], n_teste: int | None = None) -> pd.DataFra
     return tabela
 
 
-def leitura_operacional(resultados: list[dict], nome_regra: str = "Regra ADA",
+def leitura_operacional(resultados: list[dict], nome_regra: str = "Regra SBD",
                         equiparados: list[dict] | None = None) -> str:
     """Escreve em uma frase a carga de encaminhamento de cada estratégia.
 
@@ -293,7 +293,7 @@ def _diferenca(delta: float, singular: str, plural: str) -> str:
 
 
 def _linha_do_regime_equiparado(equiparados: list[dict],
-                                nome_regra: str = "Regra ADA",
+                                nome_regra: str = "Regra SBD",
                                 estrategia: str | None = None) -> str:
     """Impede que a tabela de carga operacional seja lida sozinha.
 
@@ -362,7 +362,7 @@ def recall_da_regra_no_treino(X_tr, y_tr, regra=None) -> float:
     """
     from sklearn.metrics import recall_score
 
-    regra = RegraClinicaADA() if regra is None else regra
+    regra = RegraClinicaSBD() if regra is None else regra
     predito = regra.fit(X_tr, y_tr).predict(X_tr)
     return float(recall_score(y_tr, predito, zero_division=0))
 
@@ -379,7 +379,7 @@ def cumpre_o_criterio(delta_recall: float, delta_nns: float) -> bool:
 
 
 def supera_a_regra_clinica(resultados: list[dict],
-                           nome_regra: str = "Regra ADA") -> pd.DataFrame:
+                           nome_regra: str = "Regra SBD") -> pd.DataFrame:
     """Aplica o critério de sucesso do projeto: mais recall **com** NNS menor.
 
     As duas condições valem juntas. Recall maior ao custo de encaminhar mais gente

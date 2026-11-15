@@ -1,4 +1,4 @@
 regime,encaminhados,taxa_encaminhamento,casos_detectados,casos_perdidos,recall,nns,regime_id,rotulo
-Regra ADA,1421,0.840331165,115,4,0.966386555,12.356521739,regra,Regra ADA
+Regra SBD,1421,0.840331165,115,4,0.966386555,12.356521739,regra,Regra SBD
 "Random Forest · B_composto, recall equiparado (alvo 0.9768 no treino)",1461,0.863985807,117,2,0.983193277,12.487179487,equiparado,"Random Forest · B_composto, recall equiparado (alvo 0,9768 no treino)"
 "Random Forest · B_composto, ponto padrão (recall-alvo 0.80)",685,0.405085748,96,23,0.806722689,7.135416667,padrao,"Random Forest · B_composto, ponto padrão (recall-alvo 0,80)"

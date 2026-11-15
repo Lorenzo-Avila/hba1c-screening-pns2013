@@ -25,7 +25,7 @@ src/data.py              carga e limpeza, uma linha por vez
 src/features.py          conjuntos, imputação, compostas, preprocessador
 src/colinearidade.py     Pearson, VIF, ablação, decomposição do escore
 src/models.py            logística, floresta e o embrulho do grid
-src/benchmark.py         regra clínica ADA e classificador da classe majoritária
+src/benchmark.py         regra clínica SBD e classificador da classe majoritária
 src/evaluate.py          limiar, métricas, calibração, McNemar, figuras
 src/experimento.py       grid publicado, artefatos, conferência. CLI
 src/tuning.py            busca da floresta. CLI, fora do grid
@@ -169,7 +169,7 @@ construção. Isso aparece na tabela de SHAP por coluna, não como irrelevância
 
 ## Uma célula do grid
 
-`models.montar` embrulha logística e floresta no preprocessador. A regra ADA e o
+`models.montar` embrulha logística e floresta no preprocessador. A regra SBD e o
 dummy saem crus: o corte de IMC 25 não sobrevive a uma padronização, e o dummy
 ignora `X`. Os dois declaram `invariante_ao_conjunto` e rodam uma vez, com
 conjunto ausente na tabela. Rodá-los em A, B e C repetiria a mesma linha.
@@ -259,7 +259,7 @@ e não combina com `--saida`. `--figuras` salva matriz, ROC, precision-recall e
 calibração. `--sem-conferencia` existe para depuração.
 
 A carga operacional traz três regimes da célula de referência, eleita pelo menor
-NNS no ponto padrão: a regra ADA, o modelo com recall equiparado ao da regra no
+NNS no ponto padrão: a regra SBD, o modelo com recall equiparado ao da regra no
 treino, e o mesmo modelo no ponto padrão. `equiparado_por_modelo` repete o regime
 equiparado para cada célula calibrável, porque a carga só detalha a referência.
 O custo marginal compara floresta menos logística, por conjunto e regime.

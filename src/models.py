@@ -12,7 +12,7 @@ justifica. Parâmetro sem lastro é parâmetro a questionar.
 `benchmark.construir_comparadores`, e duplicá-los neste módulo reintroduziria
 justamente o problema que ele resolve. `estimadores()` delega.
 
-Cada estimador declara se depende do conjunto de atributos. `RegraClinicaADA` lê
+Cada estimador declara se depende do conjunto de atributos. `RegraClinicaSBD` lê
 idade e IMC direto das preditoras cruas e o `DummyClassifier` ignora `X`: rodá-los
 sobre A, B e C daria três linhas idênticas numa tabela que reporta uma. A marca
 `invariante_ao_conjunto` é o que `experimento.rodar_grid` usa para não inflar o
@@ -126,7 +126,7 @@ def montar(estimador: Estimador, conjunto: str | dict | None = None):
 
     Quem depende do conjunto sai embrulhado no preprocessador de três estágios; os
     invariantes saem crus, porque operam sobre as preditoras em escala clínica: o
-    corte de IMC 25 da regra ADA não sobrevive a uma padronização.
+    corte de IMC 25 da regra SBD não sobrevive a uma padronização.
 
     Raises:
         ValueError: se um estimador dependente do conjunto for montado sem um.

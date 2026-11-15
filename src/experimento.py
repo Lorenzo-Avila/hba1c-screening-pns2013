@@ -15,7 +15,7 @@ Os artefatos que sustentam o argumento, todos em `reports/tabelas/`:
   A carga operacional equipara só o modelo de referência, e o contraste entre os dois
   modelos nesse regime tem dois lados (D-047).
 
-O produto cartesiano **não é cheio**. `RegraClinicaADA` lê idade e IMC das preditoras
+O produto cartesiano **não é cheio**. `RegraClinicaSBD` lê idade e IMC das preditoras
 cruas e o `DummyClassifier` ignora `X`: rodá-los sobre A, B e C daria três linhas
 idênticas cada, e a tabela deixaria de bater com o `ESTADO.md` por artefato do próprio
 grid, ou seja, uma divergência falsa em cima da verificação que existe para dar
@@ -51,7 +51,7 @@ from . import models as md
 # Modelos com resultado publicável. A Random Forest entra depois de a busca fixar seus
 # hiperparâmetros: enquanto eles eram placeholder declarado, reportar número saído dali
 # seria pior que não reportar.
-MODELOS_PADRAO = ["LogReg", "Random Forest", "Regra ADA", "Dummy (maioria)"]
+MODELOS_PADRAO = ["LogReg", "Random Forest", "Regra SBD", "Dummy (maioria)"]
 
 NOME_FLORESTA = "Random Forest"
 
@@ -62,7 +62,7 @@ NOME_FLORESTA = "Random Forest"
 CONJUNTOS_FLORESTA = ["A_atomico", "B_composto"]
 
 # Ordem das linhas na tabela publicada: os modelos primeiro, os pisos depois.
-ORDEM_MODELOS = ["LogReg", NOME_FLORESTA, "Regra ADA", "Dummy (maioria)"]
+ORDEM_MODELOS = ["LogReg", NOME_FLORESTA, "Regra SBD", "Dummy (maioria)"]
 
 # Referências da reprodução. A primeira cobre as três linhas da logística e vem da
 # Sprint 1; a segunda cobre as duas da floresta. A antiga ganhou função nova ao lado da
@@ -336,7 +336,7 @@ def modelo_de_referencia(resultados: list[dict]) -> dict:
 
 def carga_operacional(resultados: list[dict],
                       particao: Particao,
-                      nome_regra: str = "Regra ADA") -> pd.DataFrame:
+                      nome_regra: str = "Regra SBD") -> pd.DataFrame:
     """Os três regimes de encaminhamento.
 
     É o resultado que sustenta a conclusão do trabalho: a regra clínica encaminha mais
@@ -405,7 +405,7 @@ def carga_operacional(resultados: list[dict],
 
 def equiparado_por_modelo(resultados: list[dict],
                           particao: Particao,
-                          nome_regra: str = "Regra ADA") -> pd.DataFrame:
+                          nome_regra: str = "Regra SBD") -> pd.DataFrame:
     """O regime de recall equiparado de **cada** célula calibrável do grid.
 
     `carga_operacional` equipara só o modelo de referência, e o formato dela está
@@ -627,7 +627,7 @@ def pr_auc_por_faixa(resultados: list[dict], curva_pr: pd.DataFrame) -> pd.DataF
 
 
 def veredito_do_criterio(carga: pd.DataFrame,
-                         nome_regra: str = "Regra ADA") -> pd.DataFrame:
+                         nome_regra: str = "Regra SBD") -> pd.DataFrame:
     """Aplica o critério de sucesso a cada regime da carga operacional.
 
     O critério do projeto é superar a regra clínica em recall **com NNS menor**, e as
@@ -708,7 +708,7 @@ def _nota_de_recall_menor(veredito: pd.DataFrame) -> str:
 
 
 def leitura_do_criterio(carga: pd.DataFrame,
-                        nome_regra: str = "Regra ADA") -> str:
+                        nome_regra: str = "Regra SBD") -> str:
     """Diz em voz alta, regime a regime, se o critério de sucesso foi cumprido.
 
     Um resultado negativo é legítimo e tem que ser reportado como tal. O texto sai do

@@ -1,4 +1,4 @@
-"""Desempenho da célula selecionada contra a regra clínica ADA."""
+"""Desempenho da célula selecionada contra a regra clínica SBD."""
 
 import streamlit as st
 
@@ -23,14 +23,14 @@ def dp(coluna: str) -> str:
 
 
 # Faixa do comparador, antes dos cartões da célula.
-ada = comparativo[comparativo["modelo"] == "Regra ADA"].iloc[0]
-componentes.faixa(textos.COMPARADOR_ADA, [
-    componentes.metrica("Recall", v(ada, "recall"), ajuda=g["recall"]),
-    componentes.metrica("Especificidade", v(ada, "especificidade"),
+sbd = comparativo[comparativo["modelo"] == "Regra SBD"].iloc[0]
+componentes.faixa(textos.COMPARADOR_SBD, [
+    componentes.metrica("Recall", v(sbd, "recall"), ajuda=g["recall"]),
+    componentes.metrica("Especificidade", v(sbd, "especificidade"),
                         ajuda=g["especificidade"]),
-    componentes.metrica("Encaminhados", v(ada, "taxa_encaminhamento"),
+    componentes.metrica("Encaminhados", v(sbd, "taxa_encaminhamento"),
                         ajuda=g["encaminhados"]),
-    componentes.metrica("NNS", v(ada, "nns"), ajuda=g["nns"]),
+    componentes.metrica("NNS", v(sbd, "nns"), ajuda=g["nns"]),
 ])
 
 calibracao = dados.carregar("calibracao_comparada")

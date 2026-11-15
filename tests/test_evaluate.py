@@ -484,10 +484,10 @@ def test_nota_de_rodape_gerada_automaticamente(resultados, tmp_path):
     """A advertência depende do conteúdo, não de alguém lembrar de pedi-la."""
     com_corte = ev.comparar(resultados)
     com_corte.loc[0, "corte_unico"] = True
-    com_corte.loc[0, "modelo"] = "Regra ADA"
+    com_corte.loc[0, "modelo"] = "Regra SBD"
 
     nota = ev.nota_corte_unico(com_corte)
-    assert "Regra ADA" in nota
+    assert "Regra SBD" in nota
     assert "AUC-ROC" in nota and "NNS" in nota
 
     destino = ev.exportar_latex(com_corte, "com_nota.tex", path_reports=tmp_path)

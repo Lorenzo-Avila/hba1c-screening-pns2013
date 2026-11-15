@@ -7,11 +7,11 @@ LogReg & B_composto & 0.196 & 0.065 & -1.995 & 0.070 & 0.399 & 5.665 & 0.328 & 0
 LogReg & C_completo & 0.193 & 0.065 & -1.945 & 0.070 & 0.393 & 5.579 & 0.322 & 0.842 & -2.563 \\
 Random Forest & A_atomico & 0.133 & 0.065 & -1.031 & 0.070 & 0.305 & 4.341 & 0.235 & 1.031 & -2.059 \\
 Random Forest & B_composto & 0.139 & 0.065 & -1.130 & 0.070 & 0.311 & 4.416 & 0.240 & 0.937 & -2.129 \\
-Regra ADA & — & 0.775 & 0.065 & -10.842 & 0.070 & 0.840 & 11.941 & 0.775 & 0.064 & -3.314 \\
+Regra SBD & — & 0.775 & 0.065 & -10.842 & 0.070 & 0.840 & 11.941 & 0.775 & 0.064 & -3.314 \\
 Dummy (maioria) & — & 0.070 & 0.065 & -0.076 & 0.070 & 0.000 & 0.000 & 0.070 & 0.186 & -0.013 \\
 \bottomrule
 \end{tabular}
 
 \begin{flushleft}
-\footnotesize Nota: Dummy (maioria), Regra ADA são classificadores de corte único — a saída assume dois valores, não um escore. AUC-ROC, PR-AUC, Brier e a curva de calibração dependem de percorrer limiares e, para essas linhas, ficam degradadas por construção, não por desempenho. As métricas comparáveis entre todas as linhas são Recall, Especificidade e NNS.
+\footnotesize Nota: Dummy (maioria), Regra SBD são classificadores de corte único — a saída assume dois valores, não um escore. AUC-ROC, PR-AUC, Brier e a curva de calibração dependem de percorrer limiares e, para essas linhas, ficam degradadas por construção, não por desempenho. As métricas comparáveis entre todas as linhas são Recall, Especificidade e NNS.
 \end{flushleft}
